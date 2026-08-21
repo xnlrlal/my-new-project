@@ -141,6 +141,30 @@ export const MONSTERS: MonsterDef[] = [
     },
   },
   {
+    id: 'orc-grand-warrior',
+    name: '오크 대전사',
+    grade: 7,
+    maxHp: 58,
+    maxMana: 4,
+    zone: 'south',
+    essence: {
+      statBonus: { attackBonus: 2 },
+      skill: { name: '대지 가르기', cost: 2, effect: 'damage', value: 16, description: '적에게 16의 피해를 준다.' },
+    },
+  },
+  {
+    id: 'dark-knight',
+    name: '암흑 기사',
+    grade: 9,
+    maxHp: 62,
+    maxMana: 5,
+    zone: 'south',
+    essence: {
+      statBonus: { attackBonus: 1, defenseBonus: 1 },
+      skill: { name: '심판의 일격', cost: 2, effect: 'damage', value: 14, description: '적에게 14의 피해를 준다.' },
+    },
+  },
+  {
     id: 'harpy',
     name: '하피',
     grade: 5,
