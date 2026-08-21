@@ -21,7 +21,7 @@ import {
 } from './engine/profile';
 import { createEssenceFromMonster, essenceSkillCards, type EquippedEssence } from './engine/essence';
 import { computeTotalStats } from './engine/stats-calc';
-import { pickRandomGear, rollGearDrop, createGearInstance, type EquipmentSlot } from './engine/gear';
+import { rollGearDrop, createGearFromMonster, type EquipmentSlot } from './engine/gear';
 import {
   generateMaze,
   randomStartPosition,
@@ -298,12 +298,12 @@ function checkForDrop() {
   dropChecked = true;
 
   if (rollManaStoneDrop()) {
-    profile = addManaStone(profile);
+    profile = addManaStone(profile, currentMonster.grade);
     saveProfile(profile);
   }
 
   if (rollGearDrop()) {
-    profile = addGearToInventory(profile, createGearInstance(pickRandomGear()));
+    profile = addGearToInventory(profile, createGearFromMonster(currentMonster.id, currentMonster.gearDrop));
     saveProfile(profile);
   }
 

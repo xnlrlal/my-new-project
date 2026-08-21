@@ -7,13 +7,15 @@ import type { EquippedGear } from './stats-calc';
 const STORAGE_KEY = 'my-new-project:profile';
 const EXP_PER_LEVEL = 20;
 
+export type ManaStoneCounts = Partial<Record<number, number>>;
+
 export interface PlayerProfile {
   level: number;
   exp: number;
   defeatedMonsterNames: string[];
   essences: EquippedEssence[];
   discoveredEssenceIds: string[];
-  manaStones: number;
+  manaStones: ManaStoneCounts;
   inventoryGear: GearInstance[];
   equippedGear: EquippedGear;
   gold: number;
@@ -26,7 +28,7 @@ function defaultProfile(): PlayerProfile {
     defeatedMonsterNames: [],
     essences: [],
     discoveredEssenceIds: [],
-    manaStones: 0,
+    manaStones: {},
     inventoryGear: [],
     equippedGear: {},
     gold: 0,
@@ -51,8 +53,13 @@ export function recordEssenceDiscovery(profile: PlayerProfile, monsterId: string
   return { ...profile, discoveredEssenceIds: [...profile.discoveredEssenceIds, monsterId] };
 }
 
-export function addManaStone(profile: PlayerProfile): PlayerProfile {
-  return { ...profile, manaStones: profile.manaStones + 1 };
+export function addManaStone(profile: PlayerProfile, grade: number): PlayerProfile {
+  const current = profile.manaStones[grade] ?? 0;
+  return { ...profile, manaStones: { ...profile.manaStones, [grade]: current + 1 } };
+}
+
+export function totalManaStones(profile: PlayerProfile): number {
+  return Object.values(profile.manaStones).reduce<number>((sum, count) => sum + (count ?? 0), 0);
 }
 
 export function addGearToInventory(profile: PlayerProfile, gear: GearInstance): PlayerProfile {
@@ -121,7 +128,7 @@ export function loadProfile(): PlayerProfile {
       defeatedMonsterNames: Array.isArray(parsed.defeatedMonsterNames) ? parsed.defeatedMonsterNames : [],
       essences: Array.isArray(parsed.essences) ? parsed.essences : [],
       discoveredEssenceIds: Array.isArray(parsed.discoveredEssenceIds) ? parsed.discoveredEssenceIds : [],
-      manaStones: typeof parsed.manaStones === 'number' ? parsed.manaStones : 0,
+      manaStones: parsed.manaStones && typeof parsed.manaStones === 'object' ? parsed.manaStones : {},
       inventoryGear: Array.isArray(parsed.inventoryGear) ? parsed.inventoryGear : [],
       equippedGear: parsed.equippedGear && typeof parsed.equippedGear === 'object' ? parsed.equippedGear : {},
       gold: typeof parsed.gold === 'number' ? parsed.gold : 0,

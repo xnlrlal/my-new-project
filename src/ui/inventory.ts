@@ -1,4 +1,5 @@
 import type { PlayerProfile } from '../engine/profile';
+import { totalManaStones } from '../engine/profile';
 import { slotLabel } from '../engine/gear';
 import { statBonusText } from '../engine/stat-bonus';
 
@@ -7,6 +8,16 @@ export interface InventoryHandlers {
 }
 
 export function renderInventory(root: HTMLElement, profile: PlayerProfile, handlers: InventoryHandlers) {
+  const manaStoneEntries = Object.entries(profile.manaStones)
+    .map(([grade, count]) => ({ grade: Number(grade), count: count ?? 0 }))
+    .filter((entry) => entry.count > 0)
+    .sort((a, b) => a.grade - b.grade);
+
+  const manaStoneHtml =
+    manaStoneEntries.length > 0
+      ? manaStoneEntries.map((entry) => `<div class="item-row"><span>${entry.grade}등급 마석</span><span>x${entry.count}</span></div>`).join('')
+      : '<div class="stat-line">보유한 마석이 없습니다.</div>';
+
   const gearHtml =
     profile.inventoryGear.length > 0
       ? profile.inventoryGear
@@ -31,10 +42,10 @@ export function renderInventory(root: HTMLElement, profile: PlayerProfile, handl
           <span>금화</span>
           <strong>${profile.gold} G</strong>
         </div>
-        <div class="inventory-gold">
-          <span>마석</span>
-          <strong>${profile.manaStones}개</strong>
-        </div>
+      </div>
+      <div class="stats-card">
+        <div class="stat-line" style="font-weight:600">마석 (총 ${totalManaStones(profile)}개)</div>
+        ${manaStoneHtml}
       </div>
       <div class="stats-card">
         <div class="stat-line" style="font-weight:600">미착용 장비 (장비창에서 장착 가능)</div>
