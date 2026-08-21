@@ -69,6 +69,18 @@ export const MONSTERS: MonsterDef[] = [
     },
   },
   {
+    id: 'wisp',
+    name: '도깨비불',
+    grade: 2,
+    maxHp: 20,
+    maxMana: 3,
+    zone: 'west',
+    essence: {
+      statBonus: { maxMana: 1 },
+      skill: { name: '불꽃 튀기기', cost: 1, effect: 'damage', value: 6, description: '적에게 6의 피해를 준다.' },
+    },
+  },
+  {
     id: 'wolf',
     name: '늑대',
     grade: 3,
