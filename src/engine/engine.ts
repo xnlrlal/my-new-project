@@ -36,7 +36,8 @@ function drawCards(actor: Actor, count: number): Actor {
 function createActor(
   id: ActorId,
   name: string,
-  stats: { maxHp: number; maxMana: number; attackBonus: number; defenseBonus: number }
+  stats: { maxHp: number; maxMana: number; attackBonus: number; defenseBonus: number },
+  bonusCards: Card[] = []
 ): Actor {
   const base: Actor = {
     id,
@@ -49,16 +50,16 @@ function createActor(
     attackBonus: stats.attackBonus,
     defenseBonus: stats.defenseBonus,
     hand: [],
-    deck: shuffle(buildDeck()),
+    deck: shuffle(buildDeck(bonusCards)),
     discard: [],
   };
   return drawCards(base, HAND_SIZE);
 }
 
-export function initGame(raceStats: RaceStats, monster: MonsterDef): GameState {
+export function initGame(playerStats: RaceStats, monster: MonsterDef, bonusCards: Card[] = []): GameState {
   return {
     turn: 1,
-    player: createActor('player', '플레이어', raceStats),
+    player: createActor('player', '플레이어', playerStats, bonusCards),
     enemy: createActor('enemy', monster.name, { maxHp: monster.maxHp, maxMana: monster.maxMana, attackBonus: 0, defenseBonus: 0 }),
     enemyGrade: monster.grade,
     log: [{ turn: 1, actor: 'player', message: `${monster.name}(을)를 만났다! 전투 시작!` }],

@@ -337,3 +337,100 @@ button.end-turn {
   font-weight: 600;
   color: #d9a84a;
 }
+
+.essence-drop {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid #d9a84a;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.essence-drop-title {
+  font-weight: 700;
+  color: #f0c46a;
+}
+
+.essence-drop-detail {
+  font-size: 13px;
+  color: #ddd;
+  font-weight: 400;
+}
+
+.essence-drop-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.stats-skills {
+  border-top: 1px solid #2c303a;
+  margin-top: 6px;
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inventory-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.essence-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.essence-slot {
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 13px;
+}
+
+.essence-slot.empty {
+  background: #1a1c22;
+  border: 1px dashed #3a3f4b;
+  color: #777;
+  text-align: center;
+}
+
+.essence-slot.filled {
+  background: #1e2129;
+  border: 1px solid #d9a84a;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.essence-slot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.essence-name {
+  font-weight: 700;
+  color: #f0c46a;
+}
+
+.essence-stat {
+  color: #8fbfe0;
+  font-size: 12px;
+}
+
+.essence-skill {
+  color: #ccc;
+  font-size: 12px;
+}
+
+.inventory-note {
+  font-size: 12px;
+  color: #888;
+  line-height: 1.6;
+}

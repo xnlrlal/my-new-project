@@ -1,10 +1,18 @@
 import type { Actor, GameState } from '../engine/types';
 import type { ExpGrantResult } from '../engine/profile';
+import type { EquippedEssence } from '../engine/essence';
 
 export interface BattleHandlers {
   onPlayCard: (cardId: string) => void;
   onEndTurn: () => void;
   onExitToMenu: () => void;
+  onAbsorbEssence: () => void;
+  onDiscardEssence: () => void;
+}
+
+export interface EssenceDropState {
+  pending: EquippedEssence | null;
+  outcome: string | null;
 }
 
 function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number): string {
@@ -21,7 +29,13 @@ function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number): st
   `;
 }
 
-export function renderBattle(root: HTMLElement, state: GameState, expResult: ExpGrantResult | null, handlers: BattleHandlers) {
+export function renderBattle(
+  root: HTMLElement,
+  state: GameState,
+  expResult: ExpGrantResult | null,
+  essenceDrop: EssenceDropState,
+  handlers: BattleHandlers
+) {
   const { player, enemy, log, status } = state;
 
   const expMessage = expResult
@@ -30,9 +44,24 @@ export function renderBattle(root: HTMLElement, state: GameState, expResult: Exp
       : `경험치 +${expResult.gained} 획득!${expResult.leveledUp ? ' 레벨 업!' : ''}`
     : '';
 
+  const essenceHtml = essenceDrop.pending
+    ? `
+      <div class="essence-drop">
+        <div class="essence-drop-title">${essenceDrop.pending.monsterName}의 정수를 발견했습니다!</div>
+        <div class="essence-drop-detail">${essenceDrop.pending.skill.name} 스킬과 스텟 보너스가 담겨 있습니다.</div>
+        <div class="essence-drop-actions">
+          <button class="menu-start" id="absorb-essence">흡수한다</button>
+          <button class="menu-return" id="discard-essence">버린다</button>
+        </div>
+      </div>
+    `
+    : essenceDrop.outcome
+      ? `<div class="exp-line">${essenceDrop.outcome}</div>`
+      : '';
+
   const banner =
     status === 'win'
-      ? `<div class="status-banner win">승리했습니다! 🎉<div class="exp-line">${expMessage}</div><button class="menu-return" id="exit-menu">메인 메뉴로</button></div>`
+      ? `<div class="status-banner win">승리했습니다! 🎉<div class="exp-line">${expMessage}</div>${essenceHtml}<button class="menu-return" id="exit-menu" ${essenceDrop.pending ? 'disabled' : ''}>메인 메뉴로</button></div>`
       : status === 'lose'
         ? `<div class="status-banner lose">패배했습니다...<button class="menu-return" id="exit-menu">메인 메뉴로</button></div>`
         : '';
@@ -73,4 +102,6 @@ export function renderBattle(root: HTMLElement, state: GameState, expResult: Exp
 
   document.getElementById('end-turn')?.addEventListener('click', handlers.onEndTurn);
   document.getElementById('exit-menu')?.addEventListener('click', handlers.onExitToMenu);
+  document.getElementById('absorb-essence')?.addEventListener('click', handlers.onAbsorbEssence);
+  document.getElementById('discard-essence')?.addEventListener('click', handlers.onDiscardEssence);
 }

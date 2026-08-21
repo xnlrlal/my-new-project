@@ -8,12 +8,16 @@ export const CARD_POOL: Card[] = [
   { id: 'pierce', name: '관통', cost: 2, effect: 'damage', value: 8, description: '적에게 8의 피해를 준다.' },
 ];
 
-export function buildDeck(): Card[] {
+export function buildDeck(bonusCards: Card[] = []): Card[] {
   const deck: Card[] = [];
   for (let i = 0; i < 4; i++) deck.push({ ...CARD_POOL[0] });
   for (let i = 0; i < 2; i++) deck.push({ ...CARD_POOL[1] });
   for (let i = 0; i < 3; i++) deck.push({ ...CARD_POOL[2] });
   for (let i = 0; i < 2; i++) deck.push({ ...CARD_POOL[3] });
   for (let i = 0; i < 2; i++) deck.push({ ...CARD_POOL[4] });
+  for (const bonus of bonusCards) {
+    deck.push({ ...bonus });
+    deck.push({ ...bonus });
+  }
   return deck.map((card, index) => ({ ...card, id: `${card.id}-${index}` }));
 }
