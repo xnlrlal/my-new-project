@@ -2,7 +2,7 @@ import './style.css';
 import type { GameState } from './engine/types';
 import type { RaceDef } from './engine/races';
 import type { MonsterDef } from './engine/monsters';
-import { pickRandomMonster, rollEssenceDrop } from './engine/monsters';
+import { pickRandomMonster, rollEssenceDrop, rollManaStoneDrop } from './engine/monsters';
 import { initGame, playCard, endTurn } from './engine/engine';
 import {
   loadProfile,
@@ -10,6 +10,8 @@ import {
   grantExpForKill,
   absorbEssence,
   hasOpenEssenceSlot,
+  recordEssenceDiscovery,
+  addManaStone,
   type PlayerProfile,
   type ExpGrantResult,
 } from './engine/profile';
@@ -19,8 +21,10 @@ import { renderCharacterSelect } from './ui/character-select';
 import { renderStats } from './ui/stats';
 import { renderBattle } from './ui/battle';
 import { renderInventory } from './ui/inventory';
+import { renderEquipment } from './ui/equipment';
+import { renderEssenceCodex } from './ui/essence-codex';
 
-type Screen = 'menu' | 'character-select' | 'stats' | 'battle' | 'inventory';
+type Screen = 'menu' | 'character-select' | 'stats' | 'battle' | 'inventory' | 'equipment' | 'essence-codex';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -34,15 +38,26 @@ let expChecked = false;
 let dropChecked = false;
 let pendingEssence: EquippedEssence | null = null;
 let essenceOutcome: string | null = null;
+let returnScreen: Screen = 'stats';
 
 function render() {
   if (screen === 'menu') {
-    renderMenu(app, { onStart: () => goTo('character-select'), onOpenInventory: () => goTo('inventory') });
+    renderMenu(app, { onStart: () => goTo('character-select') });
     return;
   }
 
   if (screen === 'inventory') {
-    renderInventory(app, profile, { onBack: () => goTo('menu') });
+    renderInventory(app, profile, { onBack: () => goTo(returnScreen) });
+    return;
+  }
+
+  if (screen === 'equipment') {
+    renderEquipment(app, profile, { onBack: () => goTo(returnScreen) });
+    return;
+  }
+
+  if (screen === 'essence-codex') {
+    renderEssenceCodex(app, profile, { onBack: () => goTo(returnScreen) });
     return;
   }
 
@@ -61,6 +76,9 @@ function render() {
     renderStats(app, selectedRace, profile, {
       onStartBattle: startBattle,
       onBack: () => goTo('character-select'),
+      onOpenInventory: () => openSubScreen('inventory'),
+      onOpenEquipment: () => openSubScreen('equipment'),
+      onOpenEssenceCodex: () => openSubScreen('essence-codex'),
     });
     return;
   }
@@ -99,9 +117,17 @@ function render() {
           pendingEssence = null;
           render();
         },
+        onOpenInventory: () => openSubScreen('inventory'),
+        onOpenEquipment: () => openSubScreen('equipment'),
+        onOpenEssenceCodex: () => openSubScreen('essence-codex'),
       }
     );
   }
+}
+
+function openSubScreen(next: Screen) {
+  returnScreen = screen;
+  goTo(next);
 }
 
 function afterStateChange() {
@@ -140,8 +166,16 @@ function checkForExp() {
 function checkForDrop() {
   if (!state || !currentMonster || state.status !== 'win' || dropChecked) return;
   dropChecked = true;
+
+  if (rollManaStoneDrop()) {
+    profile = addManaStone(profile);
+    saveProfile(profile);
+  }
+
   if (rollEssenceDrop()) {
     pendingEssence = createEssenceFromMonster(currentMonster);
+    profile = recordEssenceDiscovery(profile, currentMonster.id);
+    saveProfile(profile);
   }
 }
 

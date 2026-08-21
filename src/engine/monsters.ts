@@ -143,7 +143,12 @@ export function pickRandomMonster(): MonsterDef {
 }
 
 const ESSENCE_DROP_CHANCE = 0.001;
+const MANA_STONE_DROP_CHANCE = 0.05;
 
 export function rollEssenceDrop(): boolean {
   return Math.random() < ESSENCE_DROP_CHANCE;
+}
+
+export function rollManaStoneDrop(): boolean {
+  return Math.random() < MANA_STONE_DROP_CHANCE;
 }

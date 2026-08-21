@@ -445,6 +445,56 @@ button.end-turn {
   font-size: 12px;
 }
 
+.nav-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.nav-row .menu-return.small {
+  flex: 1;
+  text-align: center;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.battle-nav {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 2px;
+}
+
+.nav-link {
+  background: none;
+  border: none;
+  color: #7a8290;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.inventory-gold {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 15px;
+  padding: 4px 0;
+}
+
+.inventory-gold strong {
+  color: #f0c46a;
+}
+
+.item-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #ccc;
+  padding: 2px 0;
+}
+
 .inventory-note {
   font-size: 12px;
   color: #888;

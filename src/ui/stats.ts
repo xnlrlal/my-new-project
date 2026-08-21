@@ -6,6 +6,9 @@ import { combineStats } from '../engine/essence';
 export interface StatsHandlers {
   onStartBattle: () => void;
   onBack: () => void;
+  onOpenInventory: () => void;
+  onOpenEquipment: () => void;
+  onOpenEssenceCodex: () => void;
 }
 
 export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerProfile, handlers: StatsHandlers) {
@@ -42,10 +45,18 @@ export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerPro
         </div>
       </div>
       <button class="menu-start" id="battle-btn">전투 시작</button>
+      <div class="nav-row">
+        <button class="menu-return small" id="inventory-btn">인벤토리</button>
+        <button class="menu-return small" id="equipment-btn">장착 장비창</button>
+        <button class="menu-return small" id="codex-btn">정수 창</button>
+      </div>
       <button class="menu-return" id="back-btn">종족 다시 선택</button>
     </div>
   `;
 
   document.getElementById('battle-btn')?.addEventListener('click', handlers.onStartBattle);
   document.getElementById('back-btn')?.addEventListener('click', handlers.onBack);
+  document.getElementById('inventory-btn')?.addEventListener('click', handlers.onOpenInventory);
+  document.getElementById('equipment-btn')?.addEventListener('click', handlers.onOpenEquipment);
+  document.getElementById('codex-btn')?.addEventListener('click', handlers.onOpenEssenceCodex);
 }

@@ -9,6 +9,9 @@ export interface BattleHandlers {
   onExitToMenu: () => void;
   onAbsorbEssence: () => void;
   onDiscardEssence: () => void;
+  onOpenInventory: () => void;
+  onOpenEquipment: () => void;
+  onOpenEssenceCodex: () => void;
 }
 
 export interface EssenceDropState {
@@ -82,6 +85,11 @@ export function renderBattle(
         : '';
 
   root.innerHTML = `
+    <div class="battle-nav">
+      <button class="nav-link" id="open-inventory">인벤토리</button>
+      <button class="nav-link" id="open-equipment">장비창</button>
+      <button class="nav-link" id="open-codex">정수창</button>
+    </div>
     ${banner}
     <div class="board">
       ${renderActor(enemy, 'enemy', state.enemyGrade)}
@@ -120,4 +128,7 @@ export function renderBattle(
   document.getElementById('exit-menu')?.addEventListener('click', handlers.onExitToMenu);
   document.getElementById('absorb-essence')?.addEventListener('click', handlers.onAbsorbEssence);
   document.getElementById('discard-essence')?.addEventListener('click', handlers.onDiscardEssence);
+  document.getElementById('open-inventory')?.addEventListener('click', handlers.onOpenInventory);
+  document.getElementById('open-equipment')?.addEventListener('click', handlers.onOpenEquipment);
+  document.getElementById('open-codex')?.addEventListener('click', handlers.onOpenEssenceCodex);
 }

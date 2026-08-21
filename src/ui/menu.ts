@@ -1,6 +1,5 @@
 export interface MenuHandlers {
   onStart: () => void;
-  onOpenInventory: () => void;
 }
 
 export function renderMenu(root: HTMLElement, handlers: MenuHandlers) {
@@ -13,10 +12,8 @@ export function renderMenu(root: HTMLElement, handlers: MenuHandlers) {
         <p>모든 전투 과정은 하단 로그에 기록됩니다.</p>
       </div>
       <button class="menu-start" id="start-btn">게임 시작</button>
-      <button class="menu-return" id="inventory-btn">인벤토리</button>
     </div>
   `;
 
   document.getElementById('start-btn')?.addEventListener('click', handlers.onStart);
-  document.getElementById('inventory-btn')?.addEventListener('click', handlers.onOpenInventory);
 }

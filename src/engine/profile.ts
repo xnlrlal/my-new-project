@@ -5,15 +5,35 @@ import type { EquippedEssence } from './essence';
 const STORAGE_KEY = 'my-new-project:profile';
 const EXP_PER_LEVEL = 20;
 
+export interface InventoryItem {
+  id: string;
+  name: string;
+  description: string;
+  count: number;
+}
+
 export interface PlayerProfile {
   level: number;
   exp: number;
   defeatedMonsterNames: string[];
   essences: EquippedEssence[];
+  discoveredEssenceIds: string[];
+  manaStones: number;
+  items: InventoryItem[];
+  gold: number;
 }
 
 function defaultProfile(): PlayerProfile {
-  return { level: 1, exp: 0, defeatedMonsterNames: [], essences: [] };
+  return {
+    level: 1,
+    exp: 0,
+    defeatedMonsterNames: [],
+    essences: [],
+    discoveredEssenceIds: [],
+    manaStones: 0,
+    items: [],
+    gold: 0,
+  };
 }
 
 export function maxEssenceSlots(profile: PlayerProfile): number {
@@ -27,6 +47,15 @@ export function hasOpenEssenceSlot(profile: PlayerProfile): boolean {
 export function absorbEssence(profile: PlayerProfile, essence: EquippedEssence): PlayerProfile {
   if (!hasOpenEssenceSlot(profile)) return profile;
   return { ...profile, essences: [...profile.essences, essence] };
+}
+
+export function recordEssenceDiscovery(profile: PlayerProfile, monsterId: string): PlayerProfile {
+  if (profile.discoveredEssenceIds.includes(monsterId)) return profile;
+  return { ...profile, discoveredEssenceIds: [...profile.discoveredEssenceIds, monsterId] };
+}
+
+export function addManaStone(profile: PlayerProfile): PlayerProfile {
+  return { ...profile, manaStones: profile.manaStones + 1 };
 }
 
 export function expToNextLevel(level: number): number {
@@ -43,6 +72,10 @@ export function loadProfile(): PlayerProfile {
       exp: typeof parsed.exp === 'number' ? parsed.exp : 0,
       defeatedMonsterNames: Array.isArray(parsed.defeatedMonsterNames) ? parsed.defeatedMonsterNames : [],
       essences: Array.isArray(parsed.essences) ? parsed.essences : [],
+      discoveredEssenceIds: Array.isArray(parsed.discoveredEssenceIds) ? parsed.discoveredEssenceIds : [],
+      manaStones: typeof parsed.manaStones === 'number' ? parsed.manaStones : 0,
+      items: Array.isArray(parsed.items) ? parsed.items : [],
+      gold: typeof parsed.gold === 'number' ? parsed.gold : 0,
     };
   } catch {
     return defaultProfile();
