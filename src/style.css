@@ -156,6 +156,10 @@ button.end-turn {
   font-weight: 700;
   padding: 12px;
   border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
 
 .status-banner.win {
@@ -166,4 +170,62 @@ button.end-turn {
 .status-banner.lose {
   background: #4a1f24;
   color: #e08787;
+}
+
+.menu-return {
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.menu {
+  min-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  padding: 24px 8px;
+}
+
+.menu-title {
+  font-size: 32px;
+  margin: 0;
+}
+
+.menu-subtitle {
+  margin: 0;
+  color: #9aa0ab;
+  font-size: 15px;
+}
+
+.menu-rules {
+  background: #1e2129;
+  border-radius: 10px;
+  padding: 16px;
+  font-size: 13px;
+  color: #ccc;
+  line-height: 1.6;
+  max-width: 320px;
+}
+
+.menu-rules p {
+  margin: 4px 0;
+}
+
+.menu-start {
+  background: #4a90d9;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 14px 32px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
 }

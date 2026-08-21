@@ -1,76 +1,42 @@
 import './style.css';
-import type { Actor, GameState } from './engine/types';
+import type { GameState } from './engine/types';
 import { initGame, playCard, endTurn } from './engine/engine';
+import { renderMenu } from './ui/menu';
+import { renderBattle } from './ui/battle';
 
-let state: GameState = initGame();
+type Screen = 'menu' | 'battle';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
-function renderActor(actor: Actor, role: 'player' | 'enemy'): string {
-  const hpPct = Math.round((actor.hp / actor.maxHp) * 100);
-  const manaPct = Math.round((actor.mana / actor.maxMana) * 100);
-  return `
-    <div class="actor ${role}">
-      <div class="actor-name">${actor.name}</div>
-      <div class="bar"><div class="bar-fill" style="width:${hpPct}%"></div></div>
-      <div class="stat-line">HP ${actor.hp}/${actor.maxHp} ${actor.shield > 0 ? `· 방어막 ${actor.shield}` : ''}</div>
-      <div class="bar"><div class="bar-fill mana" style="width:${manaPct}%"></div></div>
-      <div class="stat-line">마나 ${actor.mana}/${actor.maxMana}</div>
-    </div>
-  `;
-}
+let screen: Screen = 'menu';
+let state: GameState = initGame();
 
 function render() {
-  const { player, enemy, log, status } = state;
+  if (screen === 'menu') {
+    renderMenu(app, { onStart: startBattle });
+    return;
+  }
 
-  const banner =
-    status === 'win'
-      ? '<div class="status-banner win">승리했습니다! 🎉</div>'
-      : status === 'lose'
-        ? '<div class="status-banner lose">패배했습니다...</div>'
-        : '';
-
-  app.innerHTML = `
-    ${banner}
-    <div class="board">
-      ${renderActor(enemy, 'enemy')}
-      ${renderActor(player, 'player')}
-    </div>
-    <div class="log" id="log">
-      ${log.map((entry) => `<div class="log-entry ${entry.actor}">[${entry.turn}턴] ${entry.message}</div>`).join('')}
-    </div>
-    <div class="hand" id="hand">
-      ${player.hand
-        .map(
-          (card) => `
-        <button class="card" data-card-id="${card.id}" ${card.cost > player.mana || status !== 'playing' ? 'disabled' : ''}>
-          <div class="card-name"><span>${card.name}</span><span>${card.cost}</span></div>
-          <div class="card-desc">${card.description}</div>
-        </button>
-      `
-        )
-        .join('')}
-    </div>
-    <div class="actions">
-      <div class="stat-line">${status === 'playing' ? `${state.turn}턴 진행 중` : '전투 종료'}</div>
-      <button class="end-turn" id="end-turn" ${status !== 'playing' ? 'disabled' : ''}>턴 종료</button>
-    </div>
-  `;
-
-  const logEl = document.getElementById('log');
-  if (logEl) logEl.scrollTop = logEl.scrollHeight;
-
-  document.querySelectorAll<HTMLButtonElement>('[data-card-id]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state = playCard(state, btn.dataset.cardId!);
+  renderBattle(app, state, {
+    onPlayCard: (cardId) => {
+      state = playCard(state, cardId);
       render();
-    });
+    },
+    onEndTurn: () => {
+      state = endTurn(state);
+      render();
+    },
+    onExitToMenu: () => {
+      screen = 'menu';
+      render();
+    },
   });
+}
 
-  document.getElementById('end-turn')?.addEventListener('click', () => {
-    state = endTurn(state);
-    render();
-  });
+function startBattle() {
+  state = initGame();
+  screen = 'battle';
+  render();
 }
 
 render();
