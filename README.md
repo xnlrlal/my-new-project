@@ -1,15 +1,33 @@
 # my-new-project
 
-## 소개
+카드/전략 기반 웹게임 프로토타입. 로그(전투 기록) 중심으로 턴이 진행되며, 가벼운 웹 스택으로 시작해 추후 2D RPG와 모바일 앱스토어 출시까지 확장하는 것을 목표로 합니다.
 
-프로젝트에 대한 간단한 설명을 여기에 작성하세요.
+## 아키텍처
+
+게임 로직과 UI를 분리해서, 나중에 렌더러만 교체하면 2D RPG로 확장할 수 있도록 설계했습니다.
+
+- `src/engine/` — 순수 TypeScript 함수로 작성된 게임 엔진. 카드 사용, 턴 진행 등 모든 액션이 `GameState`를 새로 계산하고 `log` 배열에 이벤트를 기록합니다. DOM이나 렌더링에 전혀 의존하지 않아 UI를 바꿔도 그대로 재사용 가능합니다.
+- `src/main.ts` — 현재 UI. `GameState`를 읽어 카드/보드/로그를 렌더링하는 얇은 레이어입니다. 나중에 Phaser 기반 2D 렌더러로 교체해도 엔진은 그대로 둘 수 있습니다.
 
 ## 시작하기
 
 ```bash
-git clone https://github.com/xnlrlal/my-new-project.git
-cd my-new-project
+npm install
+npm run dev       # 개발 서버 실행
+npm run build      # 프로덕션 빌드 (dist/)
 ```
+
+## 현재 구현된 것
+
+- 플레이어 vs 적 턴제 카드 배틀 (공격/방어/회복 카드)
+- 마나 기반 카드 사용, 자동 적 AI 턴
+- 모든 행동이 로그로 기록되고 화면에 누적 표시
+
+## 로드맵
+
+- [ ] 2D RPG로 확장: `src/engine`은 유지하고 Phaser 등으로 렌더러 교체, 맵/이동/전투 씬 추가
+- [ ] 모바일 앱스토어 출시: [Capacitor](https://capacitorjs.com/)로 `dist/` 빌드를 iOS/Android 네이티브 셸에 패키징 (`npx cap init`, `npx cap add ios/android`)
+- [ ] 카드 풀 확장, 덱 빌딩, 저장/불러오기
 
 ## 라이선스
 

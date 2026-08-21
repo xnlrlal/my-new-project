@@ -1,0 +1,169 @@
+:root {
+  color-scheme: dark;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #14161c;
+  color: #eee;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+
+#app {
+  width: 100%;
+  max-width: 480px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.board {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.actor {
+  flex: 1;
+  background: #1e2129;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.actor.enemy {
+  border: 1px solid #7a3b3b;
+}
+
+.actor.player {
+  border: 1px solid #3b5f7a;
+}
+
+.actor-name {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.bar {
+  height: 8px;
+  border-radius: 4px;
+  background: #333;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.bar-fill {
+  height: 100%;
+  background: #4caf7d;
+  transition: width 0.2s ease;
+}
+
+.bar-fill.mana {
+  background: #4a90d9;
+}
+
+.stat-line {
+  font-size: 12px;
+  color: #aaa;
+  margin-top: 4px;
+}
+
+.log {
+  background: #101218;
+  border-radius: 10px;
+  padding: 10px 12px;
+  height: 180px;
+  overflow-y: auto;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.log-entry {
+  color: #ccc;
+}
+
+.log-entry.enemy {
+  color: #e08787;
+}
+
+.log-entry.player {
+  color: #87b8e0;
+}
+
+.hand {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.card {
+  flex: 1 1 45%;
+  background: #23272f;
+  border: 1px solid #3a3f4b;
+  border-radius: 10px;
+  padding: 10px;
+  cursor: pointer;
+  text-align: left;
+  color: #eee;
+  font: inherit;
+}
+
+.card:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.card-name {
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+}
+
+.card-desc {
+  font-size: 12px;
+  color: #aaa;
+  margin-top: 4px;
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+button.end-turn {
+  background: #4a90d9;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.status-banner {
+  text-align: center;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.status-banner.win {
+  background: #1f4a33;
+  color: #7be0a8;
+}
+
+.status-banner.lose {
+  background: #4a1f24;
+  color: #e08787;
+}

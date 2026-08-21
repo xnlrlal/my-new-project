@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+
+# Capacitor (added when mobile packaging is set up)
+ios/
+android/
+.capacitor/
