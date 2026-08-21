@@ -1,9 +1,9 @@
 import type { Actor, ActorId, Card, GameState, LogEntry } from './types';
 import { buildDeck } from './cards';
+import type { RaceStats } from './races';
+import type { MonsterDef } from './monsters';
 
 const HAND_SIZE = 4;
-const START_HP = 40;
-const START_MANA = 3;
 
 function shuffle<T>(items: T[]): T[] {
   const result = [...items];
@@ -33,15 +33,21 @@ function drawCards(actor: Actor, count: number): Actor {
   return { ...actor, hand, deck, discard };
 }
 
-function createActor(id: ActorId, name: string): Actor {
+function createActor(
+  id: ActorId,
+  name: string,
+  stats: { maxHp: number; maxMana: number; attackBonus: number; defenseBonus: number }
+): Actor {
   const base: Actor = {
     id,
     name,
-    hp: START_HP,
-    maxHp: START_HP,
+    hp: stats.maxHp,
+    maxHp: stats.maxHp,
     shield: 0,
-    mana: START_MANA,
-    maxMana: START_MANA,
+    mana: stats.maxMana,
+    maxMana: stats.maxMana,
+    attackBonus: stats.attackBonus,
+    defenseBonus: stats.defenseBonus,
     hand: [],
     deck: shuffle(buildDeck()),
     discard: [],
@@ -49,12 +55,13 @@ function createActor(id: ActorId, name: string): Actor {
   return drawCards(base, HAND_SIZE);
 }
 
-export function initGame(): GameState {
+export function initGame(raceStats: RaceStats, monster: MonsterDef): GameState {
   return {
     turn: 1,
-    player: createActor('player', '플레이어'),
-    enemy: createActor('enemy', '적'),
-    log: [{ turn: 1, actor: 'player', message: '전투 시작!' }],
+    player: createActor('player', '플레이어', raceStats),
+    enemy: createActor('enemy', monster.name, { maxHp: monster.maxHp, maxMana: monster.maxMana, attackBonus: 0, defenseBonus: 0 }),
+    enemyGrade: monster.grade,
+    log: [{ turn: 1, actor: 'player', message: `${monster.name}(을)를 만났다! 전투 시작!` }],
     status: 'playing',
   };
 }
@@ -73,14 +80,15 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
 
   switch (card.effect) {
     case 'damage': {
-      const absorbed = Math.min(targetActor.shield, card.value);
-      const remaining = card.value - absorbed;
+      const totalDamage = card.value + sourceActor.attackBonus;
+      const absorbed = Math.min(targetActor.shield, totalDamage);
+      const remaining = totalDamage - absorbed;
       updatedTarget = {
         ...targetActor,
         shield: targetActor.shield - absorbed,
         hp: Math.max(0, targetActor.hp - remaining),
       };
-      message = `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 ${card.value}의 피해!`;
+      message = `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 ${totalDamage}의 피해!`;
       break;
     }
     case 'heal': {
@@ -89,8 +97,9 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
       break;
     }
     case 'shield': {
-      updatedTarget = { ...targetActor, shield: targetActor.shield + card.value };
-      message = `${sourceActor.name}이(가) [${card.name}]로 방어막 ${card.value}을 얻음!`;
+      const totalShield = card.value + sourceActor.defenseBonus;
+      updatedTarget = { ...targetActor, shield: targetActor.shield + totalShield };
+      message = `${sourceActor.name}이(가) [${card.name}]로 방어막 ${totalShield}을 얻음!`;
       break;
     }
   }

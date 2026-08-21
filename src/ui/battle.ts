@@ -1,4 +1,5 @@
 import type { Actor, GameState } from '../engine/types';
+import type { ExpGrantResult } from '../engine/profile';
 
 export interface BattleHandlers {
   onPlayCard: (cardId: string) => void;
@@ -6,12 +7,12 @@ export interface BattleHandlers {
   onExitToMenu: () => void;
 }
 
-function renderActor(actor: Actor, role: 'player' | 'enemy'): string {
+function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number): string {
   const hpPct = Math.round((actor.hp / actor.maxHp) * 100);
   const manaPct = Math.round((actor.mana / actor.maxMana) * 100);
   return `
     <div class="actor ${role}">
-      <div class="actor-name">${actor.name}</div>
+      <div class="actor-name">${actor.name}${grade ? ` <span class="grade-tag">Lv.${grade}</span>` : ''}</div>
       <div class="bar"><div class="bar-fill" style="width:${hpPct}%"></div></div>
       <div class="stat-line">HP ${actor.hp}/${actor.maxHp} ${actor.shield > 0 ? `· 방어막 ${actor.shield}` : ''}</div>
       <div class="bar"><div class="bar-fill mana" style="width:${manaPct}%"></div></div>
@@ -20,12 +21,18 @@ function renderActor(actor: Actor, role: 'player' | 'enemy'): string {
   `;
 }
 
-export function renderBattle(root: HTMLElement, state: GameState, handlers: BattleHandlers) {
+export function renderBattle(root: HTMLElement, state: GameState, expResult: ExpGrantResult | null, handlers: BattleHandlers) {
   const { player, enemy, log, status } = state;
+
+  const expMessage = expResult
+    ? expResult.alreadyDefeated
+      ? '이미 처치한 적입니다 (경험치 없음)'
+      : `경험치 +${expResult.gained} 획득!${expResult.leveledUp ? ' 레벨 업!' : ''}`
+    : '';
 
   const banner =
     status === 'win'
-      ? `<div class="status-banner win">승리했습니다! 🎉<button class="menu-return" id="exit-menu">메인 메뉴로</button></div>`
+      ? `<div class="status-banner win">승리했습니다! 🎉<div class="exp-line">${expMessage}</div><button class="menu-return" id="exit-menu">메인 메뉴로</button></div>`
       : status === 'lose'
         ? `<div class="status-banner lose">패배했습니다...<button class="menu-return" id="exit-menu">메인 메뉴로</button></div>`
         : '';
@@ -33,7 +40,7 @@ export function renderBattle(root: HTMLElement, state: GameState, handlers: Batt
   root.innerHTML = `
     ${banner}
     <div class="board">
-      ${renderActor(enemy, 'enemy')}
+      ${renderActor(enemy, 'enemy', state.enemyGrade)}
       ${renderActor(player, 'player')}
     </div>
     <div class="log" id="log">

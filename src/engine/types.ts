@@ -19,6 +19,8 @@ export interface Actor {
   shield: number;
   mana: number;
   maxMana: number;
+  attackBonus: number;
+  defenseBonus: number;
   hand: Card[];
   deck: Card[];
   discard: Card[];
@@ -36,6 +38,7 @@ export interface GameState {
   turn: number;
   player: Actor;
   enemy: Actor;
+  enemyGrade: number;
   log: LogEntry[];
   status: GameStatus;
 }
