@@ -12,19 +12,24 @@ import {
   hasOpenEssenceSlot,
   recordEssenceDiscovery,
   addManaStone,
+  addGearToInventory,
+  equipGear,
+  unequipGear,
   type PlayerProfile,
   type ExpGrantResult,
 } from './engine/profile';
-import { createEssenceFromMonster, combineStats, essenceSkillCards, type EquippedEssence } from './engine/essence';
+import { createEssenceFromMonster, essenceSkillCards, type EquippedEssence } from './engine/essence';
+import { computeTotalStats } from './engine/stats-calc';
+import { pickRandomGear, rollGearDrop, createGearInstance, type EquipmentSlot } from './engine/gear';
 import { renderMenu } from './ui/menu';
 import { renderCharacterSelect } from './ui/character-select';
 import { renderStats } from './ui/stats';
 import { renderBattle } from './ui/battle';
 import { renderInventory } from './ui/inventory';
 import { renderEquipment } from './ui/equipment';
-import { renderEssenceCodex } from './ui/essence-codex';
+import { renderEssenceScreen } from './ui/essence';
 
-type Screen = 'menu' | 'character-select' | 'stats' | 'battle' | 'inventory' | 'equipment' | 'essence-codex';
+type Screen = 'menu' | 'character-select' | 'stats' | 'battle' | 'inventory' | 'equipment' | 'essence';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -52,12 +57,24 @@ function render() {
   }
 
   if (screen === 'equipment') {
-    renderEquipment(app, profile, { onBack: () => goTo(returnScreen) });
+    renderEquipment(app, profile, {
+      onBack: () => goTo(returnScreen),
+      onEquip: (instanceId) => {
+        profile = equipGear(profile, instanceId);
+        saveProfile(profile);
+        render();
+      },
+      onUnequip: (slot: EquipmentSlot) => {
+        profile = unequipGear(profile, slot);
+        saveProfile(profile);
+        render();
+      },
+    });
     return;
   }
 
-  if (screen === 'essence-codex') {
-    renderEssenceCodex(app, profile, { onBack: () => goTo(returnScreen) });
+  if (screen === 'essence') {
+    renderEssenceScreen(app, profile, { onBack: () => goTo(returnScreen) });
     return;
   }
 
@@ -78,7 +95,7 @@ function render() {
       onBack: () => goTo('character-select'),
       onOpenInventory: () => openSubScreen('inventory'),
       onOpenEquipment: () => openSubScreen('equipment'),
-      onOpenEssenceCodex: () => openSubScreen('essence-codex'),
+      onOpenEssence: () => openSubScreen('essence'),
     });
     return;
   }
@@ -119,7 +136,7 @@ function render() {
         },
         onOpenInventory: () => openSubScreen('inventory'),
         onOpenEquipment: () => openSubScreen('equipment'),
-        onOpenEssenceCodex: () => openSubScreen('essence-codex'),
+        onOpenEssence: () => openSubScreen('essence'),
       }
     );
   }
@@ -145,7 +162,7 @@ function startBattle() {
   if (!selectedRace) return;
   currentMonster = pickRandomMonster();
   const bonusCards = essenceSkillCards(profile.essences);
-  const totalStats = combineStats(selectedRace.stats, profile.essences);
+  const totalStats = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear);
   state = initGame(totalStats, currentMonster, bonusCards);
   expResult = null;
   expChecked = false;
@@ -169,6 +186,11 @@ function checkForDrop() {
 
   if (rollManaStoneDrop()) {
     profile = addManaStone(profile);
+    saveProfile(profile);
+  }
+
+  if (rollGearDrop()) {
+    profile = addGearToInventory(profile, createGearInstance(pickRandomGear()));
     saveProfile(profile);
   }
 

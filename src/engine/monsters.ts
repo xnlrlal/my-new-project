@@ -1,11 +1,7 @@
 import type { Card } from './types';
+import type { StatBonus } from './stat-bonus';
 
-export interface EssenceStatBonus {
-  maxHp?: number;
-  maxMana?: number;
-  attackBonus?: number;
-  defenseBonus?: number;
-}
+export type EssenceStatBonus = StatBonus;
 
 export interface EssenceTemplate {
   statBonus: EssenceStatBonus;

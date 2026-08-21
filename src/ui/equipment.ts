@@ -1,50 +1,70 @@
 import type { PlayerProfile } from '../engine/profile';
-import { maxEssenceSlots } from '../engine/profile';
+import { EQUIPMENT_SLOTS, slotLabel, type EquipmentSlot } from '../engine/gear';
+import { statBonusText } from '../engine/stat-bonus';
 
 export interface EquipmentHandlers {
   onBack: () => void;
-}
-
-function statBonusText(statBonus: { maxHp?: number; maxMana?: number; attackBonus?: number; defenseBonus?: number }): string {
-  const parts: string[] = [];
-  if (statBonus.maxHp) parts.push(`체력 +${statBonus.maxHp}`);
-  if (statBonus.maxMana) parts.push(`마나 +${statBonus.maxMana}`);
-  if (statBonus.attackBonus) parts.push(`공격 +${statBonus.attackBonus}`);
-  if (statBonus.defenseBonus) parts.push(`방어 +${statBonus.defenseBonus}`);
-  return parts.join(' · ') || '보너스 없음';
+  onEquip: (instanceId: string) => void;
+  onUnequip: (slot: EquipmentSlot) => void;
 }
 
 export function renderEquipment(root: HTMLElement, profile: PlayerProfile, handlers: EquipmentHandlers) {
-  const slots = maxEssenceSlots(profile);
-
-  const slotHtml = Array.from({ length: slots }, (_, i) => {
-    const essence = profile.essences[i];
-    if (essence) {
+  const slotsHtml = EQUIPMENT_SLOTS.map((slot) => {
+    const gear = profile.equippedGear[slot];
+    if (gear) {
       return `
         <div class="essence-slot filled">
           <div class="essence-slot-header">
-            <span class="essence-name">${essence.monsterName}의 정수</span>
-            <span class="grade-tag">Lv.${essence.monsterGrade}</span>
+            <span class="essence-name">${slotLabel(slot)}: ${gear.name}</span>
+            <button class="menu-return small" data-unequip-slot="${slot}">해제</button>
           </div>
-          <div class="essence-stat">${statBonusText(essence.statBonus)}</div>
-          <div class="essence-skill">스킬: ${essence.skill.name} (마나 ${essence.skill.cost}) — ${essence.skill.description}</div>
+          <div class="essence-stat">${statBonusText(gear.statBonus)}</div>
+          <div class="essence-skill">${gear.description}</div>
         </div>
       `;
     }
-    return `<div class="essence-slot empty">빈 슬롯</div>`;
+    return `
+      <div class="essence-slot empty">
+        <div class="essence-slot-header"><span>${slotLabel(slot)}</span><span>비어있음</span></div>
+      </div>
+    `;
   }).join('');
+
+  const inventoryGearHtml =
+    profile.inventoryGear.length > 0
+      ? profile.inventoryGear
+          .map(
+            (gear) => `
+        <div class="item-row gear-row">
+          <div>
+            <div>${gear.name} <span class="grade-tag">${slotLabel(gear.slot)}</span></div>
+            <div class="essence-stat">${statBonusText(gear.statBonus)}</div>
+          </div>
+          <button class="menu-start small" data-equip-id="${gear.instanceId}">장착</button>
+        </div>
+      `
+          )
+          .join('')
+      : '<div class="stat-line">보유 중인 미착용 장비가 없습니다.</div>';
 
   root.innerHTML = `
     <div class="inventory-screen">
-      <h2 class="screen-title">장착 장비창</h2>
-      <div class="stat-line" style="text-align:center">장착 슬롯 ${profile.essences.length} / ${slots} (레벨업 시 1칸씩 증가)</div>
-      <div class="essence-slots">
-        ${slotHtml || '<div class="essence-slot empty">레벨을 올리면 슬롯이 열립니다.</div>'}
+      <h2 class="screen-title">장비창</h2>
+      <div class="stat-line" style="text-align:center">무기 · 방어구 · 장신구는 자유롭게 갈아입을 수 있습니다.</div>
+      <div class="essence-slots">${slotsHtml}</div>
+      <div class="stats-card">
+        <div class="stat-line" style="font-weight:600">보유 장비</div>
+        ${inventoryGearHtml}
       </div>
-      <p class="inventory-note">장착한 정수는 특수한 방법으로만 해제할 수 있습니다.</p>
       <button class="menu-return" id="back-btn">뒤로</button>
     </div>
   `;
 
+  root.querySelectorAll<HTMLButtonElement>('[data-equip-id]').forEach((btn) => {
+    btn.addEventListener('click', () => handlers.onEquip(btn.dataset.equipId!));
+  });
+  root.querySelectorAll<HTMLButtonElement>('[data-unequip-slot]').forEach((btn) => {
+    btn.addEventListener('click', () => handlers.onUnequip(btn.dataset.unequipSlot as EquipmentSlot));
+  });
   document.getElementById('back-btn')?.addEventListener('click', handlers.onBack);
 }

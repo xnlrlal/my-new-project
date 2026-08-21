@@ -1,16 +1,11 @@
 import type { MonsterDef } from './monsters';
 import { expForGrade } from './monsters';
 import type { EquippedEssence } from './essence';
+import type { EquipmentSlot, GearInstance } from './gear';
+import type { EquippedGear } from './stats-calc';
 
 const STORAGE_KEY = 'my-new-project:profile';
 const EXP_PER_LEVEL = 20;
-
-export interface InventoryItem {
-  id: string;
-  name: string;
-  description: string;
-  count: number;
-}
 
 export interface PlayerProfile {
   level: number;
@@ -19,7 +14,8 @@ export interface PlayerProfile {
   essences: EquippedEssence[];
   discoveredEssenceIds: string[];
   manaStones: number;
-  items: InventoryItem[];
+  inventoryGear: GearInstance[];
+  equippedGear: EquippedGear;
   gold: number;
 }
 
@@ -31,7 +27,8 @@ function defaultProfile(): PlayerProfile {
     essences: [],
     discoveredEssenceIds: [],
     manaStones: 0,
-    items: [],
+    inventoryGear: [],
+    equippedGear: {},
     gold: 0,
   };
 }
@@ -58,6 +55,38 @@ export function addManaStone(profile: PlayerProfile): PlayerProfile {
   return { ...profile, manaStones: profile.manaStones + 1 };
 }
 
+export function addGearToInventory(profile: PlayerProfile, gear: GearInstance): PlayerProfile {
+  return { ...profile, inventoryGear: [...profile.inventoryGear, gear] };
+}
+
+export function equipGear(profile: PlayerProfile, instanceId: string): PlayerProfile {
+  const gear = profile.inventoryGear.find((g) => g.instanceId === instanceId);
+  if (!gear) return profile;
+
+  const remainingInventory = profile.inventoryGear.filter((g) => g.instanceId !== instanceId);
+  const previouslyEquipped = profile.equippedGear[gear.slot];
+
+  return {
+    ...profile,
+    inventoryGear: previouslyEquipped ? [...remainingInventory, previouslyEquipped] : remainingInventory,
+    equippedGear: { ...profile.equippedGear, [gear.slot]: gear },
+  };
+}
+
+export function unequipGear(profile: PlayerProfile, slot: EquipmentSlot): PlayerProfile {
+  const gear = profile.equippedGear[slot];
+  if (!gear) return profile;
+
+  const nextEquipped = { ...profile.equippedGear };
+  delete nextEquipped[slot];
+
+  return {
+    ...profile,
+    inventoryGear: [...profile.inventoryGear, gear],
+    equippedGear: nextEquipped,
+  };
+}
+
 export function expToNextLevel(level: number): number {
   return level * EXP_PER_LEVEL;
 }
@@ -74,7 +103,8 @@ export function loadProfile(): PlayerProfile {
       essences: Array.isArray(parsed.essences) ? parsed.essences : [],
       discoveredEssenceIds: Array.isArray(parsed.discoveredEssenceIds) ? parsed.discoveredEssenceIds : [],
       manaStones: typeof parsed.manaStones === 'number' ? parsed.manaStones : 0,
-      items: Array.isArray(parsed.items) ? parsed.items : [],
+      inventoryGear: Array.isArray(parsed.inventoryGear) ? parsed.inventoryGear : [],
+      equippedGear: parsed.equippedGear && typeof parsed.equippedGear === 'object' ? parsed.equippedGear : {},
       gold: typeof parsed.gold === 'number' ? parsed.gold : 0,
     };
   } catch {

@@ -246,6 +246,16 @@ button.end-turn {
   cursor: pointer;
 }
 
+.menu-start.small {
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.gear-row {
+  align-items: center;
+}
+
 .screen-title {
   text-align: center;
   margin: 8px 0 4px;

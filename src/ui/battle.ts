@@ -11,7 +11,7 @@ export interface BattleHandlers {
   onDiscardEssence: () => void;
   onOpenInventory: () => void;
   onOpenEquipment: () => void;
-  onOpenEssenceCodex: () => void;
+  onOpenEssence: () => void;
 }
 
 export interface EssenceDropState {
@@ -130,5 +130,5 @@ export function renderBattle(
   document.getElementById('discard-essence')?.addEventListener('click', handlers.onDiscardEssence);
   document.getElementById('open-inventory')?.addEventListener('click', handlers.onOpenInventory);
   document.getElementById('open-equipment')?.addEventListener('click', handlers.onOpenEquipment);
-  document.getElementById('open-codex')?.addEventListener('click', handlers.onOpenEssenceCodex);
+  document.getElementById('open-codex')?.addEventListener('click', handlers.onOpenEssence);
 }

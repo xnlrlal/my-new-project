@@ -1,5 +1,4 @@
 import type { Card } from './types';
-import type { RaceStats } from './races';
 import type { EssenceStatBonus, MonsterDef } from './monsters';
 
 export interface EquippedEssence {
@@ -23,18 +22,6 @@ export function createEssenceFromMonster(monster: MonsterDef): EquippedEssence {
     statBonus: monster.essence.statBonus,
     skill: monster.essence.skill,
   };
-}
-
-export function combineStats(base: RaceStats, essences: EquippedEssence[]): RaceStats {
-  return essences.reduce<RaceStats>(
-    (acc, essence) => ({
-      maxHp: acc.maxHp + (essence.statBonus.maxHp ?? 0),
-      maxMana: acc.maxMana + (essence.statBonus.maxMana ?? 0),
-      attackBonus: acc.attackBonus + (essence.statBonus.attackBonus ?? 0),
-      defenseBonus: acc.defenseBonus + (essence.statBonus.defenseBonus ?? 0),
-    }),
-    { ...base }
-  );
 }
 
 export function essenceSkillCards(essences: EquippedEssence[]): Card[] {
