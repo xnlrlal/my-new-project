@@ -5,7 +5,9 @@ import type { EquippedEssence } from '../engine/essence';
 export interface BattleHandlers {
   onPlayCard: (cardId: string) => void;
   onEndTurn: () => void;
+  onSkip: () => void;
   onContinue: () => void;
+  onAcknowledgeDeath: () => void;
   onExitToMenu: () => void;
   onAbsorbEssence: () => void;
   onDiscardEssence: () => void;
@@ -37,6 +39,7 @@ export function renderBattle(
   root: HTMLElement,
   state: GameState,
   floorLabel: string,
+  skipEligible: boolean,
   expResult: ExpGrantResult | null,
   essenceDrop: EssenceDropState,
   handlers: BattleHandlers
@@ -77,13 +80,18 @@ export function renderBattle(
     status === 'win'
       ? `<div class="status-banner win">승리했습니다! 🎉<div class="exp-line">${expMessage}</div>${essenceHtml}${winActions}</div>`
       : status === 'lose'
-        ? `<div class="status-banner lose">패배했습니다...
+        ? `<div class="status-banner lose">사망했습니다...
+            <div class="exp-line">모든 진행 상황이 초기화됩니다.</div>
             <div class="banner-actions">
-              <button class="menu-start" id="continue-btn">다시 도전</button>
-              <button class="menu-return small" id="exit-menu">메인 메뉴로</button>
+              <button class="menu-start" id="acknowledge-death">확인</button>
             </div>
           </div>`
         : '';
+
+  const skipButton =
+    skipEligible && status === 'playing'
+      ? `<button class="menu-return small" id="skip-btn">전투 스킵 (예상 승률 99%+)</button>`
+      : '';
 
   root.innerHTML = `
     <div class="battle-nav">
@@ -116,6 +124,7 @@ export function renderBattle(
       <div class="stat-line">${status === 'playing' ? `${state.turn}턴 진행 중` : '전투 종료'}</div>
       <button class="end-turn" id="end-turn" ${status !== 'playing' ? 'disabled' : ''}>턴 종료</button>
     </div>
+    ${skipButton}
   `;
 
   const logEl = document.getElementById('log');
@@ -126,7 +135,9 @@ export function renderBattle(
   });
 
   document.getElementById('end-turn')?.addEventListener('click', handlers.onEndTurn);
+  document.getElementById('skip-btn')?.addEventListener('click', handlers.onSkip);
   document.getElementById('continue-btn')?.addEventListener('click', handlers.onContinue);
+  document.getElementById('acknowledge-death')?.addEventListener('click', handlers.onAcknowledgeDeath);
   document.getElementById('exit-menu')?.addEventListener('click', handlers.onExitToMenu);
   document.getElementById('absorb-essence')?.addEventListener('click', handlers.onAbsorbEssence);
   document.getElementById('discard-essence')?.addEventListener('click', handlers.onDiscardEssence);

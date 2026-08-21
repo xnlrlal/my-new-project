@@ -35,6 +35,10 @@ function defaultProfile(): PlayerProfile {
   };
 }
 
+export function resetProfile(): PlayerProfile {
+  return defaultProfile();
+}
+
 export function maxEssenceSlots(profile: PlayerProfile): number {
   return profile.level;
 }

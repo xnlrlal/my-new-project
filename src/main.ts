@@ -7,6 +7,7 @@ import { initGame, playCard, endTurn } from './engine/engine';
 import {
   loadProfile,
   saveProfile,
+  resetProfile,
   grantExpForKill,
   absorbEssence,
   hasOpenEssenceSlot,
@@ -21,6 +22,7 @@ import {
 } from './engine/profile';
 import { createEssenceFromMonster, essenceSkillCards, type EquippedEssence } from './engine/essence';
 import { computeTotalStats } from './engine/stats-calc';
+import { autoPlayBattle, estimateWinProbability } from './engine/battle-ai';
 import { rollGearDrop, createGearFromMonster, type EquipmentSlot } from './engine/gear';
 import {
   generateMaze,
@@ -70,6 +72,9 @@ let dropChecked = false;
 let pendingEssence: EquippedEssence | null = null;
 let essenceOutcome: string | null = null;
 let returnScreen: Screen = 'stats';
+let skipEligible = false;
+
+const SKIP_WIN_PROBABILITY_THRESHOLD = 0.99;
 
 let dungeonFloor: 1 | 2 = 1;
 let dungeonThemeZone: ArmZone | null = null;
@@ -184,6 +189,7 @@ function render() {
       app,
       state,
       floorLabel,
+      skipEligible,
       expResult,
       { pending: pendingEssence, outcome: essenceOutcome },
       {
@@ -195,14 +201,15 @@ function render() {
           state = endTurn(state!);
           afterStateChange();
         },
-        onContinue: () => {
-          if (state?.status === 'win') {
-            dungeonMessage = '전투에서 승리했다.';
-            goTo('dungeon-map');
-          } else if (maze && pos) {
-            startZoneBattle(cellAt(maze, pos).zone);
-          }
+        onSkip: () => {
+          state = autoPlayBattle(state!);
+          afterStateChange();
         },
+        onContinue: () => {
+          dungeonMessage = '전투에서 승리했다.';
+          goTo('dungeon-map');
+        },
+        onAcknowledgeDeath: handleDeath,
         onExitToMenu: exitDungeonToMenu,
         onAbsorbEssence: () => {
           if (!pendingEssence) return;
@@ -314,12 +321,30 @@ function startZoneBattle(zone: Zone) {
   const bonusCards = essenceSkillCards(profile.essences);
   const totalStats = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear);
   state = initGame(totalStats, currentMonster, bonusCards);
+  skipEligible = estimateWinProbability(totalStats, bonusCards, currentMonster) >= SKIP_WIN_PROBABILITY_THRESHOLD;
   expResult = null;
   expChecked = false;
   dropChecked = false;
   pendingEssence = null;
   essenceOutcome = null;
   goTo('battle');
+}
+
+// Losing is permanent: the whole save (level, inventory, essences, gear,
+// discovered codex — everything) resets, matching the roguelike death rule.
+function handleDeath() {
+  profile = resetProfile();
+  persistProfile();
+  selectedRace = null;
+  currentMonster = null;
+  state = null;
+  dungeonFloor = 1;
+  dungeonThemeZone = null;
+  maze = null;
+  pos = null;
+  dungeonMessage = null;
+  portalMessage = null;
+  goTo('menu');
 }
 
 function checkForExp() {
