@@ -1,8 +1,12 @@
+import type { AuthUser } from '../engine/auth';
+
 export interface MenuHandlers {
   onStart: () => void;
+  onLogout: () => void;
+  onGoToLogin: () => void;
 }
 
-export function renderMenu(root: HTMLElement, handlers: MenuHandlers) {
+export function renderMenu(root: HTMLElement, authUser: AuthUser | null, handlers: MenuHandlers) {
   root.innerHTML = `
     <div class="menu">
       <h1 class="menu-title">my-new-project</h1>
@@ -12,8 +16,16 @@ export function renderMenu(root: HTMLElement, handlers: MenuHandlers) {
         <p>모든 전투 과정은 하단 로그에 기록됩니다.</p>
       </div>
       <button class="menu-start" id="start-btn">게임 시작</button>
+      <div class="stat-line" style="text-align:center">${authUser ? `${authUser.username}님으로 로그인됨` : '게스트 모드 (진행 상황이 이 브라우저에만 저장됩니다)'}</div>
+      ${
+        authUser
+          ? '<button class="menu-return small" id="logout-btn">로그아웃</button>'
+          : '<button class="menu-return small" id="login-link">로그인 / 회원가입</button>'
+      }
     </div>
   `;
 
   document.getElementById('start-btn')?.addEventListener('click', handlers.onStart);
+  document.getElementById('logout-btn')?.addEventListener('click', handlers.onLogout);
+  document.getElementById('login-link')?.addEventListener('click', handlers.onGoToLogin);
 }

@@ -529,3 +529,55 @@ button.end-turn {
   color: #888;
   line-height: 1.6;
 }
+
+.auth-tabs {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.auth-tab {
+  flex: 1;
+  background: #1e2129;
+  border: 1px solid #3a3f4b;
+  color: #9aa0ab;
+  border-radius: 8px;
+  padding: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-tab.active {
+  background: #4a90d9;
+  border-color: #4a90d9;
+  color: white;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.auth-input {
+  background: #1e2129;
+  border: 1px solid #3a3f4b;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #eee;
+  font-size: 14px;
+}
+
+.auth-input:focus {
+  outline: none;
+  border-color: #4a90d9;
+}
+
+.auth-error {
+  color: #e08787;
+  font-size: 13px;
+  text-align: center;
+}

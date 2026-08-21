@@ -8,3 +8,11 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+    envVars:
+      # Set these in the Render dashboard (Environment tab) after creating a
+      # Supabase project — see supabase/README.md for setup steps. Without
+      # them the app still works fully in guest (localStorage-only) mode.
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false

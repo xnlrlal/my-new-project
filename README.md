@@ -6,8 +6,8 @@
 
 게임 로직과 UI를 분리해서, 나중에 렌더러만 교체하면 2D RPG로 확장할 수 있도록 설계했습니다.
 
-- `src/engine/` — 순수 TypeScript 함수로 작성된 게임 엔진 (`engine.ts`, `cards.ts`, `races.ts`, `monsters.ts`, `dungeon.ts`, `essence.ts`, `gear.ts`, `stats-calc.ts`, `stat-bonus.ts`, `profile.ts`). 카드 사용, 턴 진행 등 모든 액션이 `GameState`를 새로 계산하고 `log` 배열에 이벤트를 기록합니다. DOM이나 렌더링에 전혀 의존하지 않아 UI를 바꿔도 그대로 재사용 가능합니다.
-- `src/ui/` — 화면별 렌더링 (`menu`, `character-select`, `stats`, `dungeon-map`, `inventory`, `equipment`, `essence`, `battle`). `src/main.ts`는 화면 전환만 담당하는 라우터입니다. 나중에 Phaser 기반 2D 렌더러로 교체해도 엔진은 그대로 둘 수 있습니다.
+- `src/engine/` — 순수 TypeScript 함수로 작성된 게임 엔진 (`engine.ts`, `cards.ts`, `races.ts`, `monsters.ts`, `dungeon.ts`, `essence.ts`, `gear.ts`, `stats-calc.ts`, `stat-bonus.ts`, `profile.ts`, `auth.ts`, `cloud-profile.ts`, `supabase-client.ts`). 카드 사용, 턴 진행 등 모든 액션이 `GameState`를 새로 계산하고 `log` 배열에 이벤트를 기록합니다. DOM이나 렌더링에 전혀 의존하지 않아 UI를 바꿔도 그대로 재사용 가능합니다.
+- `src/ui/` — 화면별 렌더링 (`auth`, `menu`, `character-select`, `stats`, `dungeon-map`, `inventory`, `equipment`, `essence`, `battle`). `src/main.ts`는 화면 전환만 담당하는 라우터입니다. 나중에 Phaser 기반 2D 렌더러로 교체해도 엔진은 그대로 둘 수 있습니다.
 
 ## 시작하기
 
@@ -19,6 +19,8 @@ npm run build      # 프로덕션 빌드 (dist/)
 
 ## 현재 구현된 것
 
+- **로그인 / 클라우드 저장**: 앱 진입 시 아이디·비밀번호로 로그인하거나 "게스트로 계속하기"를 선택. 로그인하면 진행 상황(레벨, 인벤토리, 장비, 정수 등)이 [Supabase](https://supabase.com) 계정에 저장되어 다른 기기에서도 이어할 수 있고, 게스트는 이 브라우저의 `localStorage`에만 저장됨. 로그인 없이도 게임은 항상 완전히 동작함 (설정 방법은 `supabase/README.md` 참고)
+  - 내부적으로 "아이디"를 가짜 이메일로 변환해 Supabase Auth의 이메일/비밀번호 로그인을 그대로 사용하므로, 나중에 실제 이메일 인증이나 구글 등 소셜 로그인으로 확장할 때 설정만 추가하면 됨 (게임 로직 변경 불필요)
 - 메인 메뉴에는 "게임 시작" 버튼만 있고, 인벤토리/장비창/정수창은 게임 진입 후(캐릭터 정보 화면, 탐험/전투 화면) 안에서만 접근 가능
 - 종족 선택 → 캐릭터 정보(스텟창) → **미궁 입장**
 - **미궁 탐험 (1층: 원형 미로, 2층: 구역별 4개의 별개 미궁)**
@@ -46,6 +48,16 @@ npm run build      # 프로덕션 빌드 (dist/)
   - `장비창` — 무기/방어구/장신구 슬롯. 자유롭게 장착·해제
   - `정수 창` — 지금 장착 중인 정수 목록 + 지금까지 발견한 정수 도감(흡수 안 해도 발견 기록은 남음)
 - 모든 행동이 로그로 기록되고 화면에 누적 표시
+
+## 클라우드 저장(로그인) 설정
+
+로그인 기능을 실제로 켜려면 무료 Supabase 프로젝트가 하나 필요합니다. 자세한 단계는 [`supabase/README.md`](./supabase/README.md)를 참고하세요. 요약하면:
+
+1. Supabase 프로젝트 생성 후 `supabase/schema.sql` 실행
+2. Authentication → Providers → Email에서 **Confirm email** 끄기
+3. Project URL / anon key를 `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`로 Render 환경변수에 등록 후 재배포 (로컬은 `.env.local`)
+
+이 값들이 없으면 앱은 자동으로 게스트 전용 모드로 동작합니다.
 
 ## 로드맵
 

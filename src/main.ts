@@ -45,15 +45,22 @@ import { renderInventory } from './ui/inventory';
 import { renderEquipment } from './ui/equipment';
 import { renderEssenceScreen } from './ui/essence';
 import { renderDungeonMap } from './ui/dungeon-map';
+import { renderAuth, type AuthMode } from './ui/auth';
+import { signIn, signUp, signOut, getCurrentUser, isCloudConfigured, type AuthUser } from './engine/auth';
+import { loadCloudProfile, saveCloudProfile } from './engine/cloud-profile';
 
-type Screen = 'menu' | 'character-select' | 'stats' | 'dungeon-map' | 'battle' | 'inventory' | 'equipment' | 'essence';
+type Screen = 'auth' | 'menu' | 'character-select' | 'stats' | 'dungeon-map' | 'battle' | 'inventory' | 'equipment' | 'essence';
 
 const PORTAL_EXP_BONUS = 2;
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
-let screen: Screen = 'menu';
+let screen: Screen = 'auth';
 let profile: PlayerProfile = loadProfile();
+let authUser: AuthUser | null = null;
+let authMode: AuthMode = 'login';
+let authError: string | null = null;
+let authLoading = false;
 let selectedRace: RaceDef | null = null;
 let currentMonster: MonsterDef | null = null;
 let state: GameState | null = null;
@@ -72,8 +79,38 @@ let dungeonMessage: string | null = null;
 let portalMessage: string | null = null;
 
 function render() {
+  if (screen === 'auth') {
+    renderAuth(
+      app,
+      { mode: authMode, error: authError, loading: authLoading, cloudConfigured: isCloudConfigured },
+      {
+        onSwitchMode: (mode) => {
+          authMode = mode;
+          authError = null;
+          render();
+        },
+        onSubmit: (username, password) => {
+          if (authMode === 'login') handleLogin(username, password);
+          else handleSignup(username, password);
+        },
+        onGuest: () => {
+          authUser = null;
+          goTo('menu');
+        },
+      }
+    );
+    return;
+  }
+
   if (screen === 'menu') {
-    renderMenu(app, { onStart: () => goTo('character-select') });
+    renderMenu(app, authUser, {
+      onStart: () => goTo('character-select'),
+      onLogout: handleLogout,
+      onGoToLogin: () => {
+        authError = null;
+        goTo('auth');
+      },
+    });
     return;
   }
 
@@ -87,12 +124,12 @@ function render() {
       onBack: () => goTo(returnScreen),
       onEquip: (instanceId) => {
         profile = equipGear(profile, instanceId);
-        saveProfile(profile);
+        persistProfile();
         render();
       },
       onUnequip: (slot: EquipmentSlot) => {
         profile = unequipGear(profile, slot);
-        saveProfile(profile);
+        persistProfile();
         render();
       },
     });
@@ -171,7 +208,7 @@ function render() {
           if (!pendingEssence) return;
           if (hasOpenEssenceSlot(profile)) {
             profile = absorbEssence(profile, pendingEssence);
-            saveProfile(profile);
+            persistProfile();
             essenceOutcome = `${pendingEssence.monsterName}의 정수를 흡수했습니다!`;
           } else {
             essenceOutcome = '장착 슬롯이 가득 차 흡수할 수 없었습니다.';
@@ -264,7 +301,7 @@ function handlePortalArrival(cell: DungeonCell) {
     maze.portalsFound.add(cell.portal);
     const result = addExp(profile, PORTAL_EXP_BONUS);
     profile = result.profile;
-    saveProfile(profile);
+    persistProfile();
     portalMessage = `경험치 +${PORTAL_EXP_BONUS} 획득!${result.leveledUp ? ' 레벨 업!' : ''}`;
   } else {
     portalMessage = null;
@@ -290,7 +327,7 @@ function checkForExp() {
   expChecked = true;
   expResult = grantExpForKill(profile, currentMonster);
   profile = expResult.profile;
-  saveProfile(profile);
+  persistProfile();
 }
 
 function checkForDrop() {
@@ -299,19 +336,93 @@ function checkForDrop() {
 
   if (rollManaStoneDrop()) {
     profile = addManaStone(profile, currentMonster.grade);
-    saveProfile(profile);
+    persistProfile();
   }
 
   if (rollGearDrop()) {
     profile = addGearToInventory(profile, createGearFromMonster(currentMonster.id, currentMonster.gearDrop));
-    saveProfile(profile);
+    persistProfile();
   }
 
   if (rollEssenceDrop()) {
     pendingEssence = createEssenceFromMonster(currentMonster);
     profile = recordEssenceDiscovery(profile, currentMonster.id);
-    saveProfile(profile);
+    persistProfile();
   }
 }
 
-render();
+// Always caches to localStorage immediately (so the game stays fully
+// playable offline/as a guest), and additionally syncs to the cloud in the
+// background whenever a user is logged in.
+function persistProfile() {
+  saveProfile(profile);
+  if (authUser) {
+    saveCloudProfile(authUser.id, profile).catch(() => {
+      // best-effort background sync; localStorage already has the data
+    });
+  }
+}
+
+async function adoptLoggedInProfile(user: AuthUser) {
+  authUser = user;
+  const cloud = await loadCloudProfile(user.id);
+  if (cloud) {
+    profile = cloud;
+    saveProfile(profile);
+  } else {
+    // first time this account has logged in: push whatever local/guest
+    // progress exists up to the cloud so it isn't lost
+    await saveCloudProfile(user.id, profile);
+  }
+  authError = null;
+  authLoading = false;
+  goTo('menu');
+}
+
+async function handleLogin(username: string, password: string) {
+  authLoading = true;
+  authError = null;
+  render();
+  const result = await signIn(username, password);
+  if (!result.ok || !result.user) {
+    authLoading = false;
+    authError = result.error ?? '로그인에 실패했습니다.';
+    render();
+    return;
+  }
+  await adoptLoggedInProfile(result.user);
+}
+
+async function handleSignup(username: string, password: string) {
+  authLoading = true;
+  authError = null;
+  render();
+  const result = await signUp(username, password);
+  if (!result.ok || !result.user) {
+    authLoading = false;
+    authError = result.error ?? '회원가입에 실패했습니다.';
+    render();
+    return;
+  }
+  await adoptLoggedInProfile(result.user);
+}
+
+async function handleLogout() {
+  await signOut();
+  authUser = null;
+  goTo('auth');
+}
+
+async function init() {
+  render();
+  if (isCloudConfigured) {
+    const existingUser = await getCurrentUser();
+    if (existingUser) {
+      await adoptLoggedInProfile(existingUser);
+      return;
+    }
+  }
+  goTo('auth');
+}
+
+init();
