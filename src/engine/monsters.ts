@@ -138,6 +138,25 @@ export function pickRandomMonster(): MonsterDef {
   return MONSTERS[Math.floor(Math.random() * MONSTERS.length)];
 }
 
+const MAX_GRADE = 10;
+const OCCASIONAL_GRADE_CHANCE = 0.2;
+
+function monstersOfGrade(grade: number): MonsterDef[] {
+  return MONSTERS.filter((m) => m.grade === grade);
+}
+
+export function pickMonsterForFloor(floor: number): MonsterDef {
+  const primaryGrades = [floor, Math.min(floor + 1, MAX_GRADE)];
+  const occasionalGrade = Math.min(floor + 2, MAX_GRADE);
+
+  const useOccasional = Math.random() < OCCASIONAL_GRADE_CHANCE;
+  const grade = useOccasional ? occasionalGrade : primaryGrades[Math.floor(Math.random() * primaryGrades.length)];
+
+  const candidates = monstersOfGrade(grade);
+  if (candidates.length === 0) return pickRandomMonster();
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
 const ESSENCE_DROP_CHANCE = 0.001;
 const MANA_STONE_DROP_CHANCE = 0.05;
 

@@ -25,6 +25,14 @@ body {
   gap: 12px;
 }
 
+.dungeon-floor {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #b98fe0;
+  letter-spacing: 0.02em;
+}
+
 .board {
   display: flex;
   justify-content: space-between;

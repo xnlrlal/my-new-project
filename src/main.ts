@@ -2,7 +2,7 @@ import './style.css';
 import type { GameState } from './engine/types';
 import type { RaceDef } from './engine/races';
 import type { MonsterDef } from './engine/monsters';
-import { pickRandomMonster, rollEssenceDrop, rollManaStoneDrop } from './engine/monsters';
+import { pickMonsterForFloor, rollEssenceDrop, rollManaStoneDrop } from './engine/monsters';
 import { initGame, playCard, endTurn } from './engine/engine';
 import {
   loadProfile,
@@ -44,6 +44,7 @@ let dropChecked = false;
 let pendingEssence: EquippedEssence | null = null;
 let essenceOutcome: string | null = null;
 let returnScreen: Screen = 'stats';
+let dungeonFloor = 1;
 
 function render() {
   if (screen === 'menu') {
@@ -91,7 +92,7 @@ function render() {
 
   if (screen === 'stats' && selectedRace) {
     renderStats(app, selectedRace, profile, {
-      onStartBattle: startBattle,
+      onStartBattle: enterDungeon,
       onBack: () => goTo('character-select'),
       onOpenInventory: () => openSubScreen('inventory'),
       onOpenEquipment: () => openSubScreen('equipment'),
@@ -104,6 +105,7 @@ function render() {
     renderBattle(
       app,
       state,
+      dungeonFloor,
       expResult,
       { pending: pendingEssence, outcome: essenceOutcome },
       {
@@ -115,7 +117,10 @@ function render() {
           state = endTurn(state!);
           afterStateChange();
         },
-        onContinue: startBattle,
+        onContinue: () => {
+          if (state?.status === 'win') advanceFloor();
+          else retryFloor();
+        },
         onExitToMenu: () => goTo('menu'),
         onAbsorbEssence: () => {
           if (!pendingEssence) return;
@@ -158,9 +163,23 @@ function goTo(next: Screen) {
   render();
 }
 
-function startBattle() {
+function enterDungeon() {
+  dungeonFloor = 1;
+  startFloorBattle();
+}
+
+function advanceFloor() {
+  dungeonFloor += 1;
+  startFloorBattle();
+}
+
+function retryFloor() {
+  startFloorBattle();
+}
+
+function startFloorBattle() {
   if (!selectedRace) return;
-  currentMonster = pickRandomMonster();
+  currentMonster = pickMonsterForFloor(dungeonFloor);
   const bonusCards = essenceSkillCards(profile.essences);
   const totalStats = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear);
   state = initGame(totalStats, currentMonster, bonusCards);

@@ -54,7 +54,7 @@ export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerPro
           ${skillsHtml}
         </div>
       </div>
-      <button class="menu-start" id="battle-btn">전투 시작</button>
+      <button class="menu-start" id="battle-btn">미궁 입장</button>
       <div class="nav-row">
         <button class="menu-return small" id="inventory-btn">인벤토리</button>
         <button class="menu-return small" id="equipment-btn">장비창</button>
