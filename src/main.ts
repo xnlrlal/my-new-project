@@ -23,12 +23,15 @@ import { createEssenceFromMonster, essenceSkillCards, type EquippedEssence } fro
 import { computeTotalStats } from './engine/stats-calc';
 import { pickRandomGear, rollGearDrop, createGearInstance, type EquipmentSlot } from './engine/gear';
 import {
-  generateDungeonMap,
+  generateMaze,
   randomStartPosition,
-  isAtPortal,
+  cellAt,
+  availableMoves,
   rollBattleOnMove,
-  type DungeonMap,
-  type DungeonPosition,
+  zoneLabel,
+  type ArmZone,
+  type DungeonMaze,
+  type GridPos,
   type Zone,
 } from './engine/dungeon';
 import { renderMenu } from './ui/menu';
@@ -58,9 +61,10 @@ let pendingEssence: EquippedEssence | null = null;
 let essenceOutcome: string | null = null;
 let returnScreen: Screen = 'stats';
 
-let dungeonFloor = 1;
-let dungeonMap: DungeonMap | null = null;
-let dungeonPos: DungeonPosition | null = null;
+let dungeonFloor: 1 | 2 = 1;
+let dungeonThemeZone: ArmZone | null = null;
+let maze: DungeonMaze | null = null;
+let pos: GridPos | null = null;
 let dungeonMessage: string | null = null;
 let portalMessage: string | null = null;
 
@@ -119,10 +123,13 @@ function render() {
     return;
   }
 
-  if (screen === 'dungeon-map' && dungeonMap && dungeonPos) {
-    renderDungeonMap(app, dungeonFloor, dungeonPos, dungeonMap, dungeonMessage, portalMessage, {
+  if (screen === 'dungeon-map' && maze && pos) {
+    const cell = cellAt(maze, pos);
+    const moves = availableMoves(maze, pos);
+    const floorLabel = dungeonFloor === 1 ? '미궁 1층' : `${zoneLabel(dungeonThemeZone!)} 미궁 2층`;
+    renderDungeonMap(app, floorLabel, dungeonFloor, cell, moves, dungeonMessage, portalMessage, {
       onMove: handleMove,
-      onAdvanceFloor: advanceFloor,
+      onEnterPortal: enterFloorTwo,
       onExitToMenu: exitDungeonToMenu,
       onOpenInventory: () => openSubScreen('inventory'),
       onOpenEquipment: () => openSubScreen('equipment'),
@@ -132,10 +139,11 @@ function render() {
   }
 
   if (screen === 'battle' && state) {
+    const floorLabel = dungeonFloor === 1 ? '미궁 1층' : `${zoneLabel(dungeonThemeZone!)} 미궁 2층`;
     renderBattle(
       app,
       state,
-      dungeonFloor,
+      floorLabel,
       expResult,
       { pending: pendingEssence, outcome: essenceOutcome },
       {
@@ -151,8 +159,8 @@ function render() {
           if (state?.status === 'win') {
             dungeonMessage = '전투에서 승리했다.';
             goTo('dungeon-map');
-          } else if (dungeonPos) {
-            startZoneBattle(dungeonPos.zone);
+          } else if (maze && pos) {
+            startZoneBattle(cellAt(maze, pos).zone);
           }
         },
         onExitToMenu: exitDungeonToMenu,
@@ -198,37 +206,42 @@ function goTo(next: Screen) {
 }
 
 function exitDungeonToMenu() {
-  dungeonMap = null;
-  dungeonPos = null;
+  dungeonFloor = 1;
+  dungeonThemeZone = null;
+  maze = null;
+  pos = null;
   goTo('menu');
 }
 
 function enterDungeon() {
   dungeonFloor = 1;
-  dungeonMap = generateDungeonMap();
-  dungeonPos = randomStartPosition();
+  dungeonThemeZone = null;
+  maze = generateMaze(null);
+  pos = randomStartPosition();
   dungeonMessage = '미궁에 들어섰다.';
   portalMessage = null;
   goTo('dungeon-map');
 }
 
-function advanceFloor() {
-  dungeonFloor += 1;
-  dungeonMap = generateDungeonMap();
-  dungeonPos = randomStartPosition();
-  dungeonMessage = `${dungeonFloor}층으로 이동했다.`;
+function enterFloorTwo(themeZone: ArmZone) {
+  dungeonFloor = 2;
+  dungeonThemeZone = themeZone;
+  maze = generateMaze(themeZone);
+  pos = randomStartPosition();
+  dungeonMessage = `${zoneLabel(themeZone)} 미궁(2층)에 들어섰다.`;
   portalMessage = null;
   goTo('dungeon-map');
 }
 
-function handleMove(next: DungeonPosition) {
-  if (!dungeonMap) return;
-  dungeonPos = next;
+function handleMove(next: GridPos) {
+  if (!maze) return;
+  pos = next;
+  const cell = cellAt(maze, next);
 
-  if (isAtPortal(dungeonMap, next)) {
+  if (cell.portal) {
     dungeonMessage = null;
-    if (!dungeonMap.portalBonusGranted) {
-      dungeonMap.portalBonusGranted = true;
+    if (!maze.portalsFound.has(cell.portal)) {
+      maze.portalsFound.add(cell.portal);
       const result = addExp(profile, PORTAL_EXP_BONUS);
       profile = result.profile;
       saveProfile(profile);
@@ -242,7 +255,7 @@ function handleMove(next: DungeonPosition) {
 
   portalMessage = null;
   if (rollBattleOnMove()) {
-    startZoneBattle(next.zone);
+    startZoneBattle(cell.zone);
   } else {
     dungeonMessage = '조용히 이동했다.';
     render();

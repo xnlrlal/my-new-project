@@ -1,65 +1,148 @@
 export type Zone = 'center' | 'north' | 'east' | 'south' | 'west';
 export type ArmZone = 'north' | 'east' | 'south' | 'west';
 
-export const ARMS: ArmZone[] = ['north', 'east', 'south', 'west'];
+export type Direction = 'N' | 'E' | 'S' | 'W';
 
-export interface DungeonPosition {
+export interface GridPos {
+  x: number;
+  y: number;
+}
+
+const DIRECTIONS: Direction[] = ['N', 'E', 'S', 'W'];
+
+const DIRECTION_DELTA: Record<Direction, GridPos> = {
+  N: { x: 0, y: 1 },
+  S: { x: 0, y: -1 },
+  E: { x: 1, y: 0 },
+  W: { x: -1, y: 0 },
+};
+
+const OPPOSITE: Record<Direction, Direction> = { N: 'S', S: 'N', E: 'W', W: 'E' };
+
+const DIRECTION_TO_ZONE: Record<Direction, ArmZone> = { N: 'north', S: 'south', E: 'east', W: 'west' };
+
+export const DIRECTION_LABEL: Record<Direction, string> = { N: '북쪽', E: '동쪽', S: '남쪽', W: '서쪽' };
+
+const RADIUS = 2;
+
+function cellKey(pos: GridPos): string {
+  return `${pos.x},${pos.y}`;
+}
+
+function inBounds(pos: GridPos): boolean {
+  return Math.abs(pos.x) <= RADIUS && Math.abs(pos.y) <= RADIUS;
+}
+
+function zoneForPos(pos: GridPos, themeZone: ArmZone | null): Zone {
+  if (themeZone) return themeZone;
+  if (Math.max(Math.abs(pos.x), Math.abs(pos.y)) <= 1) return 'center';
+  if (Math.abs(pos.y) >= Math.abs(pos.x)) return pos.y > 0 ? 'north' : 'south';
+  return pos.x > 0 ? 'east' : 'west';
+}
+
+export interface DungeonCell {
+  pos: GridPos;
+  open: Partial<Record<Direction, true>>;
   zone: Zone;
-  distance: number;
+  portal: ArmZone | null;
 }
 
-export interface DungeonMap {
-  armLengths: Record<ArmZone, number>;
-  portalBonusGranted: boolean;
+export interface DungeonMaze {
+  cells: Map<string, DungeonCell>;
+  portalsFound: Set<ArmZone>;
+  themeZone: ArmZone | null;
 }
 
-const MIN_ARM_LENGTH = 3;
-const MAX_ARM_LENGTH = 6;
-const BATTLE_CHANCE_ON_MOVE = 0.55;
-
-function randomArmLength(): number {
-  return MIN_ARM_LENGTH + Math.floor(Math.random() * (MAX_ARM_LENGTH - MIN_ARM_LENGTH + 1));
+function shuffle<T>(items: T[]): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
 
-export function generateDungeonMap(): DungeonMap {
-  const armLengths = {} as Record<ArmZone, number>;
-  for (const arm of ARMS) armLengths[arm] = randomArmLength();
-  return { armLengths, portalBonusGranted: false };
+export function generateMaze(themeZone: ArmZone | null): DungeonMaze {
+  const cells = new Map<string, DungeonCell>();
+
+  for (let x = -RADIUS; x <= RADIUS; x++) {
+    for (let y = -RADIUS; y <= RADIUS; y++) {
+      const pos = { x, y };
+      cells.set(cellKey(pos), { pos, open: {}, zone: zoneForPos(pos, themeZone), portal: null });
+    }
+  }
+
+  cells.get(cellKey({ x: 0, y: RADIUS }))!.portal = 'north';
+  cells.get(cellKey({ x: 0, y: -RADIUS }))!.portal = 'south';
+  cells.get(cellKey({ x: RADIUS, y: 0 }))!.portal = 'east';
+  cells.get(cellKey({ x: -RADIUS, y: 0 }))!.portal = 'west';
+
+  // Randomized DFS (recursive backtracker) spanning tree over every cell,
+  // starting from the origin. A spanning tree connects every cell to every
+  // other cell exactly once, so all 4 portals are always reachable, while
+  // naturally producing dead ends elsewhere.
+  const visited = new Set<string>([cellKey({ x: 0, y: 0 })]);
+  const stack: GridPos[] = [{ x: 0, y: 0 }];
+
+  while (stack.length > 0) {
+    const current = stack[stack.length - 1];
+    const currentKey = cellKey(current);
+
+    const candidates = shuffle(DIRECTIONS)
+      .map((dir) => ({ dir, pos: { x: current.x + DIRECTION_DELTA[dir].x, y: current.y + DIRECTION_DELTA[dir].y } }))
+      .filter(({ pos }) => inBounds(pos) && !visited.has(cellKey(pos)));
+
+    if (candidates.length === 0) {
+      stack.pop();
+      continue;
+    }
+
+    const { dir, pos } = candidates[0];
+    cells.get(currentKey)!.open[dir] = true;
+    cells.get(cellKey(pos))!.open[OPPOSITE[dir]] = true;
+    visited.add(cellKey(pos));
+    stack.push(pos);
+  }
+
+  return { cells, portalsFound: new Set(), themeZone };
 }
 
-export function randomStartPosition(): DungeonPosition {
-  if (Math.random() < 0.5) return { zone: 'center', distance: 0 };
-  const arm = ARMS[Math.floor(Math.random() * ARMS.length)];
-  return { zone: arm, distance: 1 };
+export function cellAt(maze: DungeonMaze, pos: GridPos): DungeonCell {
+  const cell = maze.cells.get(cellKey(pos));
+  if (!cell) throw new Error(`No cell at ${cellKey(pos)}`);
+  return cell;
 }
 
-export function isAtPortal(map: DungeonMap, pos: DungeonPosition): boolean {
-  return pos.zone !== 'center' && pos.distance >= map.armLengths[pos.zone];
+export function randomStartPosition(): GridPos {
+  const candidates: GridPos[] = [];
+  for (let x = -1; x <= 1; x++) {
+    for (let y = -1; y <= 1; y++) {
+      candidates.push({ x, y });
+    }
+  }
+  return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
 export interface DungeonMove {
+  direction: Direction;
   label: string;
-  next: DungeonPosition;
+  next: GridPos;
 }
 
-export function availableMoves(pos: DungeonPosition, map: DungeonMap): DungeonMove[] {
-  if (pos.zone === 'center') {
-    return ARMS.map((arm) => ({ label: `${zoneLabel(arm)}으로`, next: { zone: arm, distance: 1 } }));
-  }
-
-  const moves: DungeonMove[] = [
-    {
-      label: pos.distance === 1 ? '중심부로 돌아가기' : '한 걸음 물러나기',
-      next: pos.distance === 1 ? { zone: 'center', distance: 0 } : { zone: pos.zone, distance: pos.distance - 1 },
-    },
-  ];
-
-  if (pos.distance < map.armLengths[pos.zone]) {
-    moves.push({ label: '더 깊이 들어가기', next: { zone: pos.zone, distance: pos.distance + 1 } });
-  }
-
-  return moves;
+export function availableMoves(maze: DungeonMaze, pos: GridPos): DungeonMove[] {
+  const cell = cellAt(maze, pos);
+  return DIRECTIONS.filter((dir) => cell.open[dir]).map((dir) => ({
+    direction: dir,
+    label: `${DIRECTION_LABEL[dir]}으로 이동`,
+    next: { x: pos.x + DIRECTION_DELTA[dir].x, y: pos.y + DIRECTION_DELTA[dir].y },
+  }));
 }
+
+export function portalZoneFor(direction: Direction): ArmZone {
+  return DIRECTION_TO_ZONE[direction];
+}
+
+const BATTLE_CHANCE_ON_MOVE = 0.55;
 
 export function rollBattleOnMove(): boolean {
   return Math.random() < BATTLE_CHANCE_ON_MOVE;

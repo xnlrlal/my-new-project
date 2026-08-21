@@ -36,7 +36,7 @@ function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number): st
 export function renderBattle(
   root: HTMLElement,
   state: GameState,
-  dungeonFloor: number,
+  floorLabel: string,
   expResult: ExpGrantResult | null,
   essenceDrop: EssenceDropState,
   handlers: BattleHandlers
@@ -91,7 +91,7 @@ export function renderBattle(
       <button class="nav-link" id="open-equipment">장비창</button>
       <button class="nav-link" id="open-codex">정수창</button>
     </div>
-    <div class="dungeon-floor">미궁 ${dungeonFloor}층</div>
+    <div class="dungeon-floor">${floorLabel}</div>
     ${banner}
     <div class="board">
       ${renderActor(enemy, 'enemy', state.enemyGrade)}

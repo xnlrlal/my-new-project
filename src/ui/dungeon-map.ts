@@ -1,9 +1,9 @@
-import type { DungeonMap, DungeonMove, DungeonPosition } from '../engine/dungeon';
-import { availableMoves, isAtPortal, zoneFlavor, zoneLabel } from '../engine/dungeon';
+import type { ArmZone, DungeonCell, DungeonMove } from '../engine/dungeon';
+import { zoneFlavor, zoneLabel } from '../engine/dungeon';
 
 export interface DungeonMapHandlers {
-  onMove: (next: DungeonPosition) => void;
-  onAdvanceFloor: () => void;
+  onMove: (next: DungeonMove['next']) => void;
+  onEnterPortal: (zone: ArmZone) => void;
   onExitToMenu: () => void;
   onOpenInventory: () => void;
   onOpenEquipment: () => void;
@@ -12,29 +12,32 @@ export interface DungeonMapHandlers {
 
 export function renderDungeonMap(
   root: HTMLElement,
+  floorLabel: string,
   floor: number,
-  pos: DungeonPosition,
-  map: DungeonMap,
+  cell: DungeonCell,
+  moves: DungeonMove[],
   message: string | null,
   portalMessage: string | null,
   handlers: DungeonMapHandlers
 ) {
-  const atPortal = isAtPortal(map, pos);
-  const moves: DungeonMove[] = atPortal ? [] : availableMoves(pos, map);
-
-  const locationLine =
-    pos.zone === 'center' ? zoneLabel('center') : `${zoneLabel(pos.zone)} · ${pos.distance}걸음째`;
-
-  const portalPanel = atPortal
-    ? `
-      <div class="essence-drop">
-        <div class="essence-drop-title">포탈비석을 발견했습니다!</div>
-        ${portalMessage ? `<div class="essence-drop-detail">${portalMessage}</div>` : ''}
-        <div class="essence-drop-actions">
-          <button class="menu-start" id="advance-floor">다음 층으로 이동</button>
+  const portalPanel = cell.portal
+    ? floor === 1
+      ? `
+        <div class="essence-drop">
+          <div class="essence-drop-title">${zoneLabel(cell.portal)} 포탈비석을 발견했습니다!</div>
+          ${portalMessage ? `<div class="essence-drop-detail">${portalMessage}</div>` : ''}
+          <div class="essence-drop-actions">
+            <button class="menu-start" id="enter-portal">이 포탈로 2층 입장</button>
+          </div>
         </div>
-      </div>
-    `
+      `
+      : `
+        <div class="essence-drop">
+          <div class="essence-drop-title">포탈비석을 발견했습니다!</div>
+          ${portalMessage ? `<div class="essence-drop-detail">${portalMessage}</div>` : ''}
+          <div class="essence-drop-detail">다음 구간은 아직 준비 중입니다. 이어서 업데이트될 예정입니다.</div>
+        </div>
+      `
     : '';
 
   const movesHtml = moves
@@ -47,15 +50,15 @@ export function renderDungeonMap(
       <button class="nav-link" id="open-equipment">장비창</button>
       <button class="nav-link" id="open-codex">정수창</button>
     </div>
-    <div class="dungeon-floor">미궁 ${floor}층</div>
+    <div class="dungeon-floor">${floorLabel}</div>
     <div class="dungeon-screen">
       <div class="stats-card">
-        <div class="stats-race">${locationLine}</div>
-        <div class="stat-line">${zoneFlavor(pos.zone)}</div>
+        <div class="stats-race">${zoneLabel(cell.zone)}</div>
+        <div class="stat-line">${zoneFlavor(cell.zone)}</div>
         ${message ? `<div class="stat-line dungeon-message">${message}</div>` : ''}
       </div>
       ${portalPanel}
-      ${!atPortal ? `<div class="race-list">${movesHtml}</div>` : ''}
+      <div class="race-list">${movesHtml}</div>
       <button class="menu-return small" id="exit-menu">메인 메뉴로</button>
     </div>
   `;
@@ -67,7 +70,9 @@ export function renderDungeonMap(
     });
   });
 
-  document.getElementById('advance-floor')?.addEventListener('click', handlers.onAdvanceFloor);
+  document.getElementById('enter-portal')?.addEventListener('click', () => {
+    if (cell.portal) handlers.onEnterPortal(cell.portal);
+  });
   document.getElementById('exit-menu')?.addEventListener('click', handlers.onExitToMenu);
   document.getElementById('open-inventory')?.addEventListener('click', handlers.onOpenInventory);
   document.getElementById('open-equipment')?.addEventListener('click', handlers.onOpenEquipment);
