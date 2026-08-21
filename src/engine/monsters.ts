@@ -30,6 +30,17 @@ export const MONSTERS: MonsterDef[] = [
     },
   },
   {
+    id: 'bat',
+    name: '박쥐',
+    grade: 1,
+    maxHp: 16,
+    maxMana: 3,
+    essence: {
+      statBonus: { maxMana: 1 },
+      skill: { name: '날카로운 이빨', cost: 1, effect: 'damage', value: 5, description: '적에게 5의 피해를 준다.' },
+    },
+  },
+  {
     id: 'goblin',
     name: '고블린',
     grade: 2,
@@ -38,6 +49,17 @@ export const MONSTERS: MonsterDef[] = [
     essence: {
       statBonus: { attackBonus: 1 },
       skill: { name: '기습', cost: 1, effect: 'damage', value: 7, description: '적에게 7의 피해를 준다.' },
+    },
+  },
+  {
+    id: 'rat-pack',
+    name: '들쥐 떼',
+    grade: 2,
+    maxHp: 22,
+    maxMana: 2,
+    essence: {
+      statBonus: { maxHp: 3 },
+      skill: { name: '물어뜯기 연타', cost: 1, effect: 'damage', value: 6, description: '적에게 6의 피해를 준다.' },
     },
   },
   {
@@ -52,6 +74,17 @@ export const MONSTERS: MonsterDef[] = [
     },
   },
   {
+    id: 'kobold',
+    name: '코볼트',
+    grade: 3,
+    maxHp: 28,
+    maxMana: 3,
+    essence: {
+      statBonus: { defenseBonus: 1 },
+      skill: { name: '창 찌르기', cost: 2, effect: 'damage', value: 9, description: '적에게 9의 피해를 준다.' },
+    },
+  },
+  {
     id: 'bandit',
     name: '도적',
     grade: 4,
@@ -60,6 +93,17 @@ export const MONSTERS: MonsterDef[] = [
     essence: {
       statBonus: { maxMana: 1 },
       skill: { name: '은신 일격', cost: 1, effect: 'damage', value: 8, description: '은신 후 기습하여 8의 피해를 준다.' },
+    },
+  },
+  {
+    id: 'skeleton-soldier',
+    name: '해골 병사',
+    grade: 4,
+    maxHp: 34,
+    maxMana: 3,
+    essence: {
+      statBonus: { defenseBonus: 1, maxHp: 2 },
+      skill: { name: '뼈 방패', cost: 1, effect: 'shield', value: 6, description: '방어막 6을 얻는다.' },
     },
   },
   {
@@ -74,6 +118,17 @@ export const MONSTERS: MonsterDef[] = [
     },
   },
   {
+    id: 'harpy',
+    name: '하피',
+    grade: 5,
+    maxHp: 40,
+    maxMana: 4,
+    essence: {
+      statBonus: { maxMana: 1, attackBonus: 1 },
+      skill: { name: '발톱 할퀴기', cost: 2, effect: 'damage', value: 12, description: '적에게 12의 피해를 준다.' },
+    },
+  },
+  {
     id: 'dark-mage',
     name: '다크 메이지',
     grade: 6,
@@ -82,6 +137,17 @@ export const MONSTERS: MonsterDef[] = [
     essence: {
       statBonus: { maxMana: 1 },
       skill: { name: '화염구', cost: 2, effect: 'damage', value: 12, description: '적에게 화염 피해 12를 준다.' },
+    },
+  },
+  {
+    id: 'spectre',
+    name: '스펙터',
+    grade: 6,
+    maxHp: 38,
+    maxMana: 5,
+    essence: {
+      statBonus: { attackBonus: 2 },
+      skill: { name: '저주', cost: 2, effect: 'damage', value: 11, description: '적에게 11의 피해를 준다.' },
     },
   },
   {
@@ -96,6 +162,17 @@ export const MONSTERS: MonsterDef[] = [
     },
   },
   {
+    id: 'ogre',
+    name: '오우거',
+    grade: 7,
+    maxHp: 58,
+    maxMana: 3,
+    essence: {
+      statBonus: { maxHp: 8 },
+      skill: { name: '짓밟기', cost: 2, effect: 'damage', value: 15, description: '적에게 15의 피해를 준다.' },
+    },
+  },
+  {
     id: 'wyvern',
     name: '와이번',
     grade: 8,
@@ -104,6 +181,17 @@ export const MONSTERS: MonsterDef[] = [
     essence: {
       statBonus: { defenseBonus: 2 },
       skill: { name: '급강하', cost: 2, effect: 'damage', value: 11, description: '적에게 11의 피해를 준다.' },
+    },
+  },
+  {
+    id: 'griffon',
+    name: '그리폰',
+    grade: 8,
+    maxHp: 58,
+    maxMana: 4,
+    essence: {
+      statBonus: { attackBonus: 1, defenseBonus: 1 },
+      skill: { name: '폭풍 발톱', cost: 2, effect: 'damage', value: 13, description: '적에게 13의 피해를 준다.' },
     },
   },
   {
@@ -118,6 +206,17 @@ export const MONSTERS: MonsterDef[] = [
     },
   },
   {
+    id: 'vampire-lord',
+    name: '뱀파이어 로드',
+    grade: 9,
+    maxHp: 60,
+    maxMana: 6,
+    essence: {
+      statBonus: { maxHp: 5, maxMana: 1 },
+      skill: { name: '흡혈 일격', cost: 2, effect: 'damage', value: 13, description: '적에게 13의 피해를 준다.' },
+    },
+  },
+  {
     id: 'dragon',
     name: '드래곤',
     grade: 10,
@@ -126,6 +225,17 @@ export const MONSTERS: MonsterDef[] = [
     essence: {
       statBonus: { maxHp: 8, attackBonus: 2, defenseBonus: 2 },
       skill: { name: '브레스', cost: 3, effect: 'damage', value: 20, description: '적에게 20의 강력한 피해를 준다.' },
+    },
+  },
+  {
+    id: 'hellfire-spirit',
+    name: '지옥불 정령',
+    grade: 10,
+    maxHp: 85,
+    maxMana: 6,
+    essence: {
+      statBonus: { attackBonus: 3 },
+      skill: { name: '화염 채찍', cost: 3, effect: 'damage', value: 22, description: '적에게 22의 화염 피해를 준다.' },
     },
   },
 ];
