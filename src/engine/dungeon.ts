@@ -1,54 +1,41 @@
 export type Zone = 'center' | 'north' | 'east' | 'south' | 'west';
 export type ArmZone = 'north' | 'east' | 'south' | 'west';
 
-export type Direction = 'N' | 'E' | 'S' | 'W';
+export type CellId = string;
 
-export interface GridPos {
-  x: number;
-  y: number;
+const RING_SIZE = 8;
+
+// 8 angular slots around each ring: N, NE, E, SE, S, SW, W, NW
+const COMPASS_LABEL = ['북쪽', '북동쪽', '동쪽', '남동쪽', '남쪽', '남서쪽', '서쪽', '북서쪽'];
+
+const PORTAL_INDEX: Record<ArmZone, number> = { north: 0, east: 2, south: 4, west: 6 };
+
+function zoneForIndex(idx: number): ArmZone {
+  if (idx === 0 || idx === 1) return 'north';
+  if (idx === 2 || idx === 3) return 'east';
+  if (idx === 4 || idx === 5) return 'south';
+  return 'west';
 }
 
-const DIRECTIONS: Direction[] = ['N', 'E', 'S', 'W'];
-
-const DIRECTION_DELTA: Record<Direction, GridPos> = {
-  N: { x: 0, y: 1 },
-  S: { x: 0, y: -1 },
-  E: { x: 1, y: 0 },
-  W: { x: -1, y: 0 },
-};
-
-const OPPOSITE: Record<Direction, Direction> = { N: 'S', S: 'N', E: 'W', W: 'E' };
-
-const DIRECTION_TO_ZONE: Record<Direction, ArmZone> = { N: 'north', S: 'south', E: 'east', W: 'west' };
-
-export const DIRECTION_LABEL: Record<Direction, string> = { N: '북쪽', E: '동쪽', S: '남쪽', W: '서쪽' };
-
-const RADIUS = 2;
-
-function cellKey(pos: GridPos): string {
-  return `${pos.x},${pos.y}`;
+function ring1Id(i: number): CellId {
+  return `ring1-${((i % RING_SIZE) + RING_SIZE) % RING_SIZE}`;
 }
 
-function inBounds(pos: GridPos): boolean {
-  return Math.abs(pos.x) <= RADIUS && Math.abs(pos.y) <= RADIUS;
-}
-
-function zoneForPos(pos: GridPos, themeZone: ArmZone | null): Zone {
-  if (themeZone) return themeZone;
-  if (Math.max(Math.abs(pos.x), Math.abs(pos.y)) <= 1) return 'center';
-  if (Math.abs(pos.y) >= Math.abs(pos.x)) return pos.y > 0 ? 'north' : 'south';
-  return pos.x > 0 ? 'east' : 'west';
+function ring2Id(i: number): CellId {
+  return `ring2-${((i % RING_SIZE) + RING_SIZE) % RING_SIZE}`;
 }
 
 export interface DungeonCell {
-  pos: GridPos;
-  open: Partial<Record<Direction, true>>;
+  id: CellId;
+  ring: 0 | 1 | 2;
+  index: number;
+  open: Set<CellId>;
   zone: Zone;
   portal: ArmZone | null;
 }
 
 export interface DungeonMaze {
-  cells: Map<string, DungeonCell>;
+  cells: Map<CellId, DungeonCell>;
   portalsFound: Set<ArmZone>;
   themeZone: ArmZone | null;
 }
@@ -62,90 +49,123 @@ function shuffle<T>(items: T[]): T[] {
   return result;
 }
 
-export function generateMaze(themeZone: ArmZone | null): DungeonMaze {
-  const cells = new Map<string, DungeonCell>();
+class UnionFind {
+  private parent = new Map<CellId, CellId>();
 
-  for (let x = -RADIUS; x <= RADIUS; x++) {
-    for (let y = -RADIUS; y <= RADIUS; y++) {
-      const pos = { x, y };
-      cells.set(cellKey(pos), { pos, open: {}, zone: zoneForPos(pos, themeZone), portal: null });
+  private find(x: CellId): CellId {
+    const p = this.parent.get(x) ?? x;
+    if (p === x) {
+      this.parent.set(x, x);
+      return x;
     }
+    const root = this.find(p);
+    this.parent.set(x, root);
+    return root;
   }
 
-  cells.get(cellKey({ x: 0, y: RADIUS }))!.portal = 'north';
-  cells.get(cellKey({ x: 0, y: -RADIUS }))!.portal = 'south';
-  cells.get(cellKey({ x: RADIUS, y: 0 }))!.portal = 'east';
-  cells.get(cellKey({ x: -RADIUS, y: 0 }))!.portal = 'west';
+  union(a: CellId, b: CellId): void {
+    const ra = this.find(a);
+    const rb = this.find(b);
+    if (ra !== rb) this.parent.set(ra, rb);
+  }
 
-  // Randomized DFS (recursive backtracker) spanning tree over every cell,
-  // starting from the origin. A spanning tree connects every cell to every
-  // other cell exactly once, so all 4 portals are always reachable, while
-  // naturally producing dead ends elsewhere.
-  const visited = new Set<string>([cellKey({ x: 0, y: 0 })]);
-  const stack: GridPos[] = [{ x: 0, y: 0 }];
+  connected(a: CellId, b: CellId): boolean {
+    return this.find(a) === this.find(b);
+  }
+}
 
-  while (stack.length > 0) {
-    const current = stack[stack.length - 1];
-    const currentKey = cellKey(current);
+function connect(cells: Map<CellId, DungeonCell>, a: CellId, b: CellId): void {
+  cells.get(a)!.open.add(b);
+  cells.get(b)!.open.add(a);
+}
 
-    const candidates = shuffle(DIRECTIONS)
-      .map((dir) => ({ dir, pos: { x: current.x + DIRECTION_DELTA[dir].x, y: current.y + DIRECTION_DELTA[dir].y } }))
-      .filter(({ pos }) => inBounds(pos) && !visited.has(cellKey(pos)));
+export function generateMaze(themeZone: ArmZone | null): DungeonMaze {
+  const cells = new Map<CellId, DungeonCell>();
 
-    if (candidates.length === 0) {
-      stack.pop();
-      continue;
+  cells.set('center', { id: 'center', ring: 0, index: -1, open: new Set(), zone: 'center', portal: null });
+  for (let i = 0; i < RING_SIZE; i++) {
+    cells.set(ring1Id(i), { id: ring1Id(i), ring: 1, index: i, open: new Set(), zone: themeZone ?? zoneForIndex(i), portal: null });
+  }
+  for (let i = 0; i < RING_SIZE; i++) {
+    const portal = (Object.keys(PORTAL_INDEX) as ArmZone[]).find((z) => PORTAL_INDEX[z] === i) ?? null;
+    cells.set(ring2Id(i), { id: ring2Id(i), ring: 2, index: i, open: new Set(), zone: themeZone ?? zoneForIndex(i), portal });
+  }
+
+  const uf = new UnionFind();
+
+  // The outer ring (가장자리) is always a fully open loop, so every cell on
+  // it — including all 4 portals — is directly reachable from its neighbors
+  // with no dead ends, no matter how the inward maze turns out.
+  for (let i = 0; i < RING_SIZE; i++) {
+    connect(cells, ring2Id(i), ring2Id(i + 1));
+    uf.union(ring2Id(i), ring2Id(i + 1));
+  }
+
+  // Randomized Kruskal's algorithm over the remaining candidate passages
+  // (center<->ring1 spokes, ring1<->ring2 spokes, ring1 circumferential)
+  // connects the center and inner ring into the already-unified outer loop.
+  // Only as many edges as needed to reach full connectivity get opened, so
+  // this branch of the maze still produces genuine dead ends.
+  const candidates: [CellId, CellId][] = [];
+  for (let i = 0; i < RING_SIZE; i++) {
+    candidates.push(['center', ring1Id(i)]);
+    candidates.push([ring1Id(i), ring2Id(i)]);
+    candidates.push([ring1Id(i), ring1Id(i + 1)]);
+  }
+
+  for (const [a, b] of shuffle(candidates)) {
+    if (!uf.connected(a, b)) {
+      uf.union(a, b);
+      connect(cells, a, b);
     }
-
-    const { dir, pos } = candidates[0];
-    cells.get(currentKey)!.open[dir] = true;
-    cells.get(cellKey(pos))!.open[OPPOSITE[dir]] = true;
-    visited.add(cellKey(pos));
-    stack.push(pos);
   }
 
   return { cells, portalsFound: new Set(), themeZone };
 }
 
-export function cellAt(maze: DungeonMaze, pos: GridPos): DungeonCell {
-  const cell = maze.cells.get(cellKey(pos));
-  if (!cell) throw new Error(`No cell at ${cellKey(pos)}`);
+export function cellAt(maze: DungeonMaze, id: CellId): DungeonCell {
+  const cell = maze.cells.get(id);
+  if (!cell) throw new Error(`No cell with id ${id}`);
   return cell;
 }
 
-export function randomStartPosition(): GridPos {
-  const candidates: GridPos[] = [];
-  for (let x = -1; x <= 1; x++) {
-    for (let y = -1; y <= 1; y++) {
-      candidates.push({ x, y });
-    }
-  }
+export function randomStartPosition(): CellId {
+  const candidates: CellId[] = ['center'];
+  for (let i = 0; i < RING_SIZE; i++) candidates.push(ring1Id(i));
   return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
+export const BASE_BATTLE_CHANCE = 0.55;
+
+export function rollBattle(chance: number): boolean {
+  return Math.random() < chance;
+}
+
+function cellLabel(cell: DungeonCell): string {
+  if (cell.id === 'center') return '중심부';
+  const compass = COMPASS_LABEL[cell.index];
+  if (cell.portal) return `${compass} 포탈`;
+  return cell.ring === 1 ? `${compass} (중간 고리)` : `${compass} (가장자리)`;
+}
+
 export interface DungeonMove {
-  direction: Direction;
   label: string;
-  next: GridPos;
+  next: CellId;
+  battleChance: number;
 }
 
-export function availableMoves(maze: DungeonMaze, pos: GridPos): DungeonMove[] {
+export function availableMoves(maze: DungeonMaze, pos: CellId): DungeonMove[] {
   const cell = cellAt(maze, pos);
-  return DIRECTIONS.filter((dir) => cell.open[dir]).map((dir) => ({
-    direction: dir,
-    label: `${DIRECTION_LABEL[dir]}으로 이동`,
-    next: { x: pos.x + DIRECTION_DELTA[dir].x, y: pos.y + DIRECTION_DELTA[dir].y },
-  }));
-}
-
-export function portalZoneFor(direction: Direction): ArmZone {
-  return DIRECTION_TO_ZONE[direction];
-}
-
-const BATTLE_CHANCE_ON_MOVE = 0.55;
-
-export function rollBattleOnMove(): boolean {
-  return Math.random() < BATTLE_CHANCE_ON_MOVE;
+  return [...cell.open].map((neighborId) => {
+    const neighbor = cellAt(maze, neighborId);
+    const battleChance = neighbor.portal ? 0 : BASE_BATTLE_CHANCE;
+    const chanceLabel = neighbor.portal ? '전투 없음' : `전투 확률 ${Math.round(BASE_BATTLE_CHANCE * 100)}%`;
+    return {
+      label: `${cellLabel(neighbor)}로 이동 · ${chanceLabel}`,
+      next: neighborId,
+      battleChance,
+    };
+  });
 }
 
 export function zoneLabel(zone: Zone): string {

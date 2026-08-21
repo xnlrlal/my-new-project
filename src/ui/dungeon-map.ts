@@ -2,7 +2,7 @@ import type { ArmZone, DungeonCell, DungeonMove } from '../engine/dungeon';
 import { zoneFlavor, zoneLabel } from '../engine/dungeon';
 
 export interface DungeonMapHandlers {
-  onMove: (next: DungeonMove['next']) => void;
+  onMove: (move: DungeonMove) => void;
   onEnterPortal: (zone: ArmZone) => void;
   onExitToMenu: () => void;
   onOpenInventory: () => void;
@@ -66,7 +66,7 @@ export function renderDungeonMap(
   root.querySelectorAll<HTMLButtonElement>('[data-move-index]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const index = Number(btn.dataset.moveIndex);
-      handlers.onMove(moves[index].next);
+      handlers.onMove(moves[index]);
     });
   });
 

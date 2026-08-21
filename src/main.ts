@@ -27,11 +27,14 @@ import {
   randomStartPosition,
   cellAt,
   availableMoves,
-  rollBattleOnMove,
+  rollBattle,
+  BASE_BATTLE_CHANCE,
   zoneLabel,
   type ArmZone,
+  type CellId,
+  type DungeonCell,
   type DungeonMaze,
-  type GridPos,
+  type DungeonMove,
   type Zone,
 } from './engine/dungeon';
 import { renderMenu } from './ui/menu';
@@ -64,7 +67,7 @@ let returnScreen: Screen = 'stats';
 let dungeonFloor: 1 | 2 = 1;
 let dungeonThemeZone: ArmZone | null = null;
 let maze: DungeonMaze | null = null;
-let pos: GridPos | null = null;
+let pos: CellId | null = null;
 let dungeonMessage: string | null = null;
 let portalMessage: string | null = null;
 
@@ -217,48 +220,54 @@ function enterDungeon() {
   dungeonFloor = 1;
   dungeonThemeZone = null;
   maze = generateMaze(null);
-  pos = randomStartPosition();
-  dungeonMessage = '미궁에 들어섰다.';
-  portalMessage = null;
-  goTo('dungeon-map');
+  arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, '미궁에 들어섰다. 주변을 살핀다.');
 }
 
 function enterFloorTwo(themeZone: ArmZone) {
   dungeonFloor = 2;
   dungeonThemeZone = themeZone;
   maze = generateMaze(themeZone);
-  pos = randomStartPosition();
-  dungeonMessage = `${zoneLabel(themeZone)} 미궁(2층)에 들어섰다.`;
-  portalMessage = null;
-  goTo('dungeon-map');
+  arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, `${zoneLabel(themeZone)} 미궁(2층)에 들어섰다. 주변을 살핀다.`);
 }
 
-function handleMove(next: GridPos) {
+function handleMove(move: DungeonMove) {
+  arriveAt(move.next, move.battleChance, '조용히 이동했다.');
+}
+
+// Shared by both entering a fresh maze and moving within one, so the very
+// first placement in a dungeon rolls for a battle just like any other step.
+function arriveAt(id: CellId, battleChance: number, safeMessage: string) {
   if (!maze) return;
-  pos = next;
-  const cell = cellAt(maze, next);
+  pos = id;
+  const cell = cellAt(maze, id);
 
   if (cell.portal) {
-    dungeonMessage = null;
-    if (!maze.portalsFound.has(cell.portal)) {
-      maze.portalsFound.add(cell.portal);
-      const result = addExp(profile, PORTAL_EXP_BONUS);
-      profile = result.profile;
-      saveProfile(profile);
-      portalMessage = `경험치 +${PORTAL_EXP_BONUS} 획득!${result.leveledUp ? ' 레벨 업!' : ''}`;
-    } else {
-      portalMessage = null;
-    }
-    render();
+    handlePortalArrival(cell);
+    goTo('dungeon-map');
     return;
   }
 
   portalMessage = null;
-  if (rollBattleOnMove()) {
+  if (rollBattle(battleChance)) {
     startZoneBattle(cell.zone);
   } else {
-    dungeonMessage = '조용히 이동했다.';
-    render();
+    dungeonMessage = safeMessage;
+    goTo('dungeon-map');
+  }
+}
+
+function handlePortalArrival(cell: DungeonCell) {
+  dungeonMessage = null;
+  if (!maze || !cell.portal) return;
+
+  if (!maze.portalsFound.has(cell.portal)) {
+    maze.portalsFound.add(cell.portal);
+    const result = addExp(profile, PORTAL_EXP_BONUS);
+    profile = result.profile;
+    saveProfile(profile);
+    portalMessage = `경험치 +${PORTAL_EXP_BONUS} 획득!${result.leveledUp ? ' 레벨 업!' : ''}`;
+  } else {
+    portalMessage = null;
   }
 }
 
