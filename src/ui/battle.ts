@@ -68,7 +68,7 @@ export function renderBattle(
     ? ''
     : `
       <div class="banner-actions">
-        <button class="menu-start" id="continue-btn">다음 층으로</button>
+        <button class="menu-start" id="continue-btn">탐험 계속하기</button>
         <button class="menu-return small" id="exit-menu">메인 메뉴로</button>
       </div>
     `;

@@ -33,6 +33,17 @@ body {
   letter-spacing: 0.02em;
 }
 
+.dungeon-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dungeon-message {
+  color: #8fbfe0;
+  font-style: italic;
+}
+
 .board {
   display: flex;
   justify-content: space-between;

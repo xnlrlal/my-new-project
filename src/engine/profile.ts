@@ -91,6 +91,25 @@ export function expToNextLevel(level: number): number {
   return level * EXP_PER_LEVEL;
 }
 
+export interface AddExpResult {
+  profile: PlayerProfile;
+  leveledUp: boolean;
+}
+
+export function addExp(profile: PlayerProfile, amount: number): AddExpResult {
+  let level = profile.level;
+  let exp = profile.exp + amount;
+  let leveledUp = false;
+
+  while (exp >= expToNextLevel(level)) {
+    exp -= expToNextLevel(level);
+    level += 1;
+    leveledUp = true;
+  }
+
+  return { profile: { ...profile, level, exp }, leveledUp };
+}
+
 export function loadProfile(): PlayerProfile {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -133,20 +152,9 @@ export function grantExpForKill(profile: PlayerProfile, monster: MonsterDef): Ex
   }
 
   const gained = expForGrade(monster.grade);
-  let level = profile.level;
-  let exp = profile.exp + gained;
-  let leveledUp = false;
-
-  while (exp >= expToNextLevel(level)) {
-    exp -= expToNextLevel(level);
-    level += 1;
-    leveledUp = true;
-  }
-
+  const { profile: leveledProfile, leveledUp } = addExp(profile, gained);
   const next: PlayerProfile = {
-    ...profile,
-    level,
-    exp,
+    ...leveledProfile,
     defeatedMonsterNames: [...profile.defeatedMonsterNames, monster.name],
   };
 

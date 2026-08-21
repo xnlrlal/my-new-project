@@ -2,7 +2,7 @@ import './style.css';
 import type { GameState } from './engine/types';
 import type { RaceDef } from './engine/races';
 import type { MonsterDef } from './engine/monsters';
-import { pickMonsterForFloor, rollEssenceDrop, rollManaStoneDrop } from './engine/monsters';
+import { pickMonsterForFloorAndZone, rollEssenceDrop, rollManaStoneDrop } from './engine/monsters';
 import { initGame, playCard, endTurn } from './engine/engine';
 import {
   loadProfile,
@@ -15,12 +15,22 @@ import {
   addGearToInventory,
   equipGear,
   unequipGear,
+  addExp,
   type PlayerProfile,
   type ExpGrantResult,
 } from './engine/profile';
 import { createEssenceFromMonster, essenceSkillCards, type EquippedEssence } from './engine/essence';
 import { computeTotalStats } from './engine/stats-calc';
 import { pickRandomGear, rollGearDrop, createGearInstance, type EquipmentSlot } from './engine/gear';
+import {
+  generateDungeonMap,
+  randomStartPosition,
+  isAtPortal,
+  rollBattleOnMove,
+  type DungeonMap,
+  type DungeonPosition,
+  type Zone,
+} from './engine/dungeon';
 import { renderMenu } from './ui/menu';
 import { renderCharacterSelect } from './ui/character-select';
 import { renderStats } from './ui/stats';
@@ -28,8 +38,11 @@ import { renderBattle } from './ui/battle';
 import { renderInventory } from './ui/inventory';
 import { renderEquipment } from './ui/equipment';
 import { renderEssenceScreen } from './ui/essence';
+import { renderDungeonMap } from './ui/dungeon-map';
 
-type Screen = 'menu' | 'character-select' | 'stats' | 'battle' | 'inventory' | 'equipment' | 'essence';
+type Screen = 'menu' | 'character-select' | 'stats' | 'dungeon-map' | 'battle' | 'inventory' | 'equipment' | 'essence';
+
+const PORTAL_EXP_BONUS = 2;
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -44,7 +57,12 @@ let dropChecked = false;
 let pendingEssence: EquippedEssence | null = null;
 let essenceOutcome: string | null = null;
 let returnScreen: Screen = 'stats';
+
 let dungeonFloor = 1;
+let dungeonMap: DungeonMap | null = null;
+let dungeonPos: DungeonPosition | null = null;
+let dungeonMessage: string | null = null;
+let portalMessage: string | null = null;
 
 function render() {
   if (screen === 'menu') {
@@ -101,6 +119,18 @@ function render() {
     return;
   }
 
+  if (screen === 'dungeon-map' && dungeonMap && dungeonPos) {
+    renderDungeonMap(app, dungeonFloor, dungeonPos, dungeonMap, dungeonMessage, portalMessage, {
+      onMove: handleMove,
+      onAdvanceFloor: advanceFloor,
+      onExitToMenu: exitDungeonToMenu,
+      onOpenInventory: () => openSubScreen('inventory'),
+      onOpenEquipment: () => openSubScreen('equipment'),
+      onOpenEssence: () => openSubScreen('essence'),
+    });
+    return;
+  }
+
   if (screen === 'battle' && state) {
     renderBattle(
       app,
@@ -118,10 +148,14 @@ function render() {
           afterStateChange();
         },
         onContinue: () => {
-          if (state?.status === 'win') advanceFloor();
-          else retryFloor();
+          if (state?.status === 'win') {
+            dungeonMessage = '전투에서 승리했다.';
+            goTo('dungeon-map');
+          } else if (dungeonPos) {
+            startZoneBattle(dungeonPos.zone);
+          }
         },
-        onExitToMenu: () => goTo('menu'),
+        onExitToMenu: exitDungeonToMenu,
         onAbsorbEssence: () => {
           if (!pendingEssence) return;
           if (hasOpenEssenceSlot(profile)) {
@@ -163,23 +197,61 @@ function goTo(next: Screen) {
   render();
 }
 
+function exitDungeonToMenu() {
+  dungeonMap = null;
+  dungeonPos = null;
+  goTo('menu');
+}
+
 function enterDungeon() {
   dungeonFloor = 1;
-  startFloorBattle();
+  dungeonMap = generateDungeonMap();
+  dungeonPos = randomStartPosition();
+  dungeonMessage = '미궁에 들어섰다.';
+  portalMessage = null;
+  goTo('dungeon-map');
 }
 
 function advanceFloor() {
   dungeonFloor += 1;
-  startFloorBattle();
+  dungeonMap = generateDungeonMap();
+  dungeonPos = randomStartPosition();
+  dungeonMessage = `${dungeonFloor}층으로 이동했다.`;
+  portalMessage = null;
+  goTo('dungeon-map');
 }
 
-function retryFloor() {
-  startFloorBattle();
+function handleMove(next: DungeonPosition) {
+  if (!dungeonMap) return;
+  dungeonPos = next;
+
+  if (isAtPortal(dungeonMap, next)) {
+    dungeonMessage = null;
+    if (!dungeonMap.portalBonusGranted) {
+      dungeonMap.portalBonusGranted = true;
+      const result = addExp(profile, PORTAL_EXP_BONUS);
+      profile = result.profile;
+      saveProfile(profile);
+      portalMessage = `경험치 +${PORTAL_EXP_BONUS} 획득!${result.leveledUp ? ' 레벨 업!' : ''}`;
+    } else {
+      portalMessage = null;
+    }
+    render();
+    return;
+  }
+
+  portalMessage = null;
+  if (rollBattleOnMove()) {
+    startZoneBattle(next.zone);
+  } else {
+    dungeonMessage = '조용히 이동했다.';
+    render();
+  }
 }
 
-function startFloorBattle() {
+function startZoneBattle(zone: Zone) {
   if (!selectedRace) return;
-  currentMonster = pickMonsterForFloor(dungeonFloor);
+  currentMonster = pickMonsterForFloorAndZone(dungeonFloor, zone);
   const bonusCards = essenceSkillCards(profile.essences);
   const totalStats = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear);
   state = initGame(totalStats, currentMonster, bonusCards);
