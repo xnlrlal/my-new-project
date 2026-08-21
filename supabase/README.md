@@ -36,6 +36,21 @@ VITE_SUPABASE_URL=https://xxxxxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
 ```
 
+## admin 계정 만들기
+
+`profiles` 테이블에는 `is_admin` 컬럼이 있고, 일반 로그인 경로(앱/anon key)로는 스스로 켤 수 없도록 트리거로 막아뒀습니다 (SQL Editor에서만 변경 가능). 계정 자체(비밀번호 포함)는 앱의 회원가입 화면에서 직접 만들어야 합니다.
+
+1. 배포된 앱(또는 로컬 `npm run dev`)에서 **회원가입** 탭 → 아이디 `admin`, 원하는 비밀번호로 가입
+2. Supabase **SQL Editor**에서 아래 쿼리를 실행해 그 계정에 관리자 플래그를 켭니다 (`schema.sql` 맨 아래에도 주석으로 있음).
+
+```sql
+update public.profiles
+set is_admin = true
+where user_id = (select id from auth.users where email = 'admin@users.my-new-project.local');
+```
+
+3. 로그아웃 후 다시 `admin`으로 로그인하면 메인 메뉴에 "관리자" 표시가 뜹니다. 지금은 이 플래그만 있고 관리자 전용 기능은 아직 없습니다 — 이후 여기에 이어서 기능을 추가하면 됩니다.
+
 ## 나중에 이메일/소셜 로그인으로 확장하기
 
 이미 Supabase Auth 위에서 동작하므로, 나중에 실제 이메일 인증이나 구글 등 소셜 로그인을 추가할 때 게임 쪽 로직을 다시 만들 필요는 없습니다.

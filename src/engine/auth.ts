@@ -9,6 +9,7 @@ function usernameToEmail(username: string): string {
 export interface AuthUser {
   id: string;
   username: string;
+  isAdmin: boolean;
 }
 
 export interface AuthResult {
@@ -17,9 +18,16 @@ export interface AuthResult {
   error?: string;
 }
 
-function userFromSession(email: string | undefined, id: string): AuthUser {
+async function fetchIsAdmin(userId: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { data } = await supabase.from('profiles').select('is_admin').eq('user_id', userId).maybeSingle();
+  return data?.is_admin === true;
+}
+
+async function userFromSession(email: string | undefined, id: string): Promise<AuthUser> {
   const username = (email ?? '').split('@')[0];
-  return { id, username };
+  const isAdmin = await fetchIsAdmin(id);
+  return { id, username, isAdmin };
 }
 
 export function validateCredentials(username: string, password: string): string | null {
@@ -47,7 +55,7 @@ export async function signUp(username: string, password: string): Promise<AuthRe
   }
   if (!data.user) return { ok: false, error: '회원가입에 실패했습니다.' };
 
-  return { ok: true, user: userFromSession(data.user.email, data.user.id) };
+  return { ok: true, user: await userFromSession(data.user.email, data.user.id) };
 }
 
 export async function signIn(username: string, password: string): Promise<AuthResult> {
@@ -63,7 +71,7 @@ export async function signIn(username: string, password: string): Promise<AuthRe
   }
   if (!data.user) return { ok: false, error: '로그인에 실패했습니다.' };
 
-  return { ok: true, user: userFromSession(data.user.email, data.user.id) };
+  return { ok: true, user: await userFromSession(data.user.email, data.user.id) };
 }
 
 export async function signOut(): Promise<void> {

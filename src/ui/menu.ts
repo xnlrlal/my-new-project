@@ -16,7 +16,11 @@ export function renderMenu(root: HTMLElement, authUser: AuthUser | null, handler
         <p>모든 전투 과정은 하단 로그에 기록됩니다.</p>
       </div>
       <button class="menu-start" id="start-btn">게임 시작</button>
-      <div class="stat-line" style="text-align:center">${authUser ? `${authUser.username}님으로 로그인됨` : '게스트 모드 (진행 상황이 이 브라우저에만 저장됩니다)'}</div>
+      <div class="stat-line" style="text-align:center">${
+        authUser
+          ? `${authUser.username}님으로 로그인됨${authUser.isAdmin ? ' <span class="grade-tag">관리자</span>' : ''}`
+          : '게스트 모드 (진행 상황이 이 브라우저에만 저장됩니다)'
+      }</div>
       ${
         authUser
           ? '<button class="menu-return small" id="logout-btn">로그아웃</button>'
