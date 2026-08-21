@@ -5,6 +5,7 @@ import type { EquippedEssence } from '../engine/essence';
 export interface BattleHandlers {
   onPlayCard: (cardId: string) => void;
   onEndTurn: () => void;
+  onContinue: () => void;
   onExitToMenu: () => void;
   onAbsorbEssence: () => void;
   onDiscardEssence: () => void;
@@ -59,11 +60,25 @@ export function renderBattle(
       ? `<div class="exp-line">${essenceDrop.outcome}</div>`
       : '';
 
+  const winActions = essenceDrop.pending
+    ? ''
+    : `
+      <div class="banner-actions">
+        <button class="menu-start" id="continue-btn">다음 전투로</button>
+        <button class="menu-return small" id="exit-menu">메인 메뉴로</button>
+      </div>
+    `;
+
   const banner =
     status === 'win'
-      ? `<div class="status-banner win">승리했습니다! 🎉<div class="exp-line">${expMessage}</div>${essenceHtml}<button class="menu-return" id="exit-menu" ${essenceDrop.pending ? 'disabled' : ''}>메인 메뉴로</button></div>`
+      ? `<div class="status-banner win">승리했습니다! 🎉<div class="exp-line">${expMessage}</div>${essenceHtml}${winActions}</div>`
       : status === 'lose'
-        ? `<div class="status-banner lose">패배했습니다...<button class="menu-return" id="exit-menu">메인 메뉴로</button></div>`
+        ? `<div class="status-banner lose">패배했습니다...
+            <div class="banner-actions">
+              <button class="menu-start" id="continue-btn">다시 도전</button>
+              <button class="menu-return small" id="exit-menu">메인 메뉴로</button>
+            </div>
+          </div>`
         : '';
 
   root.innerHTML = `
@@ -101,6 +116,7 @@ export function renderBattle(
   });
 
   document.getElementById('end-turn')?.addEventListener('click', handlers.onEndTurn);
+  document.getElementById('continue-btn')?.addEventListener('click', handlers.onContinue);
   document.getElementById('exit-menu')?.addEventListener('click', handlers.onExitToMenu);
   document.getElementById('absorb-essence')?.addEventListener('click', handlers.onAbsorbEssence);
   document.getElementById('discard-essence')?.addEventListener('click', handlers.onDiscardEssence);

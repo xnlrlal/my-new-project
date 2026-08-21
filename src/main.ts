@@ -80,6 +80,7 @@ function render() {
           state = endTurn(state!);
           afterStateChange();
         },
+        onContinue: startBattle,
         onExitToMenu: () => goTo('menu'),
         onAbsorbEssence: () => {
           if (!pendingEssence) return;
