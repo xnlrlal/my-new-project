@@ -9,10 +9,12 @@ services:
         source: /*
         destination: /index.html
     envVars:
-      # Set these in the Render dashboard (Environment tab) after creating a
-      # Supabase project — see supabase/README.md for setup steps. Without
-      # them the app still works fully in guest (localStorage-only) mode.
+      # The anon/publishable key is safe to be public (Supabase's client-side
+      # design; real data protection is the RLS policies in
+      # supabase/schema.sql), so it's committed here rather than set via the
+      # dashboard. Without these the app still works fully in guest
+      # (localStorage-only) mode. See supabase/README.md for setup steps.
       - key: VITE_SUPABASE_URL
-        sync: false
+        value: https://noljjbecuhnwocrihyhz.supabase.co
       - key: VITE_SUPABASE_ANON_KEY
-        sync: false
+        value: sb_publishable_VLPdMuDoFbMGFArN99MerA_6FjKf0H8

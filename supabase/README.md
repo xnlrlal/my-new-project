@@ -2,6 +2,8 @@
 
 로그인/데이터 저장 기능은 [Supabase](https://supabase.com)의 무료 플랜을 사용합니다. 별도 백엔드 서버 없이, 브라우저에서 Supabase의 인증(Auth)과 데이터베이스(Postgres)를 직접 사용합니다. 아래 설정을 완료하기 전까지는 앱이 자동으로 **게스트 모드**(브라우저 localStorage 저장)로만 동작하며, 정상적으로 작동합니다.
 
+> **현재 프로젝트 연결 상태**: `render.yaml`에 Supabase 프로젝트 URL과 anon(publishable) key가 이미 설정되어 있습니다. 아래 1번(스키마 실행)과 2번(이메일 확인 끄기)을 Supabase 대시보드에서 아직 하지 않으셨다면 꼭 진행해주세요 — 이 두 단계는 코드가 아니라 Supabase 프로젝트 설정이라 저장소에 반영할 수 없습니다.
+
 ## 1. Supabase 프로젝트 생성
 
 1. https://supabase.com 에서 무료 계정 생성 후 새 프로젝트(Project) 생성
