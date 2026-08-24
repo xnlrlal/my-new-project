@@ -47,8 +47,8 @@ function describeAuthError(error: { message: string }): string {
   if (message.includes('rate limit')) {
     return '요청이 너무 많습니다 (이메일 발송 한도 초과). Supabase 대시보드에서 Confirm email이 꺼져 있는지 확인하고 잠시 후 다시 시도해주세요.';
   }
-  if (message.includes('signups not allowed') || message.includes('signup is disabled')) {
-    return '현재 회원가입이 비활성화되어 있습니다. Supabase 대시보드의 Authentication 설정을 확인해주세요.';
+  if (message.includes('signup') && message.includes('disabled')) {
+    return '현재 회원가입이 비활성화되어 있습니다. Supabase 대시보드의 Authentication → Providers → Email에서 "Allow new users to sign up"을 켜주세요.';
   }
   console.error('Supabase auth error:', error);
   return error.message;
