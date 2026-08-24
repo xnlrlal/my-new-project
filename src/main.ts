@@ -45,6 +45,8 @@ import {
 import { renderMenu } from './ui/menu';
 import { renderCharacterSelect } from './ui/character-select';
 import { renderVillage } from './ui/village';
+import { renderShop } from './ui/shop';
+import { renderLibrary } from './ui/library';
 import { renderStats } from './ui/stats';
 import { renderBattle } from './ui/battle';
 import { renderInventory } from './ui/inventory';
@@ -55,7 +57,19 @@ import { renderAuth, type AuthMode } from './ui/auth';
 import { signIn, signUp, signOut, getCurrentUser, isCloudConfigured, type AuthUser } from './engine/auth';
 import { loadCloudProfile, saveCloudProfile } from './engine/cloud-profile';
 
-type Screen = 'auth' | 'menu' | 'character-select' | 'village' | 'stats' | 'dungeon-map' | 'battle' | 'inventory' | 'equipment' | 'essence';
+type Screen =
+  | 'auth'
+  | 'menu'
+  | 'character-select'
+  | 'village'
+  | 'stats'
+  | 'dungeon-map'
+  | 'battle'
+  | 'inventory'
+  | 'equipment'
+  | 'essence'
+  | 'shop'
+  | 'library';
 
 const PORTAL_EXP_BONUS = 2;
 
@@ -165,10 +179,24 @@ function render() {
   }
 
   if (screen === 'village') {
-    renderVillage(app, {
+    renderVillage(app, profile.raceId != null, {
       onContinue: () => goTo('stats'),
       onBack: () => goTo('character-select'),
+      onOpenInventory: () => openSubScreen('inventory'),
+      onOpenEquipment: () => openSubScreen('equipment'),
+      onOpenShop: () => goTo('shop'),
+      onOpenLibrary: () => goTo('library'),
     });
+    return;
+  }
+
+  if (screen === 'shop') {
+    renderShop(app, { onBack: () => goTo('village') });
+    return;
+  }
+
+  if (screen === 'library') {
+    renderLibrary(app, { onBack: () => goTo('village') });
     return;
   }
 
@@ -420,6 +448,8 @@ function toResumableScreen(s: Screen): ResumableScreen | null {
     case 'inventory':
     case 'equipment':
     case 'essence':
+    case 'shop':
+    case 'library':
       return s;
     default:
       return null;

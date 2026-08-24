@@ -6,7 +6,16 @@ import type { ExpGrantResult } from './profile';
 // Screens that hold enough gameplay state to be worth resuming into exactly.
 // auth/menu/character-select carry no extra state, so they collapse to
 // 'village' (or no session at all) when captured.
-export type ResumableScreen = 'village' | 'stats' | 'dungeon-map' | 'battle' | 'inventory' | 'equipment' | 'essence';
+export type ResumableScreen =
+  | 'village'
+  | 'stats'
+  | 'dungeon-map'
+  | 'battle'
+  | 'inventory'
+  | 'equipment'
+  | 'essence'
+  | 'shop'
+  | 'library';
 
 export interface ResumeSession {
   screen: ResumableScreen;
