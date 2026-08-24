@@ -218,7 +218,6 @@ function render() {
     renderDungeonMap(app, floorLabel, dungeonFloor, cell, moves, dungeonMessage, portalMessage, {
       onMove: handleMove,
       onEnterPortal: enterFloorTwo,
-      onExitToMenu: exitDungeonToMenu,
       onOpenInventory: () => openSubScreen('inventory'),
       onOpenEquipment: () => openSubScreen('equipment'),
       onOpenEssence: () => openSubScreen('essence'),
@@ -253,7 +252,6 @@ function render() {
           goTo('dungeon-map');
         },
         onAcknowledgeDeath: handleDeath,
-        onExitToMenu: exitDungeonToMenu,
         onAbsorbEssence: () => {
           if (!pendingEssence) return;
           if (hasOpenEssenceSlot(profile)) {
@@ -296,23 +294,6 @@ function goTo(next: Screen) {
   screen = next;
   persistProfile();
   render();
-}
-
-function exitDungeonToMenu() {
-  dungeonFloor = 1;
-  dungeonThemeZone = null;
-  maze = null;
-  pos = null;
-  state = null;
-  currentMonster = null;
-  skipEligible = false;
-  expResult = null;
-  expChecked = false;
-  dropChecked = false;
-  pendingEssence = null;
-  essenceOutcome = null;
-  profile = { ...profile, session: villageSession() };
-  goTo('menu');
 }
 
 function enterDungeon() {
@@ -460,8 +441,8 @@ function toResumableScreen(s: Screen): ResumableScreen | null {
 // (including mid-battle: hand/deck/hp/log all live on `state`). Returns
 // undefined while on a non-gameplay screen (auth/menu/character-select) so
 // persistProfile() leaves the last real resume point untouched instead of
-// clobbering it — explicit exits (exitDungeonToMenu, handleDeath) set their
-// own resume point before reaching one of those screens.
+// clobbering it — handleDeath() clears all module state before reaching
+// 'menu' so this can't resurrect the run that was just lost.
 function captureSession(): ResumeSession | undefined {
   const resumable = toResumableScreen(screen);
   if (!resumable) return undefined;
@@ -482,29 +463,6 @@ function captureSession(): ResumeSession | undefined {
     dropChecked,
     pendingEssence,
     essenceOutcome,
-  };
-}
-
-// The resume point after an explicit "메인 메뉴로": no dungeon run or battle
-// left to continue, so 이어하기 should land safely in the village hub.
-function villageSession(): ResumeSession {
-  return {
-    screen: 'village',
-    returnScreen: 'stats',
-    dungeonFloor: 1,
-    dungeonThemeZone: null,
-    maze: null,
-    pos: null,
-    dungeonMessage: null,
-    portalMessage: null,
-    currentMonsterId: null,
-    state: null,
-    skipEligible: false,
-    expResult: null,
-    expChecked: false,
-    dropChecked: false,
-    pendingEssence: null,
-    essenceOutcome: null,
   };
 }
 

@@ -4,7 +4,6 @@ import { zoneFlavor, zoneLabel } from '../engine/dungeon';
 export interface DungeonMapHandlers {
   onMove: (move: DungeonMove) => void;
   onEnterPortal: (zone: ArmZone) => void;
-  onExitToMenu: () => void;
   onOpenInventory: () => void;
   onOpenEquipment: () => void;
   onOpenEssence: () => void;
@@ -59,7 +58,6 @@ export function renderDungeonMap(
       </div>
       ${portalPanel}
       <div class="race-list">${movesHtml}</div>
-      <button class="menu-return small" id="exit-menu">메인 메뉴로</button>
     </div>
   `;
 
@@ -73,7 +71,6 @@ export function renderDungeonMap(
   document.getElementById('enter-portal')?.addEventListener('click', () => {
     if (cell.portal) handlers.onEnterPortal(cell.portal);
   });
-  document.getElementById('exit-menu')?.addEventListener('click', handlers.onExitToMenu);
   document.getElementById('open-inventory')?.addEventListener('click', handlers.onOpenInventory);
   document.getElementById('open-equipment')?.addEventListener('click', handlers.onOpenEquipment);
   document.getElementById('open-codex')?.addEventListener('click', handlers.onOpenEssence);

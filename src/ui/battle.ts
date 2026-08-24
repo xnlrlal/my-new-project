@@ -8,7 +8,6 @@ export interface BattleHandlers {
   onSkip: () => void;
   onContinue: () => void;
   onAcknowledgeDeath: () => void;
-  onExitToMenu: () => void;
   onAbsorbEssence: () => void;
   onDiscardEssence: () => void;
   onOpenInventory: () => void;
@@ -72,7 +71,6 @@ export function renderBattle(
     : `
       <div class="banner-actions">
         <button class="menu-start" id="continue-btn">탐험 계속하기</button>
-        <button class="menu-return small" id="exit-menu">메인 메뉴로</button>
       </div>
     `;
 
@@ -138,7 +136,6 @@ export function renderBattle(
   document.getElementById('skip-btn')?.addEventListener('click', handlers.onSkip);
   document.getElementById('continue-btn')?.addEventListener('click', handlers.onContinue);
   document.getElementById('acknowledge-death')?.addEventListener('click', handlers.onAcknowledgeDeath);
-  document.getElementById('exit-menu')?.addEventListener('click', handlers.onExitToMenu);
   document.getElementById('absorb-essence')?.addEventListener('click', handlers.onAbsorbEssence);
   document.getElementById('discard-essence')?.addEventListener('click', handlers.onDiscardEssence);
   document.getElementById('open-inventory')?.addEventListener('click', handlers.onOpenInventory);
