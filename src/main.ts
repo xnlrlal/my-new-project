@@ -41,6 +41,7 @@ import {
 } from './engine/dungeon';
 import { renderMenu } from './ui/menu';
 import { renderCharacterSelect } from './ui/character-select';
+import { renderVillage } from './ui/village';
 import { renderStats } from './ui/stats';
 import { renderBattle } from './ui/battle';
 import { renderInventory } from './ui/inventory';
@@ -51,7 +52,7 @@ import { renderAuth, type AuthMode } from './ui/auth';
 import { signIn, signUp, signOut, getCurrentUser, isCloudConfigured, type AuthUser } from './engine/auth';
 import { loadCloudProfile, saveCloudProfile } from './engine/cloud-profile';
 
-type Screen = 'auth' | 'menu' | 'character-select' | 'stats' | 'dungeon-map' | 'battle' | 'inventory' | 'equipment' | 'essence';
+type Screen = 'auth' | 'menu' | 'character-select' | 'village' | 'stats' | 'dungeon-map' | 'battle' | 'inventory' | 'equipment' | 'essence';
 
 const PORTAL_EXP_BONUS = 2;
 
@@ -150,9 +151,17 @@ function render() {
     renderCharacterSelect(app, {
       onSelect: (race) => {
         selectedRace = race;
-        goTo('stats');
+        goTo('village');
       },
       onBack: () => goTo('menu'),
+    });
+    return;
+  }
+
+  if (screen === 'village') {
+    renderVillage(app, {
+      onContinue: () => goTo('stats'),
+      onBack: () => goTo('character-select'),
     });
     return;
   }
@@ -160,7 +169,7 @@ function render() {
   if (screen === 'stats' && selectedRace) {
     renderStats(app, selectedRace, profile, {
       onStartBattle: enterDungeon,
-      onBack: () => goTo('character-select'),
+      onBack: () => goTo('village'),
       onOpenInventory: () => openSubScreen('inventory'),
       onOpenEquipment: () => openSubScreen('equipment'),
       onOpenEssence: () => openSubScreen('essence'),

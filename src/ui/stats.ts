@@ -60,7 +60,7 @@ export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerPro
         <button class="menu-return small" id="equipment-btn">장비창</button>
         <button class="menu-return small" id="essence-btn">정수 창</button>
       </div>
-      <button class="menu-return" id="back-btn">종족 다시 선택</button>
+      <button class="menu-return" id="back-btn">마을로 돌아가기</button>
     </div>
   `;
 
