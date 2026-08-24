@@ -79,6 +79,37 @@ function connect(cells: Map<CellId, DungeonCell>, a: CellId, b: CellId): void {
   cells.get(b)!.open.add(a);
 }
 
+export interface SerializedDungeonCell {
+  id: CellId;
+  ring: 0 | 1 | 2;
+  index: number;
+  open: CellId[];
+  zone: Zone;
+  portal: ArmZone | null;
+}
+
+export interface SerializedDungeonMaze {
+  cells: SerializedDungeonCell[];
+  portalsFound: ArmZone[];
+  themeZone: ArmZone | null;
+}
+
+export function serializeMaze(maze: DungeonMaze): SerializedDungeonMaze {
+  return {
+    cells: [...maze.cells.values()].map((cell) => ({ ...cell, open: [...cell.open] })),
+    portalsFound: [...maze.portalsFound],
+    themeZone: maze.themeZone,
+  };
+}
+
+export function deserializeMaze(serialized: SerializedDungeonMaze): DungeonMaze {
+  return {
+    cells: new Map(serialized.cells.map((cell) => [cell.id, { ...cell, open: new Set(cell.open) }])),
+    portalsFound: new Set(serialized.portalsFound),
+    themeZone: serialized.themeZone,
+  };
+}
+
 export function generateMaze(themeZone: ArmZone | null): DungeonMaze {
   const cells = new Map<CellId, DungeonCell>();
 

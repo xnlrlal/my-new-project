@@ -452,6 +452,12 @@ function rollTargetGrade(floor: number): number {
   return useOccasional ? occasionalGrade : primaryGrades[Math.floor(Math.random() * primaryGrades.length)];
 }
 
+export function getMonsterById(id: string): MonsterDef {
+  const monster = MONSTERS.find((m) => m.id === id);
+  if (!monster) throw new Error(`Unknown monster: ${id}`);
+  return monster;
+}
+
 export function pickMonsterForFloorAndZone(floor: number, zone: Zone): MonsterDef {
   const targetGrade = rollTargetGrade(floor);
   const pool = zone === 'center' ? MONSTERS : MONSTERS.filter((m) => m.zone === zone);

@@ -1,0 +1,28 @@
+import type { GameState } from './types';
+import type { ArmZone, CellId, SerializedDungeonMaze } from './dungeon';
+import type { EquippedEssence } from './essence';
+import type { ExpGrantResult } from './profile';
+
+// Screens that hold enough gameplay state to be worth resuming into exactly.
+// auth/menu/character-select carry no extra state, so they collapse to
+// 'village' (or no session at all) when captured.
+export type ResumableScreen = 'village' | 'stats' | 'dungeon-map' | 'battle' | 'inventory' | 'equipment' | 'essence';
+
+export interface ResumeSession {
+  screen: ResumableScreen;
+  returnScreen: ResumableScreen;
+  dungeonFloor: 1 | 2;
+  dungeonThemeZone: ArmZone | null;
+  maze: SerializedDungeonMaze | null;
+  pos: CellId | null;
+  dungeonMessage: string | null;
+  portalMessage: string | null;
+  currentMonsterId: string | null;
+  state: GameState | null;
+  skipEligible: boolean;
+  expResult: ExpGrantResult | null;
+  expChecked: boolean;
+  dropChecked: boolean;
+  pendingEssence: EquippedEssence | null;
+  essenceOutcome: string | null;
+}

@@ -1,12 +1,13 @@
 import type { AuthUser } from '../engine/auth';
 
 export interface MenuHandlers {
-  onStart: () => void;
+  onCreateCharacter: () => void;
+  onContinueCharacter: () => void;
   onLogout: () => void;
   onGoToLogin: () => void;
 }
 
-export function renderMenu(root: HTMLElement, authUser: AuthUser | null, handlers: MenuHandlers) {
+export function renderMenu(root: HTMLElement, authUser: AuthUser | null, hasCharacter: boolean, handlers: MenuHandlers) {
   root.innerHTML = `
     <div class="menu">
       <h1 class="menu-title">my-new-project</h1>
@@ -15,7 +16,7 @@ export function renderMenu(root: HTMLElement, authUser: AuthUser | null, handler
         <p>마나를 사용해 카드를 내고, 적의 체력을 먼저 0으로 만들면 승리합니다.</p>
         <p>모든 전투 과정은 하단 로그에 기록됩니다.</p>
       </div>
-      <button class="menu-start" id="start-btn">게임 시작</button>
+      <button class="menu-start" id="start-btn">${hasCharacter ? '이어하기' : '캐릭터 생성'}</button>
       <div class="stat-line" style="text-align:center">${
         authUser
           ? `${authUser.username}님으로 로그인됨${authUser.isAdmin ? ' <span class="grade-tag">관리자</span>' : ''}`
@@ -29,7 +30,7 @@ export function renderMenu(root: HTMLElement, authUser: AuthUser | null, handler
     </div>
   `;
 
-  document.getElementById('start-btn')?.addEventListener('click', handlers.onStart);
+  document.getElementById('start-btn')?.addEventListener('click', hasCharacter ? handlers.onContinueCharacter : handlers.onCreateCharacter);
   document.getElementById('logout-btn')?.addEventListener('click', handlers.onLogout);
   document.getElementById('login-link')?.addEventListener('click', handlers.onGoToLogin);
 }

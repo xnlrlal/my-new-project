@@ -3,6 +3,8 @@ import { expForGrade } from './monsters';
 import type { EquippedEssence } from './essence';
 import type { EquipmentSlot, GearInstance } from './gear';
 import type { EquippedGear } from './stats-calc';
+import type { RaceId } from './races';
+import type { ResumeSession } from './session';
 
 const STORAGE_KEY = 'my-new-project:profile';
 const EXP_PER_LEVEL = 20;
@@ -10,6 +12,8 @@ const EXP_PER_LEVEL = 20;
 export type ManaStoneCounts = Partial<Record<number, number>>;
 
 export interface PlayerProfile {
+  raceId: RaceId | null;
+  session: ResumeSession | null;
   level: number;
   exp: number;
   defeatedMonsterNames: string[];
@@ -23,6 +27,8 @@ export interface PlayerProfile {
 
 function defaultProfile(): PlayerProfile {
   return {
+    raceId: null,
+    session: null,
     level: 1,
     exp: 0,
     defeatedMonsterNames: [],
@@ -127,6 +133,8 @@ export function loadProfile(): PlayerProfile {
     if (!raw) return defaultProfile();
     const parsed = JSON.parse(raw);
     return {
+      raceId: typeof parsed.raceId === 'string' ? (parsed.raceId as RaceId) : null,
+      session: parsed.session && typeof parsed.session === 'object' ? (parsed.session as ResumeSession) : null,
       level: typeof parsed.level === 'number' ? parsed.level : 1,
       exp: typeof parsed.exp === 'number' ? parsed.exp : 0,
       defeatedMonsterNames: Array.isArray(parsed.defeatedMonsterNames) ? parsed.defeatedMonsterNames : [],

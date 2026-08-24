@@ -1,9 +1,10 @@
 import './style.css';
 import type { GameState } from './engine/types';
-import type { RaceDef } from './engine/races';
+import { getRace, type RaceDef } from './engine/races';
 import type { MonsterDef } from './engine/monsters';
-import { pickMonsterForFloorAndZone, rollEssenceDrop, rollManaStoneDrop } from './engine/monsters';
+import { getMonsterById, pickMonsterForFloorAndZone, rollEssenceDrop, rollManaStoneDrop } from './engine/monsters';
 import { initGame, playCard, endTurn } from './engine/engine';
+import type { ResumableScreen, ResumeSession } from './engine/session';
 import {
   loadProfile,
   saveProfile,
@@ -30,6 +31,8 @@ import {
   cellAt,
   availableMoves,
   rollBattle,
+  serializeMaze,
+  deserializeMaze,
   BASE_BATTLE_CHANCE,
   zoneLabel,
   type ArmZone,
@@ -109,8 +112,10 @@ function render() {
   }
 
   if (screen === 'menu') {
-    renderMenu(app, authUser, {
-      onStart: () => goTo('character-select'),
+    const hasCharacter = profile.raceId != null;
+    renderMenu(app, authUser, hasCharacter, {
+      onCreateCharacter: () => goTo('character-select'),
+      onContinueCharacter: () => resumeCharacter(),
       onLogout: handleLogout,
       onGoToLogin: () => {
         authError = null;
@@ -151,6 +156,7 @@ function render() {
     renderCharacterSelect(app, {
       onSelect: (race) => {
         selectedRace = race;
+        profile = { ...profile, raceId: race.id };
         goTo('village');
       },
       onBack: () => goTo('menu'),
@@ -224,17 +230,18 @@ function render() {
           if (!pendingEssence) return;
           if (hasOpenEssenceSlot(profile)) {
             profile = absorbEssence(profile, pendingEssence);
-            persistProfile();
             essenceOutcome = `${pendingEssence.monsterName}의 정수를 흡수했습니다!`;
           } else {
             essenceOutcome = '장착 슬롯이 가득 차 흡수할 수 없었습니다.';
           }
           pendingEssence = null;
+          persistProfile();
           render();
         },
         onDiscardEssence: () => {
           essenceOutcome = '정수를 버렸습니다.';
           pendingEssence = null;
+          persistProfile();
           render();
         },
         onOpenInventory: () => openSubScreen('inventory'),
@@ -253,11 +260,13 @@ function openSubScreen(next: Screen) {
 function afterStateChange() {
   checkForExp();
   checkForDrop();
+  persistProfile();
   render();
 }
 
 function goTo(next: Screen) {
   screen = next;
+  persistProfile();
   render();
 }
 
@@ -266,6 +275,15 @@ function exitDungeonToMenu() {
   dungeonThemeZone = null;
   maze = null;
   pos = null;
+  state = null;
+  currentMonster = null;
+  skipEligible = false;
+  expResult = null;
+  expChecked = false;
+  dropChecked = false;
+  pendingEssence = null;
+  essenceOutcome = null;
+  profile = { ...profile, session: villageSession() };
   goTo('menu');
 }
 
@@ -340,10 +358,12 @@ function startZoneBattle(zone: Zone) {
 }
 
 // Losing is permanent: the whole save (level, inventory, essences, gear,
-// discovered codex — everything) resets, matching the roguelike death rule.
+// discovered codex, resume session — everything) resets, matching the
+// roguelike death rule. All cleanup happens before goTo('menu') so its
+// built-in persistProfile() call captures the already-reset state instead
+// of resurrecting the battle that was just lost.
 function handleDeath() {
   profile = resetProfile();
-  persistProfile();
   selectedRace = null;
   currentMonster = null;
   state = null;
@@ -353,6 +373,12 @@ function handleDeath() {
   pos = null;
   dungeonMessage = null;
   portalMessage = null;
+  skipEligible = false;
+  expResult = null;
+  expChecked = false;
+  dropChecked = false;
+  pendingEssence = null;
+  essenceOutcome = null;
   goTo('menu');
 }
 
@@ -385,16 +411,117 @@ function checkForDrop() {
   }
 }
 
+function toResumableScreen(s: Screen): ResumableScreen | null {
+  switch (s) {
+    case 'village':
+    case 'stats':
+    case 'dungeon-map':
+    case 'battle':
+    case 'inventory':
+    case 'equipment':
+    case 'essence':
+      return s;
+    default:
+      return null;
+  }
+}
+
+// Snapshots exactly what's needed to resume the current screen later
+// (including mid-battle: hand/deck/hp/log all live on `state`). Returns
+// undefined while on a non-gameplay screen (auth/menu/character-select) so
+// persistProfile() leaves the last real resume point untouched instead of
+// clobbering it — explicit exits (exitDungeonToMenu, handleDeath) set their
+// own resume point before reaching one of those screens.
+function captureSession(): ResumeSession | undefined {
+  const resumable = toResumableScreen(screen);
+  if (!resumable) return undefined;
+  return {
+    screen: resumable,
+    returnScreen: toResumableScreen(returnScreen) ?? 'stats',
+    dungeonFloor,
+    dungeonThemeZone,
+    maze: maze ? serializeMaze(maze) : null,
+    pos,
+    dungeonMessage,
+    portalMessage,
+    currentMonsterId: currentMonster?.id ?? null,
+    state,
+    skipEligible,
+    expResult,
+    expChecked,
+    dropChecked,
+    pendingEssence,
+    essenceOutcome,
+  };
+}
+
+// The resume point after an explicit "메인 메뉴로": no dungeon run or battle
+// left to continue, so 이어하기 should land safely in the village hub.
+function villageSession(): ResumeSession {
+  return {
+    screen: 'village',
+    returnScreen: 'stats',
+    dungeonFloor: 1,
+    dungeonThemeZone: null,
+    maze: null,
+    pos: null,
+    dungeonMessage: null,
+    portalMessage: null,
+    currentMonsterId: null,
+    state: null,
+    skipEligible: false,
+    expResult: null,
+    expChecked: false,
+    dropChecked: false,
+    pendingEssence: null,
+    essenceOutcome: null,
+  };
+}
+
 // Always caches to localStorage immediately (so the game stays fully
 // playable offline/as a guest), and additionally syncs to the cloud in the
-// background whenever a user is logged in.
+// background whenever a user is logged in. Also refreshes the resume
+// snapshot (see captureSession) so "이어하기" always reflects reality.
 function persistProfile() {
+  const captured = captureSession();
+  if (captured !== undefined) {
+    profile = { ...profile, session: captured };
+  }
   saveProfile(profile);
   if (authUser) {
     saveCloudProfile(authUser.id, profile).catch(() => {
       // best-effort background sync; localStorage already has the data
     });
   }
+}
+
+// Restores every module variable a saved ResumeSession touched, then
+// navigates to the exact screen the player left off on (village if there
+// is no session yet, e.g. a character that was just created).
+function resumeCharacter() {
+  if (!profile.raceId) return;
+  selectedRace = getRace(profile.raceId);
+  const session = profile.session;
+  if (!session) {
+    goTo('village');
+    return;
+  }
+  returnScreen = session.returnScreen;
+  dungeonFloor = session.dungeonFloor;
+  dungeonThemeZone = session.dungeonThemeZone;
+  maze = session.maze ? deserializeMaze(session.maze) : null;
+  pos = session.pos;
+  dungeonMessage = session.dungeonMessage;
+  portalMessage = session.portalMessage;
+  currentMonster = session.currentMonsterId ? getMonsterById(session.currentMonsterId) : null;
+  state = session.state;
+  skipEligible = session.skipEligible;
+  expResult = session.expResult;
+  expChecked = session.expChecked;
+  dropChecked = session.dropChecked;
+  pendingEssence = session.pendingEssence;
+  essenceOutcome = session.essenceOutcome;
+  goTo(session.screen);
 }
 
 async function adoptLoggedInProfile(user: AuthUser) {
