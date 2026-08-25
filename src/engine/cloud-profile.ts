@@ -1,5 +1,5 @@
 import { supabase } from './supabase-client';
-import type { PlayerProfile } from './profile';
+import { sanitizeProfile, type PlayerProfile } from './profile';
 
 const TABLE = 'profiles';
 
@@ -8,7 +8,9 @@ export async function loadCloudProfile(userId: string): Promise<PlayerProfile | 
 
   const { data, error } = await supabase.from(TABLE).select('data').eq('user_id', userId).maybeSingle();
   if (error || !data) return null;
-  return data.data as PlayerProfile;
+  // Same defensive parsing as the local path (loadProfile) — a cloud row
+  // written before a field existed shouldn't crash on it.
+  return sanitizeProfile(data.data);
 }
 
 export async function saveCloudProfile(userId: string, profile: PlayerProfile): Promise<void> {

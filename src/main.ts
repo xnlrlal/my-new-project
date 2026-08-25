@@ -670,33 +670,58 @@ function persistProfile() {
 // is no session yet, e.g. a character that was just created).
 function resumeCharacter() {
   if (!profile.raceId) return;
-  selectedRace = getRace(profile.raceId);
   const session = profile.session;
   if (!session) {
+    selectedRace = getRace(profile.raceId);
     goTo('village');
     return;
   }
-  returnScreen = session.returnScreen;
-  dungeonFloor = session.dungeonFloor;
-  dungeonThemeZone = session.dungeonThemeZone;
-  maze = session.maze ? deserializeMaze(session.maze) : null;
-  pos = session.pos;
-  floor1Maze = session.floor1Maze ? deserializeMaze(session.floor1Maze) : null;
-  floor1Pos = session.floor1Pos;
-  floor2Zones = deserializeFloor2Zones(session.floor2Zones);
-  dungeonMessage = session.dungeonMessage;
-  portalMessage = session.portalMessage;
-  dungeonElapsedSeconds = session.dungeonElapsedSeconds;
-  dungeonEntryVillageSeconds = session.dungeonEntryVillageSeconds;
-  currentMonster = session.currentMonsterId ? getMonsterById(session.currentMonsterId) : null;
-  state = session.state;
-  skipEligible = session.skipEligible;
-  expResult = session.expResult;
-  expChecked = session.expChecked;
-  dropChecked = session.dropChecked;
-  pendingEssence = session.pendingEssence;
-  essenceOutcome = session.essenceOutcome;
-  goTo(session.screen);
+  // profile.session is already sanitized to a valid ResumeSession by
+  // sanitizeProfile() (see profile.ts/session.ts) before it ever reaches
+  // here, so this shouldn't throw in practice. The try/catch is a last-resort
+  // safety net against anything that slips through anyway (an unrecognized
+  // raceId/monster id, say) — falling back to village loses only the
+  // in-progress dungeon navigation state, never profile.raceId or any of the
+  // character's actual progress (level/gear/essences/gold), which live
+  // entirely outside `session` and are untouched here.
+  try {
+    // render() has no fallback branch for 'dungeon-map'/'battle' without
+    // their required companion data (maze+pos / state) — it would just
+    // leave the previous screen frozen on screen instead of painting
+    // anything. Treat that combination as unresumable too.
+    if (session.screen === 'dungeon-map' && !(session.maze && session.pos)) {
+      throw new Error('Saved dungeon-map session is missing its maze/position');
+    }
+    if (session.screen === 'battle' && !session.state) {
+      throw new Error('Saved battle session is missing its battle state');
+    }
+
+    selectedRace = getRace(profile.raceId);
+    returnScreen = session.returnScreen;
+    dungeonFloor = session.dungeonFloor;
+    dungeonThemeZone = session.dungeonThemeZone;
+    maze = session.maze ? deserializeMaze(session.maze) : null;
+    pos = session.pos;
+    floor1Maze = session.floor1Maze ? deserializeMaze(session.floor1Maze) : null;
+    floor1Pos = session.floor1Pos;
+    floor2Zones = deserializeFloor2Zones(session.floor2Zones);
+    dungeonMessage = session.dungeonMessage;
+    portalMessage = session.portalMessage;
+    dungeonElapsedSeconds = session.dungeonElapsedSeconds;
+    dungeonEntryVillageSeconds = session.dungeonEntryVillageSeconds;
+    currentMonster = session.currentMonsterId ? getMonsterById(session.currentMonsterId) : null;
+    state = session.state;
+    skipEligible = session.skipEligible;
+    expResult = session.expResult;
+    expChecked = session.expChecked;
+    dropChecked = session.dropChecked;
+    pendingEssence = session.pendingEssence;
+    essenceOutcome = session.essenceOutcome;
+    goTo(session.screen);
+  } catch (err) {
+    console.error('Failed to resume saved session, falling back to village:', err);
+    goTo('village');
+  }
 }
 
 async function adoptLoggedInProfile(user: AuthUser) {

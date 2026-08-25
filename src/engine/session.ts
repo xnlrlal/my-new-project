@@ -53,3 +53,79 @@ export interface ResumeSession {
   pendingEssence: EquippedEssence | null;
   essenceOutcome: string | null;
 }
+
+const RESUMABLE_SCREENS: readonly ResumableScreen[] = [
+  'village',
+  'stats',
+  'dungeon-map',
+  'battle',
+  'inventory',
+  'equipment',
+  'essence',
+  'shop',
+  'library',
+];
+
+function isResumableScreen(value: unknown): value is ResumableScreen {
+  return typeof value === 'string' && (RESUMABLE_SCREENS as readonly string[]).includes(value);
+}
+
+const ARM_ZONES: readonly ArmZone[] = ['north', 'east', 'south', 'west'];
+
+function isArmZone(value: unknown): value is ArmZone {
+  return typeof value === 'string' && (ARM_ZONES as readonly string[]).includes(value);
+}
+
+function sanitizeFloor2Zones(raw: unknown): ResumeSession['floor2Zones'] {
+  if (!raw || typeof raw !== 'object') return {};
+  const result: ResumeSession['floor2Zones'] = {};
+  for (const [zone, saved] of Object.entries(raw as Record<string, unknown>)) {
+    if (!isArmZone(zone) || !saved || typeof saved !== 'object') continue;
+    const s = saved as Record<string, unknown>;
+    if (!s.maze || typeof s.maze !== 'object' || typeof s.pos !== 'string') continue;
+    result[zone] = { maze: s.maze as SerializedDungeonMaze, pos: s.pos };
+  }
+  return result;
+}
+
+// Defensively parses a raw, possibly legacy-shaped or untyped (e.g. a bare
+// cloud API response) value into a valid ResumeSession, filling in any
+// field a save made before it existed (this type has grown several times:
+// floor1Maze/floor1Pos, floor2Zones, dungeonElapsedSeconds, ...) with a safe
+// default instead of leaving it undefined. Returns null only when there's no
+// reasonable screen to resume into at all — callers should treat that as
+// "nothing to resume, fall back to village" rather than an error.
+//
+// Whenever a new ResumeSession field is added in the future, add its
+// default here too, so an old save with that field missing degrades to a
+// safe default instead of crashing deserializeMaze()/Object.entries()/etc.
+// on undefined the way this function was written to fix.
+export function sanitizeResumeSession(raw: unknown): ResumeSession | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (!isResumableScreen(r.screen)) return null;
+
+  return {
+    screen: r.screen,
+    returnScreen: isResumableScreen(r.returnScreen) ? r.returnScreen : 'stats',
+    dungeonFloor: r.dungeonFloor === 2 ? 2 : 1,
+    dungeonThemeZone: isArmZone(r.dungeonThemeZone) ? r.dungeonThemeZone : null,
+    maze: r.maze && typeof r.maze === 'object' ? (r.maze as SerializedDungeonMaze) : null,
+    pos: typeof r.pos === 'string' ? r.pos : null,
+    floor1Maze: r.floor1Maze && typeof r.floor1Maze === 'object' ? (r.floor1Maze as SerializedDungeonMaze) : null,
+    floor1Pos: typeof r.floor1Pos === 'string' ? r.floor1Pos : null,
+    floor2Zones: sanitizeFloor2Zones(r.floor2Zones),
+    dungeonElapsedSeconds: typeof r.dungeonElapsedSeconds === 'number' ? r.dungeonElapsedSeconds : 0,
+    dungeonEntryVillageSeconds: typeof r.dungeonEntryVillageSeconds === 'number' ? r.dungeonEntryVillageSeconds : 0,
+    dungeonMessage: typeof r.dungeonMessage === 'string' ? r.dungeonMessage : null,
+    portalMessage: typeof r.portalMessage === 'string' ? r.portalMessage : null,
+    currentMonsterId: typeof r.currentMonsterId === 'string' ? r.currentMonsterId : null,
+    state: r.state && typeof r.state === 'object' ? (r.state as GameState) : null,
+    skipEligible: typeof r.skipEligible === 'boolean' ? r.skipEligible : false,
+    expResult: r.expResult && typeof r.expResult === 'object' ? (r.expResult as ExpGrantResult) : null,
+    expChecked: typeof r.expChecked === 'boolean' ? r.expChecked : false,
+    dropChecked: typeof r.dropChecked === 'boolean' ? r.dropChecked : false,
+    pendingEssence: r.pendingEssence && typeof r.pendingEssence === 'object' ? (r.pendingEssence as EquippedEssence) : null,
+    essenceOutcome: typeof r.essenceOutcome === 'string' ? r.essenceOutcome : null,
+  };
+}

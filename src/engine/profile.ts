@@ -4,7 +4,7 @@ import type { EquippedEssence } from './essence';
 import type { EquipmentSlot, GearInstance } from './gear';
 import type { EquippedGear } from './stats-calc';
 import type { RaceId } from './races';
-import type { ResumeSession } from './session';
+import { sanitizeResumeSession, type ResumeSession } from './session';
 import type { ClockSpeed } from './village-clock';
 
 const STORAGE_KEY = 'my-new-project:profile';
@@ -138,30 +138,42 @@ export function addExp(profile: PlayerProfile, amount: number): AddExpResult {
   return { profile: { ...profile, level, exp }, leveledUp };
 }
 
+// Defensively parses a raw, untyped value (JSON.parse'd localStorage, or a
+// bare cloud API response — cloud-profile.ts uses this too) into a valid
+// PlayerProfile, field by field, so a save from before a field existed
+// degrades to that field's default instead of leaving `undefined` around to
+// crash something downstream. Whenever a new PlayerProfile field is added,
+// add its default here too (see sanitizeResumeSession in session.ts for the
+// same principle applied to the nested `session`).
+export function sanitizeProfile(raw: unknown): PlayerProfile {
+  if (!raw || typeof raw !== 'object') return defaultProfile();
+  const parsed = raw as Record<string, unknown>;
+  return {
+    raceId: typeof parsed.raceId === 'string' ? (parsed.raceId as RaceId) : null,
+    session: sanitizeResumeSession(parsed.session),
+    villageElapsedSeconds: typeof parsed.villageElapsedSeconds === 'number' ? parsed.villageElapsedSeconds : 0,
+    clockSpeed: parsed.clockSpeed === 2 || parsed.clockSpeed === 4 ? parsed.clockSpeed : 1,
+    lastAnsweredCycle: typeof parsed.lastAnsweredCycle === 'number' ? parsed.lastAnsweredCycle : null,
+    pendingJudgmentCycle: typeof parsed.pendingJudgmentCycle === 'number' ? parsed.pendingJudgmentCycle : null,
+    pendingJudgmentRemainingSeconds:
+      typeof parsed.pendingJudgmentRemainingSeconds === 'number' ? parsed.pendingJudgmentRemainingSeconds : null,
+    level: typeof parsed.level === 'number' ? parsed.level : 1,
+    exp: typeof parsed.exp === 'number' ? parsed.exp : 0,
+    defeatedMonsterNames: Array.isArray(parsed.defeatedMonsterNames) ? (parsed.defeatedMonsterNames as string[]) : [],
+    essences: Array.isArray(parsed.essences) ? (parsed.essences as EquippedEssence[]) : [],
+    discoveredEssenceIds: Array.isArray(parsed.discoveredEssenceIds) ? (parsed.discoveredEssenceIds as string[]) : [],
+    manaStones: parsed.manaStones && typeof parsed.manaStones === 'object' ? (parsed.manaStones as ManaStoneCounts) : {},
+    inventoryGear: Array.isArray(parsed.inventoryGear) ? (parsed.inventoryGear as GearInstance[]) : [],
+    equippedGear: parsed.equippedGear && typeof parsed.equippedGear === 'object' ? (parsed.equippedGear as EquippedGear) : {},
+    gold: typeof parsed.gold === 'number' ? parsed.gold : 0,
+  };
+}
+
 export function loadProfile(): PlayerProfile {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultProfile();
-    const parsed = JSON.parse(raw);
-    return {
-      raceId: typeof parsed.raceId === 'string' ? (parsed.raceId as RaceId) : null,
-      session: parsed.session && typeof parsed.session === 'object' ? (parsed.session as ResumeSession) : null,
-      villageElapsedSeconds: typeof parsed.villageElapsedSeconds === 'number' ? parsed.villageElapsedSeconds : 0,
-      clockSpeed: parsed.clockSpeed === 2 || parsed.clockSpeed === 4 ? parsed.clockSpeed : 1,
-      lastAnsweredCycle: typeof parsed.lastAnsweredCycle === 'number' ? parsed.lastAnsweredCycle : null,
-      pendingJudgmentCycle: typeof parsed.pendingJudgmentCycle === 'number' ? parsed.pendingJudgmentCycle : null,
-      pendingJudgmentRemainingSeconds:
-        typeof parsed.pendingJudgmentRemainingSeconds === 'number' ? parsed.pendingJudgmentRemainingSeconds : null,
-      level: typeof parsed.level === 'number' ? parsed.level : 1,
-      exp: typeof parsed.exp === 'number' ? parsed.exp : 0,
-      defeatedMonsterNames: Array.isArray(parsed.defeatedMonsterNames) ? parsed.defeatedMonsterNames : [],
-      essences: Array.isArray(parsed.essences) ? parsed.essences : [],
-      discoveredEssenceIds: Array.isArray(parsed.discoveredEssenceIds) ? parsed.discoveredEssenceIds : [],
-      manaStones: parsed.manaStones && typeof parsed.manaStones === 'object' ? parsed.manaStones : {},
-      inventoryGear: Array.isArray(parsed.inventoryGear) ? parsed.inventoryGear : [],
-      equippedGear: parsed.equippedGear && typeof parsed.equippedGear === 'object' ? parsed.equippedGear : {},
-      gold: typeof parsed.gold === 'number' ? parsed.gold : 0,
-    };
+    return sanitizeProfile(JSON.parse(raw));
   } catch {
     return defaultProfile();
   }

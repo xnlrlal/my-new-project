@@ -8,6 +8,7 @@
 
 - `src/engine/` — 순수 TypeScript 함수로 작성된 게임 엔진 (`engine.ts`, `cards.ts`, `races.ts`, `monsters.ts`, `dungeon.ts`, `essence.ts`, `gear.ts`, `stats-calc.ts`, `stat-bonus.ts`, `profile.ts`, `auth.ts`, `cloud-profile.ts`, `supabase-client.ts`). 카드 사용, 턴 진행 등 모든 액션이 `GameState`를 새로 계산하고 `log` 배열에 이벤트를 기록합니다. DOM이나 렌더링에 전혀 의존하지 않아 UI를 바꿔도 그대로 재사용 가능합니다.
 - `src/ui/` — 화면별 렌더링 (`auth`, `menu`, `character-select`, `stats`, `dungeon-map`, `inventory`, `equipment`, `essence`, `battle`). `src/main.ts`는 화면 전환만 담당하는 라우터입니다. 나중에 Phaser 기반 2D 렌더러로 교체해도 엔진은 그대로 둘 수 있습니다.
+- **세이브 데이터 필드 추가 원칙**: `PlayerProfile`/`ResumeSession`에 새 필드를 추가할 때는 반드시 (1) `defaultProfile()`에 기본값을 넣고 (2) `sanitizeProfile()`(`profile.ts`)/`sanitizeResumeSession()`(`session.ts`)에도 그 필드의 방어적 기본값 처리를 같이 추가하세요. 이 두 함수가 로컬(`loadProfile`)과 클라우드(`loadCloudProfile`) 저장분을 모두 통과하는 유일한 관문이라, 여기 안 거치면 그 필드가 없는 구버전 세이브에서 `undefined`가 그대로 흘러들어와 조용히 깨질 수 있습니다 (실제로 `floor2Zones` 필드 추가 후 이 처리를 빠뜨려서 구버전 계정의 "이어하기"가 무반응이 되는 버그가 있었습니다).
 
 ## 시작하기
 
