@@ -1,4 +1,12 @@
-export type RaceId = 'human' | 'elf' | 'orc' | 'dwarf';
+export type RaceId = 'human' | 'elf' | 'orc' | 'dwarf' | 'barbarian';
+
+// Race ids selectable in character-select, in display order. Orc is
+// deliberately excluded — it's been retired as a playable race (see the
+// 'orc' monster in monsters.ts) but stays in RACES/RaceId below so existing
+// saves with raceId: 'orc' keep resolving through getRace() instead of
+// crashing on an unknown id. Ids present here but not 'barbarian' render as
+// locked cards rather than being hidden.
+export const SELECTABLE_RACE_IDS: RaceId[] = ['barbarian', 'human', 'elf', 'dwarf'];
 
 export interface RaceStats {
   maxHp: number;
@@ -15,6 +23,12 @@ export interface RaceDef {
 }
 
 export const RACES: RaceDef[] = [
+  {
+    id: 'barbarian',
+    name: '바바리안',
+    description: '분노에 몸을 맡긴 전사. 마나는 부족하지만 공격력은 모든 종족 중 최고다.',
+    stats: { maxHp: 45, maxMana: 2, attackBonus: 3, defenseBonus: 0 },
+  },
   {
     id: 'human',
     name: '인간',

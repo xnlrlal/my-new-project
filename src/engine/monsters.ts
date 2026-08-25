@@ -203,6 +203,24 @@ export const MONSTERS: MonsterDef[] = [
     },
   },
   {
+    id: 'orc',
+    name: '오크',
+    grade: 6,
+    maxHp: 50,
+    maxMana: 3,
+    zone: 'south',
+    essence: {
+      statBonus: { attackBonus: 1, maxHp: 3 },
+      skill: { name: '거친 몽둥이질', cost: 2, effect: 'damage', value: 12, description: '적에게 12의 피해를 준다.' },
+    },
+    gearDrop: {
+      name: '오크의 뼈 곤봉',
+      slot: 'weapon',
+      statBonus: { attackBonus: 1 },
+      description: '오크가 휘두르던 뼈 곤봉. 공격력이 오른다.',
+    },
+  },
+  {
     id: 'orc-grand-warrior',
     name: '오크 대전사',
     grade: 7,
