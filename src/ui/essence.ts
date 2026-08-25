@@ -26,7 +26,7 @@ export function renderEssenceScreen(
           <div class="essence-slot filled">
             <div class="essence-slot-header">
               <span class="essence-name">${essence.monsterName}의 정수</span>
-              <span class="grade-tag">Lv.${essence.monsterGrade}</span>
+              <span class="grade-tag">${essence.monsterGrade}등급</span>
             </div>
             <div class="essence-stat">${statBonusText(essence.statBonus)}</div>
             <div class="essence-skill">스킬: ${essence.skill.name} (마나 ${essence.skill.cost}) — ${essence.skill.description}</div>
@@ -41,14 +41,14 @@ export function renderEssenceScreen(
     if (!discovered) {
       return `
         <div class="essence-slot empty">
-          <div class="essence-slot-header"><span class="essence-name">???</span><span class="grade-tag">Lv.${monster.grade}</span></div>
+          <div class="essence-slot-header"><span class="essence-name">???</span><span class="grade-tag">${monster.grade}등급</span></div>
           <div class="essence-stat">아직 발견하지 못한 정수입니다.</div>
         </div>
       `;
     }
     return `
       <div class="essence-slot filled">
-        <div class="essence-slot-header"><span class="essence-name">${monster.name}의 정수</span><span class="grade-tag">Lv.${monster.grade}</span></div>
+        <div class="essence-slot-header"><span class="essence-name">${monster.name}의 정수</span><span class="grade-tag">${monster.grade}등급</span></div>
         <div class="essence-stat">${statBonusText(monster.essence.statBonus)}</div>
         <div class="essence-skill">스킬: ${monster.essence.skill.name} — ${monster.essence.skill.description}</div>
       </div>

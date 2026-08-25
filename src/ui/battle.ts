@@ -25,7 +25,7 @@ function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number): st
   const manaPct = Math.round((actor.mana / actor.maxMana) * 100);
   return `
     <div class="actor ${role}">
-      <div class="actor-name">${actor.name}${grade ? ` <span class="grade-tag">Lv.${grade}</span>` : ''}</div>
+      <div class="actor-name">${actor.name}${grade ? ` <span class="grade-tag">${grade}등급</span>` : ''}</div>
       <div class="bar"><div class="bar-fill" style="width:${hpPct}%"></div></div>
       <div class="stat-line">HP ${actor.hp}/${actor.maxHp} ${actor.shield > 0 ? `· 방어막 ${actor.shield}` : ''}</div>
       <div class="bar"><div class="bar-fill mana" style="width:${manaPct}%"></div></div>

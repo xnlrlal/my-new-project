@@ -10,10 +10,13 @@ export interface EssenceTemplate {
   skill: Omit<Card, 'id'>;
 }
 
+// 1 = 최강(가장 강함), 9 = 최약(가장 약함) — 숫자가 작을수록 강한 등급제.
+export type MonsterGrade = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+
 export interface MonsterDef {
   id: string;
   name: string;
-  grade: number;
+  grade: MonsterGrade;
   maxHp: number;
   maxMana: number;
   zone: ArmZone;
@@ -25,7 +28,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'slime',
     name: '슬라임',
-    grade: 1,
+    grade: 9,
     maxHp: 18,
     maxMana: 2,
     zone: 'south',
@@ -43,7 +46,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'bat',
     name: '박쥐',
-    grade: 1,
+    grade: 9,
     maxHp: 16,
     maxMana: 3,
     zone: 'north',
@@ -61,7 +64,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'goblin',
     name: '고블린',
-    grade: 2,
+    grade: 9,
     maxHp: 24,
     maxMana: 2,
     zone: 'south',
@@ -79,7 +82,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'rat-pack',
     name: '들쥐 떼',
-    grade: 2,
+    grade: 9,
     maxHp: 22,
     maxMana: 2,
     zone: 'east',
@@ -97,7 +100,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'wisp',
     name: '도깨비불',
-    grade: 2,
+    grade: 9,
     maxHp: 20,
     maxMana: 3,
     zone: 'west',
@@ -115,7 +118,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'wolf',
     name: '늑대',
-    grade: 3,
+    grade: 8,
     maxHp: 30,
     maxMana: 3,
     zone: 'east',
@@ -133,7 +136,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'kobold',
     name: '코볼트',
-    grade: 3,
+    grade: 8,
     maxHp: 28,
     maxMana: 3,
     zone: 'south',
@@ -151,7 +154,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'bandit',
     name: '도적',
-    grade: 4,
+    grade: 7,
     maxHp: 36,
     maxMana: 3,
     zone: 'south',
@@ -169,7 +172,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'skeleton-soldier',
     name: '해골 병사',
-    grade: 4,
+    grade: 7,
     maxHp: 34,
     maxMana: 3,
     zone: 'north',
@@ -187,7 +190,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'orc-warrior',
     name: '오크 전사',
-    grade: 5,
+    grade: 6,
     maxHp: 42,
     maxMana: 3,
     zone: 'south',
@@ -205,7 +208,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'orc',
     name: '오크',
-    grade: 6,
+    grade: 5,
     maxHp: 50,
     maxMana: 3,
     zone: 'south',
@@ -223,7 +226,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'orc-grand-warrior',
     name: '오크 대전사',
-    grade: 7,
+    grade: 4,
     maxHp: 58,
     maxMana: 4,
     zone: 'south',
@@ -241,7 +244,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'dark-knight',
     name: '암흑 기사',
-    grade: 9,
+    grade: 2,
     maxHp: 62,
     maxMana: 5,
     zone: 'south',
@@ -259,7 +262,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'harpy',
     name: '하피',
-    grade: 5,
+    grade: 6,
     maxHp: 40,
     maxMana: 4,
     zone: 'east',
@@ -277,7 +280,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'dark-mage',
     name: '다크 메이지',
-    grade: 6,
+    grade: 5,
     maxHp: 40,
     maxMana: 5,
     zone: 'west',
@@ -295,7 +298,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'spectre',
     name: '스펙터',
-    grade: 6,
+    grade: 5,
     maxHp: 38,
     maxMana: 5,
     zone: 'north',
@@ -313,7 +316,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'troll',
     name: '트롤',
-    grade: 7,
+    grade: 4,
     maxHp: 55,
     maxMana: 3,
     zone: 'west',
@@ -331,7 +334,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'ogre',
     name: '오우거',
-    grade: 7,
+    grade: 4,
     maxHp: 58,
     maxMana: 3,
     zone: 'east',
@@ -349,7 +352,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'wyvern',
     name: '와이번',
-    grade: 8,
+    grade: 3,
     maxHp: 60,
     maxMana: 4,
     zone: 'west',
@@ -367,7 +370,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'griffon',
     name: '그리폰',
-    grade: 8,
+    grade: 3,
     maxHp: 58,
     maxMana: 4,
     zone: 'east',
@@ -385,7 +388,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'lich',
     name: '리치',
-    grade: 9,
+    grade: 2,
     maxHp: 62,
     maxMana: 6,
     zone: 'north',
@@ -403,7 +406,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'vampire-lord',
     name: '뱀파이어 로드',
-    grade: 9,
+    grade: 2,
     maxHp: 60,
     maxMana: 6,
     zone: 'north',
@@ -421,7 +424,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'dragon',
     name: '드래곤',
-    grade: 10,
+    grade: 1,
     maxHp: 80,
     maxMana: 6,
     zone: 'west',
@@ -439,7 +442,7 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'hellfire-spirit',
     name: '지옥불 정령',
-    grade: 10,
+    grade: 1,
     maxHp: 85,
     maxMana: 6,
     zone: 'west',
@@ -456,16 +459,28 @@ export const MONSTERS: MonsterDef[] = [
   },
 ];
 
+const STRONGEST_GRADE: MonsterGrade = 1;
+const WEAKEST_GRADE: MonsterGrade = 9;
+
+// Grade 1 (strongest) is worth the most exp, grade 9 (weakest) the least —
+// the inverse of the raw grade number, since grade itself now runs the
+// opposite direction (1 = strongest).
 export function expForGrade(grade: number): number {
-  return grade;
+  return WEAKEST_GRADE + 1 - grade;
 }
 
-const MAX_GRADE = 10;
 const OCCASIONAL_GRADE_CHANCE = 0.2;
 
+function clampGrade(g: number): MonsterGrade {
+  return Math.min(WEAKEST_GRADE, Math.max(STRONGEST_GRADE, g)) as MonsterGrade;
+}
+
+// Deeper floors should trend toward stronger (numerically lower) monsters —
+// mirrors the pre-inversion "grade = floor, capped at the top" progression,
+// just expressed toward STRONGEST_GRADE instead of away from grade 1.
 function rollTargetGrade(floor: number): number {
-  const primaryGrades = [floor, Math.min(floor + 1, MAX_GRADE)];
-  const occasionalGrade = Math.min(floor + 2, MAX_GRADE);
+  const primaryGrades = [clampGrade(WEAKEST_GRADE - floor + 1), clampGrade(WEAKEST_GRADE - floor)];
+  const occasionalGrade = clampGrade(WEAKEST_GRADE - floor - 1);
   const useOccasional = Math.random() < OCCASIONAL_GRADE_CHANCE;
   return useOccasional ? occasionalGrade : primaryGrades[Math.floor(Math.random() * primaryGrades.length)];
 }
