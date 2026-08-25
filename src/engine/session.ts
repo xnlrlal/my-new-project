@@ -7,6 +7,7 @@ import type { ExpGrantResult } from './profile';
 // auth/menu/character-select carry no extra state, so they collapse to
 // 'village' (or no session at all) when captured.
 export type ResumableScreen =
+  | 'ritual'
   | 'village'
   | 'stats'
   | 'dungeon-map'
@@ -61,6 +62,7 @@ export interface ResumeSession {
 }
 
 const RESUMABLE_SCREENS: readonly ResumableScreen[] = [
+  'ritual',
   'village',
   'stats',
   'dungeon-map',
