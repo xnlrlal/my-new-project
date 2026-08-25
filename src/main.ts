@@ -1,7 +1,7 @@
 import './style.css';
 import type { GameState } from './engine/types';
 import { getRace, type RaceDef } from './engine/races';
-import type { MonsterDef } from './engine/monsters';
+import type { MonsterDef, MonsterGrade } from './engine/monsters';
 import { getMonsterById, pickMonsterForFloorAndZone, rollEssenceDrop, rollManaStoneDrop } from './engine/monsters';
 import { initGame, playCard, endTurn } from './engine/engine';
 import type { ResumableScreen, ResumeSession } from './engine/session';
@@ -19,6 +19,7 @@ import {
   unequipGear,
   addExp,
   isClockVisible,
+  exchangeManaStonesForGrade,
   type PlayerProfile,
   type ExpGrantResult,
 } from './engine/profile';
@@ -64,6 +65,7 @@ import {
 } from './engine/dungeon-clock';
 import { renderShop } from './ui/shop';
 import { renderLibrary } from './ui/library';
+import { renderExchange } from './ui/exchange';
 import { renderStats } from './ui/stats';
 import { renderBattle } from './ui/battle';
 import { renderInventory } from './ui/inventory';
@@ -86,7 +88,8 @@ type Screen =
   | 'equipment'
   | 'essence'
   | 'shop'
-  | 'library';
+  | 'library'
+  | 'exchange';
 
 const PORTAL_EXP_BONUS = 2;
 
@@ -231,6 +234,7 @@ function render() {
     renderVillage(
       app,
       profile.raceId != null,
+      profile.hasVisitedDungeonExchange,
       {
         dateTime: gameDateTimeFromElapsed(profile.villageElapsedSeconds),
         speed: profile.clockSpeed,
@@ -245,6 +249,7 @@ function render() {
         onOpenEquipment: () => openSubScreen('equipment'),
         onOpenShop: () => goTo('shop'),
         onOpenLibrary: () => goTo('library'),
+        onOpenExchange: () => goTo('exchange'),
         onQuitToMenu: () => goTo('menu'),
         onSetSpeed: (speed) => {
           profile = { ...profile, clockSpeed: speed };
@@ -274,6 +279,18 @@ function render() {
 
   if (screen === 'shop') {
     renderShop(app, { onBack: () => goTo('village') });
+    return;
+  }
+
+  if (screen === 'exchange') {
+    renderExchange(app, profile, {
+      onBack: () => goTo('village'),
+      onExchangeGrade: (grade: MonsterGrade) => {
+        profile = exchangeManaStonesForGrade(profile, grade);
+        persistProfile();
+        render();
+      },
+    });
     return;
   }
 
@@ -418,7 +435,11 @@ function forceReturnFromDungeon() {
   dropChecked = false;
   pendingEssence = null;
   essenceOutcome = null;
-  profile = { ...profile, villageElapsedSeconds: villageNoonAfterForcedReturn(dungeonEntryVillageSeconds) };
+  profile = {
+    ...profile,
+    villageElapsedSeconds: villageNoonAfterForcedReturn(dungeonEntryVillageSeconds),
+    hasVisitedDungeonExchange: true,
+  };
   dungeonEntryVillageSeconds = 0;
   goTo('village');
 }
@@ -597,6 +618,7 @@ function toResumableScreen(s: Screen): ResumableScreen | null {
     case 'essence':
     case 'shop':
     case 'library':
+    case 'exchange':
       return s;
     default:
       return null;

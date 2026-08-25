@@ -469,6 +469,28 @@ export function expForGrade(grade: number): number {
   return WEAKEST_GRADE + 1 - grade;
 }
 
+// 마석 환전소 등급별 환전율(마석 1개당 스톤). 9등급/8등급은 확정 수치(500,
+// 2000 = 정확히 4배), 그 위로는 등급이 오를수록 배율이 매 단계 완만해지는
+// 곡선(×4.00 → ×2.50 → ×2.00 → ×1.70 → ×1.47 → ×1.36 → ×1.235 → ×1.19)으로
+// 설계됨 — "5층까지 탐험하는 플레이어가 연간 70만 스톤 세금을 감당 가능"이라는
+// 목표를 rollTargetGrade(5)로 추정한 등급 분포(3등급 20%/4등급 39%/5등급 41%)
+// 기준으로 시뮬레이션해 확인함 (설계 논의 참고).
+const STONE_VALUE_BY_GRADE: Record<MonsterGrade, number> = {
+  9: 500,
+  8: 2000,
+  7: 5000,
+  6: 10000,
+  5: 17000,
+  4: 25000,
+  3: 34000,
+  2: 42000,
+  1: 50000,
+};
+
+export function stoneValueForGrade(grade: MonsterGrade): number {
+  return STONE_VALUE_BY_GRADE[grade];
+}
+
 const OCCASIONAL_GRADE_CHANCE = 0.2;
 
 function clampGrade(g: number): MonsterGrade {

@@ -1,5 +1,5 @@
-import type { MonsterDef } from './monsters';
-import { expForGrade } from './monsters';
+import type { MonsterDef, MonsterGrade } from './monsters';
+import { expForGrade, stoneValueForGrade } from './monsters';
 import type { EquippedEssence } from './essence';
 import type { EquipmentSlot, GearInstance } from './gear';
 import type { EquippedGear } from './stats-calc';
@@ -35,6 +35,14 @@ export interface PlayerProfile {
   // yet — once that item exists, this field goes away and isClockVisible()
   // reads the item's equipped state instead; no other call site changes.
   clockItemEquipped: boolean;
+  // Gates the 환전소(exchange) village facility. Set true the first time
+  // forceReturnFromDungeon() fires in main.ts — "다녀옴" for this facility
+  // is defined as that first forced return, since that's currently the only
+  // way back to the village from an active dungeon run short of death.
+  // Defaults false, and resetProfile() naturally re-defaults it on death
+  // since it just returns defaultProfile() — no special permadeath handling
+  // needed here.
+  hasVisitedDungeonExchange: boolean;
 }
 
 function defaultProfile(): PlayerProfile {
@@ -56,6 +64,7 @@ function defaultProfile(): PlayerProfile {
     equippedGear: {},
     gold: 0,
     clockItemEquipped: true,
+    hasVisitedDungeonExchange: false,
   };
 }
 
@@ -97,6 +106,23 @@ export function addManaStone(profile: PlayerProfile, grade: number): PlayerProfi
 
 export function totalManaStones(profile: PlayerProfile): number {
   return Object.values(profile.manaStones).reduce<number>((sum, count) => sum + (count ?? 0), 0);
+}
+
+// Exchanges every mana stone of one grade for stone at that grade's fixed
+// per-stone rate (all stones of a grade are worth the same — no individual
+// variance) and clears that grade's bucket. No-op if the player holds none.
+export function exchangeManaStonesForGrade(profile: PlayerProfile, grade: MonsterGrade): PlayerProfile {
+  const count = profile.manaStones[grade] ?? 0;
+  if (count <= 0) return profile;
+
+  const nextManaStones = { ...profile.manaStones };
+  delete nextManaStones[grade];
+
+  return {
+    ...profile,
+    manaStones: nextManaStones,
+    gold: profile.gold + count * stoneValueForGrade(grade),
+  };
 }
 
 export function addGearToInventory(profile: PlayerProfile, gear: GearInstance): PlayerProfile {
@@ -183,6 +209,7 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
     equippedGear: parsed.equippedGear && typeof parsed.equippedGear === 'object' ? (parsed.equippedGear as EquippedGear) : {},
     gold: typeof parsed.gold === 'number' ? parsed.gold : 0,
     clockItemEquipped: typeof parsed.clockItemEquipped === 'boolean' ? parsed.clockItemEquipped : true,
+    hasVisitedDungeonExchange: typeof parsed.hasVisitedDungeonExchange === 'boolean' ? parsed.hasVisitedDungeonExchange : false,
   };
 }
 

@@ -14,6 +14,7 @@ export interface VillageHandlers {
   onOpenEquipment: () => void;
   onOpenShop: () => void;
   onOpenLibrary: () => void;
+  onOpenExchange: () => void;
   onSetSpeed: (speed: ClockSpeed) => void;
   onSkip: () => void;
   onAcceptJudgment: () => void;
@@ -25,7 +26,13 @@ export interface VillageHandlers {
 // the "뒤로" button that would let a player reselect their race must not
 // render then, since character creation is a one-time, irreversible choice
 // until death resets the whole save.
-export function renderVillage(root: HTMLElement, hasCharacter: boolean, clock: VillageClockView, handlers: VillageHandlers) {
+export function renderVillage(
+  root: HTMLElement,
+  hasCharacter: boolean,
+  hasVisitedDungeonExchange: boolean,
+  clock: VillageClockView,
+  handlers: VillageHandlers
+) {
   const judging = clock.pendingJudgmentRemainingSeconds !== null;
   const backButton = hasCharacter ? '' : '<button class="menu-return" id="back-btn">뒤로</button>';
 
@@ -69,6 +76,7 @@ export function renderVillage(root: HTMLElement, hasCharacter: boolean, clock: V
       <div class="nav-row">
         <button class="menu-return small" id="shop-btn" ${judging ? 'disabled' : ''}>상점</button>
         <button class="menu-return small" id="library-btn" ${judging ? 'disabled' : ''}>도서관</button>
+        <button class="menu-return small" id="exchange-btn" ${judging || !hasVisitedDungeonExchange ? 'disabled' : ''}>환전소${hasVisitedDungeonExchange ? '' : ' <span class="race-locked-badge">잠김</span>'}</button>
       </div>
       <button class="menu-return small" id="quit-btn" ${judging ? 'disabled' : ''}>게임 종료</button>
       ${backButton}
@@ -81,6 +89,7 @@ export function renderVillage(root: HTMLElement, hasCharacter: boolean, clock: V
   document.getElementById('equipment-btn')?.addEventListener('click', handlers.onOpenEquipment);
   document.getElementById('shop-btn')?.addEventListener('click', handlers.onOpenShop);
   document.getElementById('library-btn')?.addEventListener('click', handlers.onOpenLibrary);
+  document.getElementById('exchange-btn')?.addEventListener('click', handlers.onOpenExchange);
   document.getElementById('skip-btn')?.addEventListener('click', handlers.onSkip);
   document.getElementById('quit-btn')?.addEventListener('click', handlers.onQuitToMenu);
   document.getElementById('accept-judgment')?.addEventListener('click', handlers.onAcceptJudgment);
