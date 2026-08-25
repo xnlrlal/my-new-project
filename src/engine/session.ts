@@ -24,6 +24,12 @@ export interface ResumeSession {
   dungeonThemeZone: ArmZone | null;
   maze: SerializedDungeonMaze | null;
   pos: CellId | null;
+  // Snapshot of floor 1's maze/position taken the moment the player enters
+  // floor 2, so backtracking (while unlocked) resumes exactly where floor 1
+  // was left rather than regenerating it — regenerating would reopen the
+  // portal-EXP-farming exploit the same way the removed "메인 메뉴로" did.
+  floor1Maze: SerializedDungeonMaze | null;
+  floor1Pos: CellId | null;
   // Cumulative in-dungeon clock, running since entry (not reset per floor)
   // and independent of the village clock, which is frozen for the duration.
   dungeonElapsedSeconds: number;

@@ -4,6 +4,7 @@ import { zoneFlavor, zoneLabel } from '../engine/dungeon';
 export interface DungeonMapHandlers {
   onMove: (move: DungeonMove) => void;
   onEnterPortal: (zone: ArmZone) => void;
+  onRevertToFloor1: () => void;
   onOpenInventory: () => void;
   onOpenEquipment: () => void;
   onOpenEssence: () => void;
@@ -17,6 +18,7 @@ export function renderDungeonMap(
   moves: DungeonMove[],
   message: string | null,
   portalMessage: string | null,
+  floor1RevertLocked: boolean,
   handlers: DungeonMapHandlers
 ) {
   const portalPanel = cell.portal
@@ -34,6 +36,15 @@ export function renderDungeonMap(
         <div class="essence-drop">
           <div class="essence-drop-title">포탈비석을 발견했습니다!</div>
           ${portalMessage ? `<div class="essence-drop-detail">${portalMessage}</div>` : ''}
+          ${
+            floor1RevertLocked
+              ? '<div class="essence-drop-detail">이 포탈은 더 이상 1층으로 연결되지 않습니다.</div>'
+              : `
+                <div class="essence-drop-actions">
+                  <button class="menu-return" id="revert-floor1">1층으로 귀환</button>
+                </div>
+              `
+          }
           <div class="essence-drop-detail">다음 구간은 아직 준비 중입니다. 이어서 업데이트될 예정입니다.</div>
         </div>
       `
@@ -71,6 +82,7 @@ export function renderDungeonMap(
   document.getElementById('enter-portal')?.addEventListener('click', () => {
     if (cell.portal) handlers.onEnterPortal(cell.portal);
   });
+  document.getElementById('revert-floor1')?.addEventListener('click', handlers.onRevertToFloor1);
   document.getElementById('open-inventory')?.addEventListener('click', handlers.onOpenInventory);
   document.getElementById('open-equipment')?.addEventListener('click', handlers.onOpenEquipment);
   document.getElementById('open-codex')?.addEventListener('click', handlers.onOpenEssence);

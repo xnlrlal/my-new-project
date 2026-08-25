@@ -53,7 +53,12 @@ import {
   nextJudgmentPointSeconds,
   JUDGMENT_COUNTDOWN_SECONDS,
 } from './engine/village-clock';
-import { advanceDungeonClock, shouldForceDungeonReturn, villageNoonAfterForcedReturn } from './engine/dungeon-clock';
+import {
+  advanceDungeonClock,
+  isFloor1RevertLocked,
+  shouldForceDungeonReturn,
+  villageNoonAfterForcedReturn,
+} from './engine/dungeon-clock';
 import { renderShop } from './ui/shop';
 import { renderLibrary } from './ui/library';
 import { renderStats } from './ui/stats';
@@ -111,6 +116,10 @@ let dungeonMessage: string | null = null;
 let portalMessage: string | null = null;
 let dungeonElapsedSeconds = 0;
 let dungeonEntryVillageSeconds = 0;
+// Snapshot of floor 1 taken at the moment of entering floor 2, so
+// backtracking (while unlocked) resumes it exactly instead of regenerating.
+let floor1Maze: DungeonMaze | null = null;
+let floor1Pos: CellId | null = null;
 
 const GAME_CLOCK_TICK_MS = 1000;
 // Wall-clock timestamp of the last tick, purely in-memory (never persisted)
@@ -263,9 +272,10 @@ function render() {
     const cell = cellAt(maze, pos);
     const moves = availableMoves(maze, pos);
     const floorLabel = dungeonFloor === 1 ? '미궁 1층' : `${zoneLabel(dungeonThemeZone!)} 미궁 2층`;
-    renderDungeonMap(app, floorLabel, dungeonFloor, cell, moves, dungeonMessage, portalMessage, {
+    renderDungeonMap(app, floorLabel, dungeonFloor, cell, moves, dungeonMessage, portalMessage, isFloor1RevertLocked(dungeonElapsedSeconds), {
       onMove: handleMove,
       onEnterPortal: enterFloorTwo,
+      onRevertToFloor1: revertToFloor1,
       onOpenInventory: () => openSubScreen('inventory'),
       onOpenEquipment: () => openSubScreen('equipment'),
       onOpenEssence: () => openSubScreen('essence'),
@@ -349,6 +359,8 @@ function enterDungeon() {
   dungeonThemeZone = null;
   maze = generateMaze(null);
   dungeonElapsedSeconds = 0;
+  floor1Maze = null;
+  floor1Pos = null;
   arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, '미궁에 들어섰다. 주변을 살핀다.');
 }
 
@@ -369,6 +381,8 @@ function forceReturnFromDungeon() {
   dungeonMessage = null;
   portalMessage = null;
   dungeonElapsedSeconds = 0;
+  floor1Maze = null;
+  floor1Pos = null;
   state = null;
   currentMonster = null;
   skipEligible = false;
@@ -383,10 +397,32 @@ function forceReturnFromDungeon() {
 }
 
 function enterFloorTwo(themeZone: ArmZone) {
+  // Snapshot floor 1 exactly as it stands so backtracking can resume it
+  // later instead of regenerating (see floor1Maze's declaration comment).
+  floor1Maze = maze;
+  floor1Pos = pos;
   dungeonFloor = 2;
   dungeonThemeZone = themeZone;
   maze = generateMaze(themeZone);
   arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, `${zoneLabel(themeZone)} 미궁(2층)에 들어섰다. 주변을 살핀다.`);
+}
+
+// Only reachable from floor 2's portal cell, and only before the 7-day
+// revert lock — enforced again here (not just hidden in the UI) in case the
+// lock crosses between render and click. Reuses the floor 1 snapshot taken
+// on the way up rather than generating a new maze, so this can't be abused
+// to re-farm floor 1's portal EXP the way the removed "메인 메뉴로" could.
+function revertToFloor1() {
+  if (dungeonFloor !== 2 || !floor1Maze || !floor1Pos || isFloor1RevertLocked(dungeonElapsedSeconds)) return;
+  dungeonFloor = 1;
+  dungeonThemeZone = null;
+  maze = floor1Maze;
+  pos = floor1Pos;
+  floor1Maze = null;
+  floor1Pos = null;
+  dungeonMessage = '1층으로 돌아왔다.';
+  portalMessage = null;
+  goTo('dungeon-map');
 }
 
 function handleMove(move: DungeonMove) {
@@ -463,6 +499,8 @@ function handleDeath() {
   portalMessage = null;
   dungeonElapsedSeconds = 0;
   dungeonEntryVillageSeconds = 0;
+  floor1Maze = null;
+  floor1Pos = null;
   skipEligible = false;
   expResult = null;
   expChecked = false;
@@ -534,6 +572,8 @@ function captureSession(): ResumeSession | undefined {
     dungeonThemeZone,
     maze: maze ? serializeMaze(maze) : null,
     pos,
+    floor1Maze: floor1Maze ? serializeMaze(floor1Maze) : null,
+    floor1Pos,
     dungeonMessage,
     portalMessage,
     dungeonElapsedSeconds,
@@ -592,6 +632,8 @@ function resumeCharacter() {
   dungeonThemeZone = session.dungeonThemeZone;
   maze = session.maze ? deserializeMaze(session.maze) : null;
   pos = session.pos;
+  floor1Maze = session.floor1Maze ? deserializeMaze(session.floor1Maze) : null;
+  floor1Pos = session.floor1Pos;
   dungeonMessage = session.dungeonMessage;
   portalMessage = session.portalMessage;
   dungeonElapsedSeconds = session.dungeonElapsedSeconds;
