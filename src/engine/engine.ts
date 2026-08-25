@@ -56,10 +56,19 @@ function createActor(
   return drawCards(base, HAND_SIZE);
 }
 
-export function initGame(playerStats: RaceStats, monster: MonsterDef, bonusCards: Card[] = []): GameState {
+// startingHp lets a caller carry HP over from a previous battle in the same
+// dungeon run (see dungeonHp in main.ts) instead of always beginning at full
+// health. Clamped to [0, maxHp] so a stale value from before a maxHp change
+// (gear/essence swapped mid-run) can never overheal or go negative. Omitted
+// (or undefined) means "start at full", which is what every other caller
+// (a brand-new dungeon entry, or the skip-probability simulation with no
+// carried HP to pass) still gets.
+export function initGame(playerStats: RaceStats, monster: MonsterDef, bonusCards: Card[] = [], startingHp?: number): GameState {
+  const player = createActor('player', '플레이어', playerStats, bonusCards);
+  const hp = startingHp === undefined ? player.maxHp : Math.min(Math.max(0, startingHp), player.maxHp);
   return {
     turn: 1,
-    player: createActor('player', '플레이어', playerStats, bonusCards),
+    player: { ...player, hp },
     enemy: createActor('enemy', monster.name, { maxHp: monster.maxHp, maxMana: monster.maxMana, attackBonus: 0, defenseBonus: 0 }),
     enemyGrade: monster.grade,
     log: [{ turn: 1, actor: 'player', message: `${monster.name}(을)를 만났다! 전투 시작!` }],

@@ -131,6 +131,12 @@ let dungeonMessage: string | null = null;
 let portalMessage: string | null = null;
 let dungeonElapsedSeconds = 0;
 let dungeonEntryVillageSeconds = 0;
+// Player HP carried across battles for the current dungeon run (mirrors
+// `maze`: non-null only while a run is active). Reset to full only on a
+// brand-new dungeon entry (enterDungeon); floor transitions leave it
+// untouched. Kept in sync with the live battle state in afterStateChange()
+// so it's current even if a forced return interrupts a fight mid-turn.
+let dungeonHp: number | null = null;
 // Snapshot of floor 1 taken at the moment of entering floor 2, so
 // backtracking (while unlocked) resumes it exactly instead of regenerating.
 let floor1Maze: DungeonMaze | null = null;
@@ -398,6 +404,10 @@ function openSubScreen(next: Screen) {
 }
 
 function afterStateChange() {
+  // Keep the run's carried HP current as the fight progresses, not just at
+  // its end, so an interrupting forced return (which can fire mid-turn)
+  // captures the right value.
+  if (state) dungeonHp = state.player.hp;
   checkForExp();
   checkForDrop();
   persistProfile();
@@ -418,6 +428,9 @@ function enterDungeon() {
   floor1Maze = null;
   floor1Pos = null;
   floor2Zones = {};
+  // Brand-new dungeon entry is the only place HP resets to full — floor
+  // transitions and backtracking leave whatever's left in dungeonHp alone.
+  dungeonHp = selectedRace ? computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear).maxHp : null;
   arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, '미궁에 들어섰다. 주변을 살핀다.');
 }
 
@@ -445,6 +458,7 @@ function forceReturnFromDungeon() {
   floor1Pos = null;
   floor2Zones = {};
   state = null;
+  dungeonHp = null;
   currentMonster = null;
   skipEligible = false;
   expResult = null;
@@ -566,8 +580,14 @@ function startZoneBattle(zone: Zone) {
   currentMonster = pickMonsterForFloorAndZone(dungeonFloor, zone);
   const bonusCards = essenceSkillCards(profile.essences);
   const totalStats = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear);
-  state = initGame(totalStats, currentMonster, bonusCards);
-  skipEligible = estimateWinProbability(totalStats, bonusCards, currentMonster) >= SKIP_WIN_PROBABILITY_THRESHOLD;
+  // Carry HP left over from the previous battle in this run (clamped inside
+  // initGame against the just-recomputed maxHp, in case gear/essences
+  // changed mid-run); a brand-new run has no carried HP yet, so fall back to
+  // full via undefined.
+  const startingHp = dungeonHp ?? undefined;
+  state = initGame(totalStats, currentMonster, bonusCards, startingHp);
+  dungeonHp = state.player.hp;
+  skipEligible = estimateWinProbability(totalStats, bonusCards, currentMonster, startingHp) >= SKIP_WIN_PROBABILITY_THRESHOLD;
   expResult = null;
   expChecked = false;
   dropChecked = false;
@@ -591,6 +611,7 @@ function handleDeath(reason: 'battle' | 'tax') {
   selectedRace = null;
   currentMonster = null;
   state = null;
+  dungeonHp = null;
   dungeonFloor = 1;
   dungeonThemeZone = null;
   maze = null;
@@ -703,6 +724,7 @@ function captureSession(): ResumeSession | undefined {
     dungeonEntryVillageSeconds,
     currentMonsterId: currentMonster?.id ?? null,
     state,
+    dungeonHp,
     skipEligible,
     expResult,
     expChecked,
@@ -785,6 +807,7 @@ function resumeCharacter() {
     dungeonEntryVillageSeconds = session.dungeonEntryVillageSeconds;
     currentMonster = session.currentMonsterId ? getMonsterById(session.currentMonsterId) : null;
     state = session.state;
+    dungeonHp = session.dungeonHp;
     skipEligible = session.skipEligible;
     expResult = session.expResult;
     expChecked = session.expChecked;

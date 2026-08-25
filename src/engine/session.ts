@@ -47,6 +47,11 @@ export interface ResumeSession {
   portalMessage: string | null;
   currentMonsterId: string | null;
   state: GameState | null;
+  // Player HP carried across battles within this dungeon run (survives
+  // dungeon-map navigation and subscreens, not just mid-battle reloads —
+  // `state` alone only covers the latter). Full HP on a brand-new dungeon
+  // entry, null once there's no active run (mirrors `maze`).
+  dungeonHp: number | null;
   skipEligible: boolean;
   expResult: ExpGrantResult | null;
   expChecked: boolean;
@@ -123,6 +128,7 @@ export function sanitizeResumeSession(raw: unknown): ResumeSession | null {
     portalMessage: typeof r.portalMessage === 'string' ? r.portalMessage : null,
     currentMonsterId: typeof r.currentMonsterId === 'string' ? r.currentMonsterId : null,
     state: r.state && typeof r.state === 'object' ? (r.state as GameState) : null,
+    dungeonHp: typeof r.dungeonHp === 'number' ? r.dungeonHp : null,
     skipEligible: typeof r.skipEligible === 'boolean' ? r.skipEligible : false,
     expResult: r.expResult && typeof r.expResult === 'object' ? (r.expResult as ExpGrantResult) : null,
     expChecked: typeof r.expChecked === 'boolean' ? r.expChecked : false,

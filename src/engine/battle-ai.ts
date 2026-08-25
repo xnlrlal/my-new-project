@@ -30,11 +30,12 @@ export function estimateWinProbability(
   playerStats: RaceStats,
   bonusCards: Card[],
   monster: MonsterDef,
+  startingHp?: number,
   trials = 150
 ): number {
   let wins = 0;
   for (let i = 0; i < trials; i++) {
-    const result = autoPlayBattle(initGame(playerStats, monster, bonusCards));
+    const result = autoPlayBattle(initGame(playerStats, monster, bonusCards, startingHp));
     if (result.status === 'win') wins++;
   }
   return wins / trials;
