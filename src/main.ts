@@ -802,7 +802,17 @@ function advanceProfileVillageTime(newElapsed: number) {
   const crossedCycle = crossedJudgmentCycle(profile.villageElapsedSeconds, newElapsed, profile.lastAnsweredCycle);
   profile =
     crossedCycle !== null
-      ? { ...profile, villageElapsedSeconds: newElapsed, pendingJudgmentCycle: crossedCycle, pendingJudgmentRemainingSeconds: JUDGMENT_COUNTDOWN_SECONDS }
+      ? // Snap to the cycle's exact 06:00 boundary rather than `newElapsed`
+        // (which may have overshot it within this tick) — the judgment
+        // window is meant to freeze the display at exactly 06:00 from the
+        // moment it opens, not just once tickGameClock's pending-judgment
+        // branch takes over on the next tick.
+        {
+          ...profile,
+          villageElapsedSeconds: judgmentBoundarySeconds(crossedCycle),
+          pendingJudgmentCycle: crossedCycle,
+          pendingJudgmentRemainingSeconds: JUDGMENT_COUNTDOWN_SECONDS,
+        }
       : { ...profile, villageElapsedSeconds: newElapsed };
 }
 
@@ -834,17 +844,21 @@ function tickGameClock() {
     return;
   }
 
-  const newElapsed = advanceVillageClock(profile.villageElapsedSeconds, realDeltaSeconds, profile.clockSpeed);
-
   if (profile.pendingJudgmentRemainingSeconds !== null) {
-    // The 30-second decision countdown is real time, not scaled by
-    // clockSpeed — it's decision pressure on the player, not game time.
+    // The village clock is frozen at this cycle's 06:00 boundary for the
+    // whole decision window ("멈춘 시간" — the player hasn't answered yet,
+    // so no game time passes). Only the 30-second decision countdown itself
+    // moves, and it's real time, not scaled by clockSpeed — it's decision
+    // pressure on the player, not game time.
+    const boundary =
+      profile.pendingJudgmentCycle !== null ? judgmentBoundarySeconds(profile.pendingJudgmentCycle) : profile.villageElapsedSeconds;
     const remaining = profile.pendingJudgmentRemainingSeconds - realDeltaSeconds;
     profile =
       remaining <= 0
-        ? { ...profile, villageElapsedSeconds: newElapsed, lastAnsweredCycle: profile.pendingJudgmentCycle, pendingJudgmentCycle: null, pendingJudgmentRemainingSeconds: null }
-        : { ...profile, villageElapsedSeconds: newElapsed, pendingJudgmentRemainingSeconds: remaining };
+        ? { ...profile, villageElapsedSeconds: boundary, lastAnsweredCycle: profile.pendingJudgmentCycle, pendingJudgmentCycle: null, pendingJudgmentRemainingSeconds: null }
+        : { ...profile, villageElapsedSeconds: boundary, pendingJudgmentRemainingSeconds: remaining };
   } else {
+    const newElapsed = advanceVillageClock(profile.villageElapsedSeconds, realDeltaSeconds, profile.clockSpeed);
     advanceProfileVillageTime(newElapsed);
   }
 
