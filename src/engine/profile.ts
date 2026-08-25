@@ -1,11 +1,12 @@
 import type { MonsterDef, MonsterGrade } from './monsters';
 import { expForGrade, stoneValueForGrade } from './monsters';
 import type { EquippedEssence } from './essence';
-import type { EquipmentSlot, GearInstance } from './gear';
+import { createGrantedGear, type EquipmentSlot, type GearInstance } from './gear';
 import type { EquippedGear } from './stats-calc';
 import type { RaceId } from './races';
 import { sanitizeResumeSession, type ResumeSession } from './session';
 import type { ClockSpeed } from './village-clock';
+import { STARTER_ARMOR, findWeaponChoice } from './ritual';
 
 const STORAGE_KEY = 'my-new-project:profile';
 const EXP_PER_LEVEL = 20;
@@ -50,6 +51,13 @@ export interface PlayerProfile {
   // years that already passed. null = no year settled yet (still in the
   // tax-free first year).
   lastTaxedYear: number | null;
+  // Set true once the barbarian coming-of-age ritual (무기 선택 +
+  // 기본 방어구 지급, ui/ritual.ts) has been completed — gates the
+  // forced 'ritual' screen right after character-select from ever
+  // showing again. Defaults false, and resetProfile() naturally
+  // re-defaults it on death since it just returns defaultProfile() —
+  // a new character always goes through the ritual again.
+  hasCompletedComingOfAge: boolean;
 }
 
 function defaultProfile(): PlayerProfile {
@@ -73,6 +81,7 @@ function defaultProfile(): PlayerProfile {
     clockItemEquipped: true,
     hasVisitedDungeonExchange: false,
     lastTaxedYear: null,
+    hasCompletedComingOfAge: false,
   };
 }
 
@@ -165,6 +174,26 @@ export function unequipGear(profile: PlayerProfile, slot: EquipmentSlot): Player
   };
 }
 
+// Grants the chosen ritual weapon plus the fixed starter armor set,
+// equipping all four directly (not routed through inventoryGear — the
+// character is meant to walk out of the ritual already dressed), and marks
+// the ritual done. No-op (returns profile unchanged) if the weapon id isn't
+// recognized or the ritual was already completed, so a stray double-call
+// can't re-grant gear onto an already-equipped character.
+export function completeComingOfAge(profile: PlayerProfile, weaponChoiceId: string): PlayerProfile {
+  if (profile.hasCompletedComingOfAge) return profile;
+  const weaponChoice = findWeaponChoice(weaponChoiceId);
+  if (!weaponChoice) return profile;
+
+  const granted = [weaponChoice, ...STARTER_ARMOR].map((choice) => createGrantedGear(choice.id, choice.template));
+  const equippedGear: EquippedGear = { ...profile.equippedGear };
+  for (const gear of granted) {
+    equippedGear[gear.slot] = gear;
+  }
+
+  return { ...profile, equippedGear, hasCompletedComingOfAge: true };
+}
+
 export function expToNextLevel(level: number): number {
   return level * EXP_PER_LEVEL;
 }
@@ -219,6 +248,7 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
     clockItemEquipped: typeof parsed.clockItemEquipped === 'boolean' ? parsed.clockItemEquipped : true,
     hasVisitedDungeonExchange: typeof parsed.hasVisitedDungeonExchange === 'boolean' ? parsed.hasVisitedDungeonExchange : false,
     lastTaxedYear: typeof parsed.lastTaxedYear === 'number' ? parsed.lastTaxedYear : null,
+    hasCompletedComingOfAge: typeof parsed.hasCompletedComingOfAge === 'boolean' ? parsed.hasCompletedComingOfAge : false,
   };
 }
 

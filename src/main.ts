@@ -20,6 +20,7 @@ import {
   addExp,
   isClockVisible,
   exchangeManaStonesForGrade,
+  completeComingOfAge,
   type PlayerProfile,
   type ExpGrantResult,
 } from './engine/profile';
@@ -47,6 +48,7 @@ import {
 } from './engine/dungeon';
 import { renderMenu } from './ui/menu';
 import { renderCharacterSelect } from './ui/character-select';
+import { renderRitual } from './ui/ritual';
 import { renderVillage } from './ui/village';
 import {
   advanceVillageClock,
@@ -81,6 +83,7 @@ type Screen =
   | 'auth'
   | 'menu'
   | 'character-select'
+  | 'ritual'
   | 'village'
   | 'stats'
   | 'dungeon-map'
@@ -240,9 +243,19 @@ function render() {
       onSelect: (race) => {
         selectedRace = race;
         profile = { ...profile, raceId: race.id };
-        goTo('village');
+        goTo(race.id === 'barbarian' && !profile.hasCompletedComingOfAge ? 'ritual' : 'village');
       },
       onBack: () => goTo('menu'),
+    });
+    return;
+  }
+
+  if (screen === 'ritual') {
+    renderRitual(app, {
+      onSelectWeapon: (weaponId) => {
+        profile = completeComingOfAge(profile, weaponId);
+        goTo('village');
+      },
     });
     return;
   }
@@ -663,6 +676,7 @@ function checkForDrop() {
 
 function toResumableScreen(s: Screen): ResumableScreen | null {
   switch (s) {
+    case 'ritual':
     case 'village':
     case 'stats':
     case 'dungeon-map':
