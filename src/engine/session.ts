@@ -30,6 +30,12 @@ export interface ResumeSession {
   // portal-EXP-farming exploit the same way the removed "메인 메뉴로" did.
   floor1Maze: SerializedDungeonMaze | null;
   floor1Pos: CellId | null;
+  // Same idea in the other direction: each floor-2 zone's maze/position is
+  // snapshotted the moment the player leaves it (reverts to floor 1), keyed
+  // by theme zone, so re-entering that same zone later reuses it instead of
+  // generating a fresh one. Only a zone's very first-ever entry (nothing
+  // saved for it yet) generates a new maze.
+  floor2Zones: Partial<Record<ArmZone, { maze: SerializedDungeonMaze; pos: CellId }>>;
   // Cumulative in-dungeon clock, running since entry (not reset per floor)
   // and independent of the village clock, which is frozen for the duration.
   dungeonElapsedSeconds: number;

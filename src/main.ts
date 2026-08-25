@@ -40,6 +40,7 @@ import {
   type DungeonCell,
   type DungeonMaze,
   type DungeonMove,
+  type SerializedDungeonMaze,
   type Zone,
 } from './engine/dungeon';
 import { renderMenu } from './ui/menu';
@@ -120,6 +121,11 @@ let dungeonEntryVillageSeconds = 0;
 // backtracking (while unlocked) resumes it exactly instead of regenerating.
 let floor1Maze: DungeonMaze | null = null;
 let floor1Pos: CellId | null = null;
+// Same idea for floor 2, per zone: snapshotted the moment the player leaves
+// a zone (reverts to floor 1), so re-entering that zone later reuses it
+// instead of generating a fresh one. Only a zone's first-ever entry (no
+// snapshot yet) generates a new maze.
+let floor2Zones: Partial<Record<ArmZone, { maze: DungeonMaze; pos: CellId }>> = {};
 
 const GAME_CLOCK_TICK_MS = 1000;
 // Wall-clock timestamp of the last tick, purely in-memory (never persisted)
@@ -361,6 +367,7 @@ function enterDungeon() {
   dungeonElapsedSeconds = 0;
   floor1Maze = null;
   floor1Pos = null;
+  floor2Zones = {};
   arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, '미궁에 들어섰다. 주변을 살핀다.');
 }
 
@@ -383,6 +390,7 @@ function forceReturnFromDungeon() {
   dungeonElapsedSeconds = 0;
   floor1Maze = null;
   floor1Pos = null;
+  floor2Zones = {};
   state = null;
   currentMonster = null;
   skipEligible = false;
@@ -396,6 +404,10 @@ function forceReturnFromDungeon() {
   goTo('village');
 }
 
+// Reuses a zone's floor-2 maze if the player has been there before this run
+// (see floor2Zones' declaration comment) — only a zone's very first entry
+// ever generates a fresh maze. "최초 미궁 진입을 제외하고 역행 시엔 재사용이
+// 원칙" applies symmetrically to floor 1 and every floor-2 zone alike.
 function enterFloorTwo(themeZone: ArmZone) {
   // Snapshot floor 1 exactly as it stands so backtracking can resume it
   // later instead of regenerating (see floor1Maze's declaration comment).
@@ -403,8 +415,18 @@ function enterFloorTwo(themeZone: ArmZone) {
   floor1Pos = pos;
   dungeonFloor = 2;
   dungeonThemeZone = themeZone;
-  maze = generateMaze(themeZone);
-  arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, `${zoneLabel(themeZone)} 미궁(2층)에 들어섰다. 주변을 살핀다.`);
+
+  const saved = floor2Zones[themeZone];
+  if (saved) {
+    maze = saved.maze;
+    pos = saved.pos;
+    dungeonMessage = `${zoneLabel(themeZone)} 미궁(2층)으로 돌아왔다.`;
+    portalMessage = null;
+    goTo('dungeon-map');
+  } else {
+    maze = generateMaze(themeZone);
+    arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, `${zoneLabel(themeZone)} 미궁(2층)에 들어섰다. 주변을 살핀다.`);
+  }
 }
 
 // Only reachable from floor 2's portal cell, and only before the 7-day
@@ -414,6 +436,11 @@ function enterFloorTwo(themeZone: ArmZone) {
 // to re-farm floor 1's portal EXP the way the removed "메인 메뉴로" could.
 function revertToFloor1() {
   if (dungeonFloor !== 2 || !floor1Maze || !floor1Pos || isFloor1RevertLocked(dungeonElapsedSeconds)) return;
+  // Snapshot this floor-2 zone exactly as it stands so re-entering it later
+  // reuses it instead of generating a fresh one.
+  if (dungeonThemeZone && maze && pos) {
+    floor2Zones = { ...floor2Zones, [dungeonThemeZone]: { maze, pos } };
+  }
   dungeonFloor = 1;
   dungeonThemeZone = null;
   maze = floor1Maze;
@@ -501,6 +528,7 @@ function handleDeath() {
   dungeonEntryVillageSeconds = 0;
   floor1Maze = null;
   floor1Pos = null;
+  floor2Zones = {};
   skipEligible = false;
   expResult = null;
   expChecked = false;
@@ -556,6 +584,26 @@ function toResumableScreen(s: Screen): ResumableScreen | null {
   }
 }
 
+function serializeFloor2Zones(
+  zones: Partial<Record<ArmZone, { maze: DungeonMaze; pos: CellId }>>
+): Partial<Record<ArmZone, { maze: SerializedDungeonMaze; pos: CellId }>> {
+  const result: Partial<Record<ArmZone, { maze: SerializedDungeonMaze; pos: CellId }>> = {};
+  for (const [zone, saved] of Object.entries(zones) as [ArmZone, { maze: DungeonMaze; pos: CellId }][]) {
+    result[zone] = { maze: serializeMaze(saved.maze), pos: saved.pos };
+  }
+  return result;
+}
+
+function deserializeFloor2Zones(
+  zones: Partial<Record<ArmZone, { maze: SerializedDungeonMaze; pos: CellId }>>
+): Partial<Record<ArmZone, { maze: DungeonMaze; pos: CellId }>> {
+  const result: Partial<Record<ArmZone, { maze: DungeonMaze; pos: CellId }>> = {};
+  for (const [zone, saved] of Object.entries(zones) as [ArmZone, { maze: SerializedDungeonMaze; pos: CellId }][]) {
+    result[zone] = { maze: deserializeMaze(saved.maze), pos: saved.pos };
+  }
+  return result;
+}
+
 // Snapshots exactly what's needed to resume the current screen later
 // (including mid-battle: hand/deck/hp/log all live on `state`). Returns
 // undefined while on a non-gameplay screen (auth/menu/character-select) so
@@ -574,6 +622,7 @@ function captureSession(): ResumeSession | undefined {
     pos,
     floor1Maze: floor1Maze ? serializeMaze(floor1Maze) : null,
     floor1Pos,
+    floor2Zones: serializeFloor2Zones(floor2Zones),
     dungeonMessage,
     portalMessage,
     dungeonElapsedSeconds,
@@ -634,6 +683,7 @@ function resumeCharacter() {
   pos = session.pos;
   floor1Maze = session.floor1Maze ? deserializeMaze(session.floor1Maze) : null;
   floor1Pos = session.floor1Pos;
+  floor2Zones = deserializeFloor2Zones(session.floor2Zones);
   dungeonMessage = session.dungeonMessage;
   portalMessage = session.portalMessage;
   dungeonElapsedSeconds = session.dungeonElapsedSeconds;
