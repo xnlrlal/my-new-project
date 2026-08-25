@@ -49,9 +49,11 @@ import {
   advanceVillageClock,
   crossedJudgmentCycle,
   gameDateTimeFromElapsed,
+  judgmentBoundarySeconds,
   nextJudgmentPointSeconds,
   JUDGMENT_COUNTDOWN_SECONDS,
 } from './engine/village-clock';
+import { advanceDungeonClock, shouldForceDungeonReturn, villageNoonAfterForcedReturn } from './engine/dungeon-clock';
 import { renderShop } from './ui/shop';
 import { renderLibrary } from './ui/library';
 import { renderStats } from './ui/stats';
@@ -107,8 +109,10 @@ let maze: DungeonMaze | null = null;
 let pos: CellId | null = null;
 let dungeonMessage: string | null = null;
 let portalMessage: string | null = null;
+let dungeonElapsedSeconds = 0;
+let dungeonEntryVillageSeconds = 0;
 
-const VILLAGE_CLOCK_TICK_MS = 1000;
+const GAME_CLOCK_TICK_MS = 1000;
 // Wall-clock timestamp of the last tick, purely in-memory (never persisted)
 // so a page reload never "catches up" on time that passed while the tab was
 // closed — the first tick after load just seeds this and advances nothing.
@@ -220,7 +224,9 @@ function render() {
           render();
         },
         onAcceptJudgment: () => {
-          profile = { ...profile, lastAnsweredCycle: profile.pendingJudgmentCycle, pendingJudgmentCycle: null, pendingJudgmentRemainingSeconds: null };
+          const cycle = profile.pendingJudgmentCycle;
+          profile = { ...profile, lastAnsweredCycle: cycle, pendingJudgmentCycle: null, pendingJudgmentRemainingSeconds: null };
+          dungeonEntryVillageSeconds = cycle !== null ? judgmentBoundarySeconds(cycle) : profile.villageElapsedSeconds;
           enterDungeon();
         },
         onDeclineJudgment: () => {
@@ -342,7 +348,38 @@ function enterDungeon() {
   dungeonFloor = 1;
   dungeonThemeZone = null;
   maze = generateMaze(null);
+  dungeonElapsedSeconds = 0;
   arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, '미궁에 들어섰다. 주변을 살핀다.');
+}
+
+// Time's up: the dungeon closes around the player regardless of what
+// they're doing — "전투 중이라도 즉시 강제귀환, 유예 없음". Progress earned
+// so far (profile: level/items/gear/essences/mana stones) is kept; this
+// isn't a loss, just an abrupt, involuntary end to the run, unlike death.
+// Village time is set to "그날 정오" (entry's 06:00 + 6h) regardless of how
+// many in-dungeon days actually passed, per spec — not the same kind of
+// exit exitDungeonToMenu used to be (that was a player-triggered escape
+// hatch and was removed entirely to close the portal-farming exploit; this
+// only ever fires automatically from the time system, never on demand).
+function forceReturnFromDungeon() {
+  dungeonFloor = 1;
+  dungeonThemeZone = null;
+  maze = null;
+  pos = null;
+  dungeonMessage = null;
+  portalMessage = null;
+  dungeonElapsedSeconds = 0;
+  state = null;
+  currentMonster = null;
+  skipEligible = false;
+  expResult = null;
+  expChecked = false;
+  dropChecked = false;
+  pendingEssence = null;
+  essenceOutcome = null;
+  profile = { ...profile, villageElapsedSeconds: villageNoonAfterForcedReturn(dungeonEntryVillageSeconds) };
+  dungeonEntryVillageSeconds = 0;
+  goTo('village');
 }
 
 function enterFloorTwo(themeZone: ArmZone) {
@@ -424,6 +461,8 @@ function handleDeath() {
   pos = null;
   dungeonMessage = null;
   portalMessage = null;
+  dungeonElapsedSeconds = 0;
+  dungeonEntryVillageSeconds = 0;
   skipEligible = false;
   expResult = null;
   expChecked = false;
@@ -497,6 +536,8 @@ function captureSession(): ResumeSession | undefined {
     pos,
     dungeonMessage,
     portalMessage,
+    dungeonElapsedSeconds,
+    dungeonEntryVillageSeconds,
     currentMonsterId: currentMonster?.id ?? null,
     state,
     skipEligible,
@@ -508,16 +549,26 @@ function captureSession(): ResumeSession | undefined {
   };
 }
 
-// Always caches to localStorage immediately (so the game stays fully
-// playable offline/as a guest), and additionally syncs to the cloud in the
-// background whenever a user is logged in. Also refreshes the resume
-// snapshot (see captureSession) so "이어하기" always reflects reality.
-function persistProfile() {
+// Refreshes the resume snapshot (see captureSession) and caches to
+// localStorage immediately (so the game stays fully playable offline/as a
+// guest), but does not touch the network. Used by the once-a-second clock
+// ticks (village and dungeon alike) so idle time is never lost on a same-tab
+// reload without pushing a network write every single second.
+function persistProfileLocalOnly() {
   const captured = captureSession();
   if (captured !== undefined) {
     profile = { ...profile, session: captured };
   }
   saveProfile(profile);
+}
+
+// Same as persistProfileLocalOnly(), plus a background cloud sync for
+// logged-in players. Used everywhere state changes from a real action
+// (screen transitions, card plays, gear changes, etc.) rather than from
+// ticking, so cloud sync stays bounded by how often the player actually
+// does something.
+function persistProfile() {
+  persistProfileLocalOnly();
   if (authUser) {
     saveCloudProfile(authUser.id, profile).catch(() => {
       // best-effort background sync; localStorage already has the data
@@ -543,6 +594,8 @@ function resumeCharacter() {
   pos = session.pos;
   dungeonMessage = session.dungeonMessage;
   portalMessage = session.portalMessage;
+  dungeonElapsedSeconds = session.dungeonElapsedSeconds;
+  dungeonEntryVillageSeconds = session.dungeonEntryVillageSeconds;
   currentMonster = session.currentMonsterId ? getMonsterById(session.currentMonsterId) : null;
   state = session.state;
   skipEligible = session.skipEligible;
@@ -617,15 +670,13 @@ function advanceProfileVillageTime(newElapsed: number) {
       : { ...profile, villageElapsedSeconds: newElapsed };
 }
 
-// Only ticks while there's a character and no active dungeon run (maze ===
-// null), matching "마을 시계는 활성 미궁 런이 없을 때만 흐름" regardless of
-// which screen that state happens to be showing on (village/stats/shop/
-// library/inventory/equipment/menu all qualify; character-select doesn't,
-// since raceId isn't set yet; dungeon-map/battle don't, since maze is set).
-// Persists to localStorage every tick (cheap) but relies on the existing
-// action-triggered persistProfile() calls elsewhere to sync to the cloud,
-// rather than pushing a network write once a second for logged-in players.
-function tickVillageClock() {
+// Drives whichever of the two clocks currently applies: while maze !== null
+// (an active dungeon run) the dungeon clock advances and is checked for a
+// forced floor closure; otherwise (village/stats/shop/library/inventory/
+// equipment/menu — state-based, not screen-based, as before) the village
+// clock advances, judgment window included. The two are mutually exclusive
+// by construction. Neither runs before a character exists.
+function tickGameClock() {
   const now = Date.now();
   if (lastVillageTickAt === null) {
     lastVillageTickAt = now;
@@ -634,7 +685,17 @@ function tickVillageClock() {
   const realDeltaSeconds = (now - lastVillageTickAt) / 1000;
   lastVillageTickAt = now;
 
-  if (maze !== null || !profile.raceId) return;
+  if (!profile.raceId) return;
+
+  if (maze !== null) {
+    dungeonElapsedSeconds = advanceDungeonClock(dungeonElapsedSeconds, realDeltaSeconds);
+    if (shouldForceDungeonReturn(dungeonElapsedSeconds, dungeonFloor)) {
+      forceReturnFromDungeon();
+      return;
+    }
+    persistProfileLocalOnly();
+    return;
+  }
 
   const newElapsed = advanceVillageClock(profile.villageElapsedSeconds, realDeltaSeconds, profile.clockSpeed);
 
@@ -656,7 +717,7 @@ function tickVillageClock() {
 
 async function init() {
   render();
-  setInterval(tickVillageClock, VILLAGE_CLOCK_TICK_MS);
+  setInterval(tickGameClock, GAME_CLOCK_TICK_MS);
   if (isCloudConfigured) {
     const existingUser = await getCurrentUser();
     if (existingUser) {

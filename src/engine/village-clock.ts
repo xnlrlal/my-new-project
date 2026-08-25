@@ -5,9 +5,9 @@
 
 export type ClockSpeed = 1 | 2 | 4;
 
-const SECONDS_PER_HOUR = 3600;
+export const SECONDS_PER_HOUR = 3600;
 const HOURS_PER_DAY = 24;
-const SECONDS_PER_GAME_DAY = HOURS_PER_DAY * SECONDS_PER_HOUR;
+export const SECONDS_PER_GAME_DAY = HOURS_PER_DAY * SECONDS_PER_HOUR;
 
 // 마을 내 하루 = 실시간 60초.
 const REAL_SECONDS_PER_VILLAGE_DAY = 60;
@@ -51,7 +51,12 @@ export function nextJudgmentPointSeconds(elapsedSeconds: number): number {
   return cycleIndex * JUDGMENT_CYCLE_SECONDS + JUDGMENT_OFFSET_SECONDS;
 }
 
-function judgmentBoundaryForCycle(cycleIndex: number): number {
+// Absolute villageElapsedSeconds value at which a given judgment cycle's
+// 06:00 falls. Used when a player accepts a judgment: the dungeon "entry
+// time" is defined as this boundary, not whatever villageElapsedSeconds has
+// drifted to by the moment they click (the clock keeps advancing during the
+// 30-second decision window).
+export function judgmentBoundarySeconds(cycleIndex: number): number {
   return cycleIndex * JUDGMENT_CYCLE_SECONDS + JUDGMENT_OFFSET_SECONDS;
 }
 
@@ -64,7 +69,7 @@ function judgmentBoundaryForCycle(cycleIndex: number): number {
 export function crossedJudgmentCycle(prevElapsed: number, newElapsed: number, lastAnsweredCycle: number | null): number | null {
   let cycleIndex = Math.max(0, Math.floor((prevElapsed - JUDGMENT_OFFSET_SECONDS) / JUDGMENT_CYCLE_SECONDS));
   for (let guard = 0; guard < 10000; guard++) {
-    const boundary = judgmentBoundaryForCycle(cycleIndex);
+    const boundary = judgmentBoundarySeconds(cycleIndex);
     if (boundary > newElapsed) return null;
     if (boundary > prevElapsed && lastAnsweredCycle !== cycleIndex) return cycleIndex;
     cycleIndex++;

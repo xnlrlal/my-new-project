@@ -24,6 +24,12 @@ export interface ResumeSession {
   dungeonThemeZone: ArmZone | null;
   maze: SerializedDungeonMaze | null;
   pos: CellId | null;
+  // Cumulative in-dungeon clock, running since entry (not reset per floor)
+  // and independent of the village clock, which is frozen for the duration.
+  dungeonElapsedSeconds: number;
+  // villageElapsedSeconds at the exact judgment boundary this run was
+  // accepted at — used to compute "그날 정오" if a forced return happens.
+  dungeonEntryVillageSeconds: number;
   dungeonMessage: string | null;
   portalMessage: string | null;
   currentMonsterId: string | null;
