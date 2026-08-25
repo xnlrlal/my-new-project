@@ -43,6 +43,13 @@ export interface PlayerProfile {
   // since it just returns defaultProfile() — no special permadeath handling
   // needed here.
   hasVisitedDungeonExchange: boolean;
+  // Last tax-year boundary (crossedTaxYear's 0-indexed yearIndex) already
+  // settled — either actually charged, or silently advanced past while
+  // TAX_SYSTEM_ENABLED is off (see tax.ts). Keeping this moving even while
+  // the system is off means flipping it on later never retroactively bills
+  // years that already passed. null = no year settled yet (still in the
+  // tax-free first year).
+  lastTaxedYear: number | null;
 }
 
 function defaultProfile(): PlayerProfile {
@@ -65,6 +72,7 @@ function defaultProfile(): PlayerProfile {
     gold: 0,
     clockItemEquipped: true,
     hasVisitedDungeonExchange: false,
+    lastTaxedYear: null,
   };
 }
 
@@ -210,6 +218,7 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
     gold: typeof parsed.gold === 'number' ? parsed.gold : 0,
     clockItemEquipped: typeof parsed.clockItemEquipped === 'boolean' ? parsed.clockItemEquipped : true,
     hasVisitedDungeonExchange: typeof parsed.hasVisitedDungeonExchange === 'boolean' ? parsed.hasVisitedDungeonExchange : false,
+    lastTaxedYear: typeof parsed.lastTaxedYear === 'number' ? parsed.lastTaxedYear : null,
   };
 }
 

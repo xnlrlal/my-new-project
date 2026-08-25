@@ -85,6 +85,29 @@ export function crossedJudgmentCycle(prevElapsed: number, newElapsed: number, la
   return null;
 }
 
+// 1년 = 30일 판단 주기 12번 분량(360일). 12번째 판단창(361일차 06:00)이 뜨는
+// 바로 그 날 자정에 첫 세금 경계가 겹치도록 의도적으로 맞춘 값 — 30과 360이
+// 정확히 나누어떨어지므로 이 겹침은 매 12번째 판단 사이클마다 규칙적으로
+// 발생한다 (tax.ts의 연간 세금 시스템 설계 참고).
+export const TAX_YEAR_DAYS = 360;
+const TAX_YEAR_SECONDS = SECONDS_PER_GAME_DAY * TAX_YEAR_DAYS;
+
+// crossedJudgmentCycle과 완전히 같은 구조의 경계 감지 — 주기 길이만 다르다.
+// yearIndex는 0부터 시작하며, yearIndex=0의 경계(정확히 360일 경과 시점)를
+// 넘는 것이 "1년차가 끝나고 2년차가 시작"되는 최초의 징수 시점이다. 즉
+// "첫해 면제"는 별도 조건 없이 이 함수가 360일이 지나기 전까진 아무것도
+// 반환하지 않는다는 사실만으로 자연스럽게 성립한다.
+export function crossedTaxYear(prevElapsed: number, newElapsed: number, lastTaxedYear: number | null): number | null {
+  let yearIndex = Math.max(0, Math.floor(prevElapsed / TAX_YEAR_SECONDS));
+  for (let guard = 0; guard < 10000; guard++) {
+    const boundary = (yearIndex + 1) * TAX_YEAR_SECONDS;
+    if (boundary > newElapsed) return null;
+    if (boundary > prevElapsed && lastTaxedYear !== yearIndex) return yearIndex;
+    yearIndex++;
+  }
+  return null;
+}
+
 export interface GameDuration {
   days: number;
   hours: number;

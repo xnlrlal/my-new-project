@@ -66,6 +66,7 @@ import {
 import { renderShop } from './ui/shop';
 import { renderLibrary } from './ui/library';
 import { renderExchange } from './ui/exchange';
+import { applyAnnualTaxIfCrossed, ANNUAL_TAX_AMOUNT } from './engine/tax';
 import { renderStats } from './ui/stats';
 import { renderBattle } from './ui/battle';
 import { renderInventory } from './ui/inventory';
@@ -111,6 +112,14 @@ let pendingEssence: EquippedEssence | null = null;
 let essenceOutcome: string | null = null;
 let returnScreen: Screen = 'stats';
 let skipEligible = false;
+// Why the last permadeath happened — transient, never persisted, shown
+// once on the menu screen after a tax death (battle death already has its
+// own on-screen banner before handleDeath() runs, so it doesn't need this).
+let deathReason: 'battle' | 'tax' | null = null;
+// One-shot "세금이 징수되었습니다" flash message for the village screen —
+// set when a tax payment actually goes through, consumed (read once, then
+// cleared) the next time the village screen renders.
+let lastTaxMessage: string | null = null;
 
 const SKIP_WIN_PROBABILITY_THRESHOLD = 0.99;
 
@@ -179,7 +188,9 @@ function render() {
 
   if (screen === 'menu') {
     const hasCharacter = profile.raceId != null;
-    renderMenu(app, authUser, hasCharacter, {
+    const taxDeathNotice = deathReason === 'tax';
+    deathReason = null;
+    renderMenu(app, authUser, hasCharacter, taxDeathNotice, {
       onCreateCharacter: () => goTo('character-select'),
       onContinueCharacter: () => resumeCharacter(),
       onLogout: handleLogout,
@@ -231,10 +242,13 @@ function render() {
   }
 
   if (screen === 'village') {
+    const taxMessage = lastTaxMessage;
+    lastTaxMessage = null;
     renderVillage(
       app,
       profile.raceId != null,
       profile.hasVisitedDungeonExchange,
+      taxMessage,
       {
         dateTime: gameDateTimeFromElapsed(profile.villageElapsedSeconds),
         speed: profile.clockSpeed,
@@ -257,7 +271,7 @@ function render() {
           render();
         },
         onSkip: () => {
-          advanceProfileVillageTime(nextJudgmentPointSeconds(profile.villageElapsedSeconds));
+          if (advanceProfileVillageTime(nextJudgmentPointSeconds(profile.villageElapsedSeconds))) return;
           persistProfile();
           render();
         },
@@ -351,7 +365,7 @@ function render() {
           dungeonMessage = '전투에서 승리했다.';
           goTo('dungeon-map');
         },
-        onAcknowledgeDeath: handleDeath,
+        onAcknowledgeDeath: () => handleDeath('battle'),
         onAbsorbEssence: () => {
           if (!pendingEssence) return;
           if (hasOpenEssenceSlot(profile)) {
@@ -417,6 +431,9 @@ function enterDungeon() {
 // hatch and was removed entirely to close the portal-farming exploit; this
 // only ever fires automatically from the time system, never on demand).
 function forceReturnFromDungeon() {
+  const prevElapsed = profile.villageElapsedSeconds;
+  const newElapsed = villageNoonAfterForcedReturn(dungeonEntryVillageSeconds);
+
   dungeonFloor = 1;
   dungeonThemeZone = null;
   maze = null;
@@ -435,12 +452,23 @@ function forceReturnFromDungeon() {
   dropChecked = false;
   pendingEssence = null;
   essenceOutcome = null;
-  profile = {
-    ...profile,
-    villageElapsedSeconds: villageNoonAfterForcedReturn(dungeonEntryVillageSeconds),
-    hasVisitedDungeonExchange: true,
-  };
   dungeonEntryVillageSeconds = 0;
+
+  // villageElapsedSeconds is frozen for the entire dungeon visit and then
+  // jumps straight from prevElapsed to newElapsed here — a normal tick-based
+  // crossing check never runs across that gap. Checking tax here too is
+  // what stops "just stay in the dungeon" from dodging it indefinitely:
+  // this only ever delays settlement until the player is forced back out,
+  // never skips it (see crossedTaxYear/applyAnnualTaxIfCrossed).
+  const taxOutcome = applyAnnualTaxIfCrossed(profile, prevElapsed, newElapsed);
+  if (taxOutcome.died) {
+    handleDeath('tax');
+    return;
+  }
+  profile = { ...taxOutcome.profile, villageElapsedSeconds: newElapsed, hasVisitedDungeonExchange: true };
+  if (taxOutcome.taxedYear !== null) {
+    lastTaxMessage = `${taxOutcome.taxedYear + 2}년차 세금 ${ANNUAL_TAX_AMOUNT.toLocaleString()}스톤이 징수되었습니다. (잔액: ${profile.gold.toLocaleString()}스톤)`;
+  }
   goTo('village');
 }
 
@@ -548,12 +576,17 @@ function startZoneBattle(zone: Zone) {
   goTo('battle');
 }
 
-// Losing is permanent: the whole save (level, inventory, essences, gear,
-// discovered codex, resume session — everything) resets, matching the
-// roguelike death rule. All cleanup happens before goTo('menu') so its
-// built-in persistProfile() call captures the already-reset state instead
-// of resurrecting the battle that was just lost.
-function handleDeath() {
+// Death is permanent regardless of cause (battle loss or unpaid annual
+// tax): the whole save (level, inventory, essences, gear, discovered codex,
+// resume session — everything) resets, matching the roguelike death rule.
+// All cleanup happens before goTo('menu') so its built-in persistProfile()
+// call captures the already-reset state instead of resurrecting whatever
+// was in progress. `reason` only drives which one-shot message the player
+// sees afterward (see `deathReason`) — battle deaths already show their own
+// banner on the battle screen before this runs, so menu.ts only surfaces
+// the reason for 'tax'.
+function handleDeath(reason: 'battle' | 'tax') {
+  deathReason = reason;
   profile = resetProfile();
   selectedRace = null;
   currentMonster = null;
@@ -820,7 +853,28 @@ async function handleLogout() {
 // 06:00 boundary. Shared by the tick (gradual advance) and the skip button
 // (jumps straight to the next boundary) so both go through the same
 // crossing-detection logic instead of duplicating it.
-function advanceProfileVillageTime(newElapsed: number) {
+// Returns true if this advance triggered a tax death (profile has already
+// been reset and the screen already moved to 'menu' — callers should stop
+// immediately rather than proceeding to persist/render whatever they had
+// queued next).
+function advanceProfileVillageTime(newElapsed: number): boolean {
+  const prevElapsed = profile.villageElapsedSeconds;
+
+  // Tax is settled before the judgment-cycle check below, using the same
+  // prevElapsed -> newElapsed span: on the (regularly recurring, every 12th
+  // cycle) day both a tax-year boundary and a judgment boundary fall on,
+  // tax resolves first — if it kills the character there is no save left
+  // for a judgment window to open on.
+  const taxOutcome = applyAnnualTaxIfCrossed(profile, prevElapsed, newElapsed);
+  if (taxOutcome.died) {
+    handleDeath('tax');
+    return true;
+  }
+  profile = taxOutcome.profile;
+  if (taxOutcome.taxedYear !== null) {
+    lastTaxMessage = `${taxOutcome.taxedYear + 2}년차 세금 ${ANNUAL_TAX_AMOUNT.toLocaleString()}스톤이 징수되었습니다. (잔액: ${profile.gold.toLocaleString()}스톤)`;
+  }
+
   const crossedCycle = crossedJudgmentCycle(profile.villageElapsedSeconds, newElapsed, profile.lastAnsweredCycle);
   profile =
     crossedCycle !== null
@@ -836,6 +890,7 @@ function advanceProfileVillageTime(newElapsed: number) {
           pendingJudgmentRemainingSeconds: JUDGMENT_COUNTDOWN_SECONDS,
         }
       : { ...profile, villageElapsedSeconds: newElapsed };
+  return false;
 }
 
 // Drives whichever of the two clocks currently applies: while maze !== null
@@ -881,7 +936,7 @@ function tickGameClock() {
         : { ...profile, villageElapsedSeconds: boundary, pendingJudgmentRemainingSeconds: remaining };
   } else {
     const newElapsed = advanceVillageClock(profile.villageElapsedSeconds, realDeltaSeconds, profile.clockSpeed);
-    advanceProfileVillageTime(newElapsed);
+    if (advanceProfileVillageTime(newElapsed)) return;
   }
 
   saveProfile(profile);
