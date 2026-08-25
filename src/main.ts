@@ -228,6 +228,7 @@ function render() {
         onOpenEquipment: () => openSubScreen('equipment'),
         onOpenShop: () => goTo('shop'),
         onOpenLibrary: () => goTo('library'),
+        onQuitToMenu: () => goTo('menu'),
         onSetSpeed: (speed) => {
           profile = { ...profile, clockSpeed: speed };
           persistProfile();

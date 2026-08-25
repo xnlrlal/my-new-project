@@ -18,6 +18,7 @@ export interface VillageHandlers {
   onSkip: () => void;
   onAcceptJudgment: () => void;
   onDeclineJudgment: () => void;
+  onQuitToMenu: () => void;
 }
 
 function pad2(n: number): string {
@@ -73,6 +74,7 @@ export function renderVillage(root: HTMLElement, hasCharacter: boolean, clock: V
         <button class="menu-return small" id="shop-btn" ${judging ? 'disabled' : ''}>상점</button>
         <button class="menu-return small" id="library-btn" ${judging ? 'disabled' : ''}>도서관</button>
       </div>
+      <button class="menu-return small" id="quit-btn" ${judging ? 'disabled' : ''}>게임 종료</button>
       ${backButton}
     </div>
   `;
@@ -84,6 +86,7 @@ export function renderVillage(root: HTMLElement, hasCharacter: boolean, clock: V
   document.getElementById('shop-btn')?.addEventListener('click', handlers.onOpenShop);
   document.getElementById('library-btn')?.addEventListener('click', handlers.onOpenLibrary);
   document.getElementById('skip-btn')?.addEventListener('click', handlers.onSkip);
+  document.getElementById('quit-btn')?.addEventListener('click', handlers.onQuitToMenu);
   document.getElementById('accept-judgment')?.addEventListener('click', handlers.onAcceptJudgment);
   document.getElementById('decline-judgment')?.addEventListener('click', handlers.onDeclineJudgment);
   root.querySelectorAll<HTMLButtonElement>('[data-speed]').forEach((btn) => {
