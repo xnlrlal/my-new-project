@@ -9,8 +9,8 @@ export const SECONDS_PER_HOUR = 3600;
 const HOURS_PER_DAY = 24;
 export const SECONDS_PER_GAME_DAY = HOURS_PER_DAY * SECONDS_PER_HOUR;
 
-// 마을 내 하루 = 실시간 60초.
-const REAL_SECONDS_PER_VILLAGE_DAY = 60;
+// 마을 내 하루 = 실시간 120초 (게임 내 1시간 = 실시간 5초와 일관됨: 24시간×5초=120초).
+const REAL_SECONDS_PER_VILLAGE_DAY = 120;
 const VILLAGE_CLOCK_SCALE = SECONDS_PER_GAME_DAY / REAL_SECONDS_PER_VILLAGE_DAY;
 
 const JUDGMENT_CYCLE_DAYS = 30;

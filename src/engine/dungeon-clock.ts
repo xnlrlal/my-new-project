@@ -7,11 +7,11 @@
 
 import { SECONDS_PER_GAME_DAY, SECONDS_PER_HOUR } from './village-clock';
 
-// 미궁 내부: 1시간 = 실시간 5초. 마을 시계의 배속 설정과는 무관하게 항상
+// 미궁 내부: 하루 = 실시간 60초. 마을 시계의 배속 설정과는 무관하게 항상
 // 고정 속도로 흐름 — 미궁 안에서는 시간 압박이 조절 대상이 아니라 위험
 // 그 자체이기 때문.
-const REAL_SECONDS_PER_DUNGEON_HOUR = 5;
-const DUNGEON_CLOCK_SCALE = SECONDS_PER_HOUR / REAL_SECONDS_PER_DUNGEON_HOUR;
+const REAL_SECONDS_PER_DUNGEON_DAY = 60;
+const DUNGEON_CLOCK_SCALE = SECONDS_PER_GAME_DAY / REAL_SECONDS_PER_DUNGEON_DAY;
 
 export function advanceDungeonClock(elapsedSeconds: number, realDeltaSeconds: number): number {
   if (realDeltaSeconds <= 0) return elapsedSeconds;
