@@ -5,6 +5,7 @@ import type { EquipmentSlot, GearInstance } from './gear';
 import type { EquippedGear } from './stats-calc';
 import type { RaceId } from './races';
 import type { ResumeSession } from './session';
+import type { ClockSpeed } from './village-clock';
 
 const STORAGE_KEY = 'my-new-project:profile';
 const EXP_PER_LEVEL = 20;
@@ -14,6 +15,8 @@ export type ManaStoneCounts = Partial<Record<number, number>>;
 export interface PlayerProfile {
   raceId: RaceId | null;
   session: ResumeSession | null;
+  villageElapsedSeconds: number;
+  clockSpeed: ClockSpeed;
   level: number;
   exp: number;
   defeatedMonsterNames: string[];
@@ -29,6 +32,8 @@ function defaultProfile(): PlayerProfile {
   return {
     raceId: null,
     session: null,
+    villageElapsedSeconds: 0,
+    clockSpeed: 1,
     level: 1,
     exp: 0,
     defeatedMonsterNames: [],
@@ -135,6 +140,8 @@ export function loadProfile(): PlayerProfile {
     return {
       raceId: typeof parsed.raceId === 'string' ? (parsed.raceId as RaceId) : null,
       session: parsed.session && typeof parsed.session === 'object' ? (parsed.session as ResumeSession) : null,
+      villageElapsedSeconds: typeof parsed.villageElapsedSeconds === 'number' ? parsed.villageElapsedSeconds : 0,
+      clockSpeed: parsed.clockSpeed === 2 || parsed.clockSpeed === 4 ? parsed.clockSpeed : 1,
       level: typeof parsed.level === 'number' ? parsed.level : 1,
       exp: typeof parsed.exp === 'number' ? parsed.exp : 0,
       defeatedMonsterNames: Array.isArray(parsed.defeatedMonsterNames) ? parsed.defeatedMonsterNames : [],

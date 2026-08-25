@@ -45,6 +45,7 @@ import {
 import { renderMenu } from './ui/menu';
 import { renderCharacterSelect } from './ui/character-select';
 import { renderVillage } from './ui/village';
+import { advanceVillageClock, gameDateTimeFromElapsed, nextJudgmentPointSeconds } from './engine/village-clock';
 import { renderShop } from './ui/shop';
 import { renderLibrary } from './ui/library';
 import { renderStats } from './ui/stats';
@@ -100,6 +101,12 @@ let maze: DungeonMaze | null = null;
 let pos: CellId | null = null;
 let dungeonMessage: string | null = null;
 let portalMessage: string | null = null;
+
+const VILLAGE_CLOCK_TICK_MS = 1000;
+// Wall-clock timestamp of the last tick, purely in-memory (never persisted)
+// so a page reload never "catches up" on time that passed while the tab was
+// closed — the first tick after load just seeds this and advances nothing.
+let lastVillageTickAt: number | null = null;
 
 function render() {
   if (screen === 'auth') {
@@ -179,14 +186,29 @@ function render() {
   }
 
   if (screen === 'village') {
-    renderVillage(app, profile.raceId != null, {
-      onContinue: () => goTo('stats'),
-      onBack: () => goTo('character-select'),
-      onOpenInventory: () => openSubScreen('inventory'),
-      onOpenEquipment: () => openSubScreen('equipment'),
-      onOpenShop: () => goTo('shop'),
-      onOpenLibrary: () => goTo('library'),
-    });
+    renderVillage(
+      app,
+      profile.raceId != null,
+      { dateTime: gameDateTimeFromElapsed(profile.villageElapsedSeconds), speed: profile.clockSpeed },
+      {
+        onContinue: () => goTo('stats'),
+        onBack: () => goTo('character-select'),
+        onOpenInventory: () => openSubScreen('inventory'),
+        onOpenEquipment: () => openSubScreen('equipment'),
+        onOpenShop: () => goTo('shop'),
+        onOpenLibrary: () => goTo('library'),
+        onSetSpeed: (speed) => {
+          profile = { ...profile, clockSpeed: speed };
+          persistProfile();
+          render();
+        },
+        onSkip: () => {
+          profile = { ...profile, villageElapsedSeconds: nextJudgmentPointSeconds(profile.villageElapsedSeconds) };
+          persistProfile();
+          render();
+        },
+      }
+    );
     return;
   }
 
@@ -562,8 +584,36 @@ async function handleLogout() {
   goTo('auth');
 }
 
+// Only ticks while there's a character and no active dungeon run (maze ===
+// null), matching "마을 시계는 활성 미궁 런이 없을 때만 흐름" regardless of
+// which screen that state happens to be showing on (village/stats/shop/
+// library/inventory/equipment/menu all qualify; character-select doesn't,
+// since raceId isn't set yet; dungeon-map/battle don't, since maze is set).
+// Persists to localStorage every tick (cheap) but relies on the existing
+// action-triggered persistProfile() calls elsewhere to sync to the cloud,
+// rather than pushing a network write once a second for logged-in players.
+function tickVillageClock() {
+  const now = Date.now();
+  if (lastVillageTickAt === null) {
+    lastVillageTickAt = now;
+    return;
+  }
+  const realDeltaSeconds = (now - lastVillageTickAt) / 1000;
+  lastVillageTickAt = now;
+
+  if (maze !== null || !profile.raceId) return;
+
+  profile = {
+    ...profile,
+    villageElapsedSeconds: advanceVillageClock(profile.villageElapsedSeconds, realDeltaSeconds, profile.clockSpeed),
+  };
+  saveProfile(profile);
+  if (screen === 'village') render();
+}
+
 async function init() {
   render();
+  setInterval(tickVillageClock, VILLAGE_CLOCK_TICK_MS);
   if (isCloudConfigured) {
     const existingUser = await getCurrentUser();
     if (existingUser) {
