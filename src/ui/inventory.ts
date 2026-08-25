@@ -48,8 +48,8 @@ export function renderInventory(
       ${clockHtml}
       <div class="stats-card">
         <div class="inventory-gold">
-          <span>금화</span>
-          <strong>${profile.gold} G</strong>
+          <span>스톤</span>
+          <strong>${profile.gold} 스톤</strong>
         </div>
       </div>
       <div class="stats-card">
@@ -60,7 +60,7 @@ export function renderInventory(
         <div class="stat-line" style="font-weight:600">미착용 장비 (장비창에서 장착 가능)</div>
         ${gearHtml}
       </div>
-      <p class="inventory-note">마석과 장비는 몬스터 처치 시 드물게 드랍되어 자동으로 인벤토리에 담깁니다. 금화는 드랍되지 않으며, 표시만 됩니다.</p>
+      <p class="inventory-note">마석과 장비는 몬스터 처치 시 드물게 드랍되어 자동으로 인벤토리에 담깁니다. 스톤은 드랍되지 않으며, 표시만 됩니다.</p>
       <button class="menu-return" id="back-btn">뒤로</button>
     </div>
   `;
