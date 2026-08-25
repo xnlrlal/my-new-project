@@ -45,7 +45,13 @@ import {
 import { renderMenu } from './ui/menu';
 import { renderCharacterSelect } from './ui/character-select';
 import { renderVillage } from './ui/village';
-import { advanceVillageClock, gameDateTimeFromElapsed, nextJudgmentPointSeconds } from './engine/village-clock';
+import {
+  advanceVillageClock,
+  crossedJudgmentCycle,
+  gameDateTimeFromElapsed,
+  nextJudgmentPointSeconds,
+  JUDGMENT_COUNTDOWN_SECONDS,
+} from './engine/village-clock';
 import { renderShop } from './ui/shop';
 import { renderLibrary } from './ui/library';
 import { renderStats } from './ui/stats';
@@ -189,7 +195,13 @@ function render() {
     renderVillage(
       app,
       profile.raceId != null,
-      { dateTime: gameDateTimeFromElapsed(profile.villageElapsedSeconds), speed: profile.clockSpeed },
+      {
+        dateTime: gameDateTimeFromElapsed(profile.villageElapsedSeconds),
+        speed: profile.clockSpeed,
+        secondsUntilJudgment: nextJudgmentPointSeconds(profile.villageElapsedSeconds) - profile.villageElapsedSeconds,
+        pendingJudgmentRemainingSeconds:
+          profile.pendingJudgmentRemainingSeconds !== null ? Math.ceil(profile.pendingJudgmentRemainingSeconds) : null,
+      },
       {
         onContinue: () => goTo('stats'),
         onBack: () => goTo('character-select'),
@@ -203,7 +215,16 @@ function render() {
           render();
         },
         onSkip: () => {
-          profile = { ...profile, villageElapsedSeconds: nextJudgmentPointSeconds(profile.villageElapsedSeconds) };
+          advanceProfileVillageTime(nextJudgmentPointSeconds(profile.villageElapsedSeconds));
+          persistProfile();
+          render();
+        },
+        onAcceptJudgment: () => {
+          profile = { ...profile, lastAnsweredCycle: profile.pendingJudgmentCycle, pendingJudgmentCycle: null, pendingJudgmentRemainingSeconds: null };
+          enterDungeon();
+        },
+        onDeclineJudgment: () => {
+          profile = { ...profile, lastAnsweredCycle: profile.pendingJudgmentCycle, pendingJudgmentCycle: null, pendingJudgmentRemainingSeconds: null };
           persistProfile();
           render();
         },
@@ -223,8 +244,7 @@ function render() {
   }
 
   if (screen === 'stats' && selectedRace) {
-    renderStats(app, selectedRace, profile, {
-      onStartBattle: enterDungeon,
+    renderStats(app, selectedRace, profile, nextJudgmentPointSeconds(profile.villageElapsedSeconds) - profile.villageElapsedSeconds, {
       onBack: () => goTo('village'),
       onOpenInventory: () => openSubScreen('inventory'),
       onOpenEquipment: () => openSubScreen('equipment'),
@@ -584,6 +604,19 @@ async function handleLogout() {
   goTo('auth');
 }
 
+// Moves villageElapsedSeconds to newElapsed, opening a judgment window
+// (30 real-second decision timer) if doing so crosses an unanswered 30-day/
+// 06:00 boundary. Shared by the tick (gradual advance) and the skip button
+// (jumps straight to the next boundary) so both go through the same
+// crossing-detection logic instead of duplicating it.
+function advanceProfileVillageTime(newElapsed: number) {
+  const crossedCycle = crossedJudgmentCycle(profile.villageElapsedSeconds, newElapsed, profile.lastAnsweredCycle);
+  profile =
+    crossedCycle !== null
+      ? { ...profile, villageElapsedSeconds: newElapsed, pendingJudgmentCycle: crossedCycle, pendingJudgmentRemainingSeconds: JUDGMENT_COUNTDOWN_SECONDS }
+      : { ...profile, villageElapsedSeconds: newElapsed };
+}
+
 // Only ticks while there's a character and no active dungeon run (maze ===
 // null), matching "마을 시계는 활성 미궁 런이 없을 때만 흐름" regardless of
 // which screen that state happens to be showing on (village/stats/shop/
@@ -603,10 +636,20 @@ function tickVillageClock() {
 
   if (maze !== null || !profile.raceId) return;
 
-  profile = {
-    ...profile,
-    villageElapsedSeconds: advanceVillageClock(profile.villageElapsedSeconds, realDeltaSeconds, profile.clockSpeed),
-  };
+  const newElapsed = advanceVillageClock(profile.villageElapsedSeconds, realDeltaSeconds, profile.clockSpeed);
+
+  if (profile.pendingJudgmentRemainingSeconds !== null) {
+    // The 30-second decision countdown is real time, not scaled by
+    // clockSpeed — it's decision pressure on the player, not game time.
+    const remaining = profile.pendingJudgmentRemainingSeconds - realDeltaSeconds;
+    profile =
+      remaining <= 0
+        ? { ...profile, villageElapsedSeconds: newElapsed, lastAnsweredCycle: profile.pendingJudgmentCycle, pendingJudgmentCycle: null, pendingJudgmentRemainingSeconds: null }
+        : { ...profile, villageElapsedSeconds: newElapsed, pendingJudgmentRemainingSeconds: remaining };
+  } else {
+    advanceProfileVillageTime(newElapsed);
+  }
+
   saveProfile(profile);
   if (screen === 'village') render();
 }

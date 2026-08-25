@@ -3,16 +3,16 @@ import type { PlayerProfile } from '../engine/profile';
 import { expToNextLevel } from '../engine/profile';
 import { computeTotalStats } from '../engine/stats-calc';
 import { EQUIPMENT_SLOTS, slotLabel } from '../engine/gear';
+import { formatGameDuration, gameDurationFromSeconds } from '../engine/village-clock';
 
 export interface StatsHandlers {
-  onStartBattle: () => void;
   onBack: () => void;
   onOpenInventory: () => void;
   onOpenEquipment: () => void;
   onOpenEssence: () => void;
 }
 
-export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerProfile, handlers: StatsHandlers) {
+export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerProfile, secondsUntilJudgment: number, handlers: StatsHandlers) {
   const expNeeded = expToNextLevel(profile.level);
   const expPct = Math.round((profile.exp / expNeeded) * 100);
   const totalStats = computeTotalStats(race.stats, profile.essences, profile.equippedGear);
@@ -54,7 +54,7 @@ export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerPro
           ${skillsHtml}
         </div>
       </div>
-      <button class="menu-start" id="battle-btn">미궁 입장</button>
+      <div class="stat-line" style="text-align:center">미궁 입장까지 남은 시간: ${formatGameDuration(gameDurationFromSeconds(secondsUntilJudgment))}</div>
       <div class="nav-row">
         <button class="menu-return small" id="inventory-btn">인벤토리</button>
         <button class="menu-return small" id="equipment-btn">장비창</button>
@@ -64,7 +64,6 @@ export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerPro
     </div>
   `;
 
-  document.getElementById('battle-btn')?.addEventListener('click', handlers.onStartBattle);
   document.getElementById('back-btn')?.addEventListener('click', handlers.onBack);
   document.getElementById('inventory-btn')?.addEventListener('click', handlers.onOpenInventory);
   document.getElementById('equipment-btn')?.addEventListener('click', handlers.onOpenEquipment);

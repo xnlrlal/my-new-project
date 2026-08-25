@@ -17,6 +17,9 @@ export interface PlayerProfile {
   session: ResumeSession | null;
   villageElapsedSeconds: number;
   clockSpeed: ClockSpeed;
+  lastAnsweredCycle: number | null;
+  pendingJudgmentCycle: number | null;
+  pendingJudgmentRemainingSeconds: number | null;
   level: number;
   exp: number;
   defeatedMonsterNames: string[];
@@ -34,6 +37,9 @@ function defaultProfile(): PlayerProfile {
     session: null,
     villageElapsedSeconds: 0,
     clockSpeed: 1,
+    lastAnsweredCycle: null,
+    pendingJudgmentCycle: null,
+    pendingJudgmentRemainingSeconds: null,
     level: 1,
     exp: 0,
     defeatedMonsterNames: [],
@@ -142,6 +148,10 @@ export function loadProfile(): PlayerProfile {
       session: parsed.session && typeof parsed.session === 'object' ? (parsed.session as ResumeSession) : null,
       villageElapsedSeconds: typeof parsed.villageElapsedSeconds === 'number' ? parsed.villageElapsedSeconds : 0,
       clockSpeed: parsed.clockSpeed === 2 || parsed.clockSpeed === 4 ? parsed.clockSpeed : 1,
+      lastAnsweredCycle: typeof parsed.lastAnsweredCycle === 'number' ? parsed.lastAnsweredCycle : null,
+      pendingJudgmentCycle: typeof parsed.pendingJudgmentCycle === 'number' ? parsed.pendingJudgmentCycle : null,
+      pendingJudgmentRemainingSeconds:
+        typeof parsed.pendingJudgmentRemainingSeconds === 'number' ? parsed.pendingJudgmentRemainingSeconds : null,
       level: typeof parsed.level === 'number' ? parsed.level : 1,
       exp: typeof parsed.exp === 'number' ? parsed.exp : 0,
       defeatedMonsterNames: Array.isArray(parsed.defeatedMonsterNames) ? parsed.defeatedMonsterNames : [],
