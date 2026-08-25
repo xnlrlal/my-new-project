@@ -1,4 +1,4 @@
-import { formatGameDuration, gameDurationFromSeconds, type ClockSpeed, type GameDateTime } from '../engine/village-clock';
+import { formatGameDateTime, formatGameDuration, gameDurationFromSeconds, type ClockSpeed, type GameDateTime } from '../engine/village-clock';
 
 export interface VillageClockView {
   dateTime: GameDateTime;
@@ -19,10 +19,6 @@ export interface VillageHandlers {
   onAcceptJudgment: () => void;
   onDeclineJudgment: () => void;
   onQuitToMenu: () => void;
-}
-
-function pad2(n: number): string {
-  return n.toString().padStart(2, '0');
 }
 
 // hasCharacter=true means race selection is already final (raceId saved) —
@@ -57,7 +53,7 @@ export function renderVillage(root: HTMLElement, hasCharacter: boolean, clock: V
     <div class="char-select">
       <h2 class="screen-title">마을</h2>
       <div class="stats-card">
-        <div class="stat-line" style="text-align:center;font-weight:600">${clock.dateTime.day}일차 ${pad2(clock.dateTime.hour)}:${pad2(clock.dateTime.minute)}</div>
+        <div class="stat-line" style="text-align:center;font-weight:600">${formatGameDateTime(clock.dateTime)}</div>
         <div class="nav-row">
           ${speedButtons}
         </div>

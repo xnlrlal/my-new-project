@@ -8,7 +8,15 @@ export interface EquipmentHandlers {
   onUnequip: (slot: EquipmentSlot) => void;
 }
 
-export function renderEquipment(root: HTMLElement, profile: PlayerProfile, handlers: EquipmentHandlers) {
+export function renderEquipment(
+  root: HTMLElement,
+  profile: PlayerProfile,
+  dungeonClockLabel: string | null,
+  handlers: EquipmentHandlers
+) {
+  const clockHtml = dungeonClockLabel
+    ? `<div class="stat-line dungeon-clock" style="text-align:center;font-weight:600">${dungeonClockLabel}</div>`
+    : '';
   const slotsHtml = EQUIPMENT_SLOTS.map((slot) => {
     const gear = profile.equippedGear[slot];
     if (gear) {
@@ -50,6 +58,7 @@ export function renderEquipment(root: HTMLElement, profile: PlayerProfile, handl
   root.innerHTML = `
     <div class="inventory-screen">
       <h2 class="screen-title">장비창</h2>
+      ${clockHtml}
       <div class="stat-line" style="text-align:center">무기 · 방어구 · 장신구는 자유롭게 갈아입을 수 있습니다.</div>
       <div class="essence-slots">${slotsHtml}</div>
       <div class="stats-card">

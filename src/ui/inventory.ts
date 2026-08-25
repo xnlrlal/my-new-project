@@ -7,7 +7,15 @@ export interface InventoryHandlers {
   onBack: () => void;
 }
 
-export function renderInventory(root: HTMLElement, profile: PlayerProfile, handlers: InventoryHandlers) {
+export function renderInventory(
+  root: HTMLElement,
+  profile: PlayerProfile,
+  dungeonClockLabel: string | null,
+  handlers: InventoryHandlers
+) {
+  const clockHtml = dungeonClockLabel
+    ? `<div class="stat-line dungeon-clock" style="text-align:center;font-weight:600">${dungeonClockLabel}</div>`
+    : '';
   const manaStoneEntries = Object.entries(profile.manaStones)
     .map(([grade, count]) => ({ grade: Number(grade), count: count ?? 0 }))
     .filter((entry) => entry.count > 0)
@@ -37,6 +45,7 @@ export function renderInventory(root: HTMLElement, profile: PlayerProfile, handl
   root.innerHTML = `
     <div class="inventory-screen">
       <h2 class="screen-title">인벤토리</h2>
+      ${clockHtml}
       <div class="stats-card">
         <div class="inventory-gold">
           <span>금화</span>

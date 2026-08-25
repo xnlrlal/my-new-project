@@ -38,12 +38,16 @@ export function renderBattle(
   root: HTMLElement,
   state: GameState,
   floorLabel: string,
+  dungeonClockLabel: string | null,
   skipEligible: boolean,
   expResult: ExpGrantResult | null,
   essenceDrop: EssenceDropState,
   handlers: BattleHandlers
 ) {
   const { player, enemy, log, status } = state;
+  const clockHtml = dungeonClockLabel
+    ? `<div class="stat-line dungeon-clock" style="text-align:center;font-weight:600">${dungeonClockLabel}</div>`
+    : '';
 
   const expMessage = expResult
     ? expResult.alreadyDefeated
@@ -98,6 +102,7 @@ export function renderBattle(
       <button class="nav-link" id="open-codex">정수창</button>
     </div>
     <div class="dungeon-floor">${floorLabel}</div>
+    ${clockHtml}
     ${banner}
     <div class="board">
       ${renderActor(enemy, 'enemy', state.enemyGrade)}

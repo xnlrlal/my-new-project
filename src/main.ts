@@ -18,6 +18,7 @@ import {
   equipGear,
   unequipGear,
   addExp,
+  isClockVisible,
   type PlayerProfile,
   type ExpGrantResult,
 } from './engine/profile';
@@ -49,6 +50,7 @@ import { renderVillage } from './ui/village';
 import {
   advanceVillageClock,
   crossedJudgmentCycle,
+  formatGameDateTime,
   gameDateTimeFromElapsed,
   judgmentBoundarySeconds,
   nextJudgmentPointSeconds,
@@ -133,7 +135,22 @@ const GAME_CLOCK_TICK_MS = 1000;
 // closed — the first tick after load just seeds this and advances nothing.
 let lastVillageTickAt: number | null = null;
 
+// Screens reachable while an active dungeon run exists (maze !== null) —
+// dungeon-map/battle themselves plus the inventory/equipment/essence
+// subscreens opened from either, since maze stays set the whole time a
+// subscreen is open. Shared by the dungeonClockLabel computation below and
+// by tickGameClock()'s per-second re-render while the clock is visible.
+const DUNGEON_CONTEXT_SCREENS: Screen[] = ['dungeon-map', 'battle', 'inventory', 'equipment', 'essence'];
+
 function render() {
+  // Computed once per render rather than per-screen: maze !== null already
+  // means "currently inside a dungeon run" for every one of
+  // DUNGEON_CONTEXT_SCREENS (subscreens don't clear maze), so a single check
+  // here covers all five call sites below. isClockVisible() is the one
+  // on/off decision point — see its doc comment in profile.ts.
+  const dungeonClockLabel =
+    maze !== null && isClockVisible(profile) ? formatGameDateTime(gameDateTimeFromElapsed(dungeonElapsedSeconds)) : null;
+
   if (screen === 'auth') {
     renderAuth(
       app,
@@ -172,12 +189,12 @@ function render() {
   }
 
   if (screen === 'inventory') {
-    renderInventory(app, profile, { onBack: () => goTo(returnScreen) });
+    renderInventory(app, profile, dungeonClockLabel, { onBack: () => goTo(returnScreen) });
     return;
   }
 
   if (screen === 'equipment') {
-    renderEquipment(app, profile, {
+    renderEquipment(app, profile, dungeonClockLabel, {
       onBack: () => goTo(returnScreen),
       onEquip: (instanceId) => {
         profile = equipGear(profile, instanceId);
@@ -194,7 +211,7 @@ function render() {
   }
 
   if (screen === 'essence') {
-    renderEssenceScreen(app, profile, { onBack: () => goTo(returnScreen) });
+    renderEssenceScreen(app, profile, dungeonClockLabel, { onBack: () => goTo(returnScreen) });
     return;
   }
 
@@ -279,7 +296,7 @@ function render() {
     const cell = cellAt(maze, pos);
     const moves = availableMoves(maze, pos);
     const floorLabel = dungeonFloor === 1 ? '미궁 1층' : `${zoneLabel(dungeonThemeZone!)} 미궁 2층`;
-    renderDungeonMap(app, floorLabel, dungeonFloor, cell, moves, dungeonMessage, portalMessage, isFloor1RevertLocked(dungeonElapsedSeconds), {
+    renderDungeonMap(app, floorLabel, dungeonFloor, cell, moves, dungeonMessage, portalMessage, isFloor1RevertLocked(dungeonElapsedSeconds), dungeonClockLabel, {
       onMove: handleMove,
       onEnterPortal: enterFloorTwo,
       onRevertToFloor1: revertToFloor1,
@@ -296,6 +313,7 @@ function render() {
       app,
       state,
       floorLabel,
+      dungeonClockLabel,
       skipEligible,
       expResult,
       { pending: pendingEssence, outcome: essenceOutcome },
@@ -812,6 +830,7 @@ function tickGameClock() {
       return;
     }
     persistProfileLocalOnly();
+    if (isClockVisible(profile) && DUNGEON_CONTEXT_SCREENS.includes(screen)) render();
     return;
   }
 

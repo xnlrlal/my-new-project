@@ -7,7 +7,15 @@ export interface EssenceScreenHandlers {
   onBack: () => void;
 }
 
-export function renderEssenceScreen(root: HTMLElement, profile: PlayerProfile, handlers: EssenceScreenHandlers) {
+export function renderEssenceScreen(
+  root: HTMLElement,
+  profile: PlayerProfile,
+  dungeonClockLabel: string | null,
+  handlers: EssenceScreenHandlers
+) {
+  const clockHtml = dungeonClockLabel
+    ? `<div class="stat-line dungeon-clock" style="text-align:center;font-weight:600">${dungeonClockLabel}</div>`
+    : '';
   const slots = maxEssenceSlots(profile);
 
   const equippedHtml =
@@ -50,6 +58,7 @@ export function renderEssenceScreen(root: HTMLElement, profile: PlayerProfile, h
   root.innerHTML = `
     <div class="inventory-screen">
       <h2 class="screen-title">정수 창</h2>
+      ${clockHtml}
       <p class="inventory-note">정수는 몬스터의 영혼을 흡수하는 개념이라 무기/방어구처럼 자유롭게 바꿔 낄 수 없습니다. 한 번 흡수하면 특수한 방법으로만 해제할 수 있습니다.</p>
 
       <div class="stat-line" style="font-weight:600">장착 중인 정수 (${profile.essences.length} / ${slots})</div>

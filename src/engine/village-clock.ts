@@ -43,6 +43,14 @@ export function gameDateTimeFromElapsed(elapsedSeconds: number): GameDateTime {
   return { day, hour, minute };
 }
 
+// "N일차 HH:MM" — the one display format for an absolute in-game date/time,
+// shared by the village clock and (via dungeonElapsedSeconds fed through
+// gameDateTimeFromElapsed) the in-dungeon clock, so the two never drift into
+// visually different formats.
+export function formatGameDateTime(dt: GameDateTime): string {
+  return `${dt.day}일차 ${pad2(dt.hour)}:${pad2(dt.minute)}`;
+}
+
 // The next elapsed-seconds value at which a 30-day cycle reaches 06:00 —
 // i.e. where the judgment window appears. Always strictly greater than the
 // input, so repeated skips keep advancing one cycle at a time.

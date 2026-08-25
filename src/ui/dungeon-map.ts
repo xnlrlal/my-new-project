@@ -19,8 +19,13 @@ export function renderDungeonMap(
   message: string | null,
   portalMessage: string | null,
   floor1RevertLocked: boolean,
+  dungeonClockLabel: string | null,
   handlers: DungeonMapHandlers
 ) {
+  const clockHtml = dungeonClockLabel
+    ? `<div class="stat-line dungeon-clock" style="text-align:center;font-weight:600">${dungeonClockLabel}</div>`
+    : '';
+
   const portalPanel = cell.portal
     ? floor === 1
       ? `
@@ -61,6 +66,7 @@ export function renderDungeonMap(
       <button class="nav-link" id="open-codex">정수창</button>
     </div>
     <div class="dungeon-floor">${floorLabel}</div>
+    ${clockHtml}
     <div class="dungeon-screen">
       <div class="stats-card">
         <div class="stats-race">${zoneLabel(cell.zone)}</div>
