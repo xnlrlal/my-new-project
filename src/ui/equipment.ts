@@ -23,7 +23,9 @@ export function renderEquipment(
       return `
         <div class="essence-slot filled">
           <div class="essence-slot-header">
-            <span class="essence-name">${slotLabel(slot)}: ${gear.name}</span>
+            <span class="essence-name">${slotLabel(slot)}: ${gear.name}${
+              gear.isPermanent !== true ? ' <span class="race-locked-badge">미궁 한정</span>' : ''
+            }</span>
             <button class="menu-return small" data-unequip-slot="${slot}">해제</button>
           </div>
           <div class="essence-stat">${statBonusText(gear.statBonus)}</div>
@@ -45,7 +47,9 @@ export function renderEquipment(
             (gear) => `
         <div class="item-row gear-row">
           <div>
-            <div>${gear.name} <span class="grade-tag">${slotLabel(gear.slot)}</span></div>
+            <div>${gear.name} <span class="grade-tag">${slotLabel(gear.slot)}</span>${
+              gear.isPermanent !== true ? ' <span class="race-locked-badge">미궁 한정</span>' : ''
+            }</div>
             <div class="essence-stat">${statBonusText(gear.statBonus)}</div>
           </div>
           <button class="menu-start small" data-equip-id="${gear.instanceId}">장착</button>
