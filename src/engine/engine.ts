@@ -36,7 +36,16 @@ function drawCards(actor: Actor, count: number): Actor {
 function createActor(
   id: ActorId,
   name: string,
-  stats: { maxHp: number; maxMana: number; strength: number; dexterity: number },
+  stats: {
+    maxHp: number;
+    maxMana: number;
+    strength: number;
+    dexterity: number;
+    accuracy: number;
+    flexibility: number;
+    perceptionJam: number;
+    obsession: number;
+  },
   bonusCards: Card[] = []
 ): Actor {
   const base: Actor = {
@@ -49,6 +58,10 @@ function createActor(
     maxMana: stats.maxMana,
     strength: stats.strength,
     dexterity: stats.dexterity,
+    accuracy: stats.accuracy,
+    flexibility: stats.flexibility,
+    perceptionJam: stats.perceptionJam,
+    obsession: stats.obsession,
     hand: [],
     deck: shuffle(buildDeck(bonusCards)),
     discard: [],
@@ -69,7 +82,19 @@ export function initGame(playerStats: RaceStats, monster: MonsterDef, bonusCards
   return {
     turn: 1,
     player: { ...player, hp },
-    enemy: createActor('enemy', monster.name, { maxHp: monster.maxHp, maxMana: monster.maxMana, strength: 0, dexterity: 0 }),
+    enemy: createActor('enemy', monster.name, {
+      maxHp: monster.maxHp,
+      maxMana: monster.maxMana,
+      strength: 0,
+      dexterity: 0,
+      // 몬스터는 아직 명중/치명타 관련 세부스탯 데이터가 없음(MonsterDef에
+      // 필드 자체가 없음) — 근력과 동일하게 0 고정. 향후 밸런스 패스에서
+      // 몬스터별 데이터를 부여할 때 여기 하드코딩을 대체하면 됨.
+      accuracy: 0,
+      flexibility: 0,
+      perceptionJam: 0,
+      obsession: 0,
+    }),
     enemyGrade: monster.grade,
     log: [{ turn: 1, actor: 'player', message: `${monster.name}(을)를 만났다! 전투 시작!` }],
     status: 'playing',
@@ -78,6 +103,46 @@ export function initGame(playerStats: RaceStats, monster: MonsterDef, bonusCards
 
 function appendLog(state: GameState, entry: Omit<LogEntry, 'turn'>): LogEntry[] {
   return [...state.log, { ...entry, turn: state.turn }];
+}
+
+// 2단계: 데미지 카드에 명중→치명타 판정 레이어를 얹는다. 카드 코스트/마나
+// 게이팅(playCard/enemyAct의 cost <= mana 체크)은 이 레이어와 무관하게
+// applyCard 바깥(호출부)에서 그대로 유지된다 — 미스여도 카드는 정상 소비됨
+// (핸드→디스카드 이동, 코스트 차감은 applyCard 하단에서 공통 처리).
+const BASE_HIT_CHANCE = 90;
+const HIT_CHANCE_MIN = 20;
+const HIT_CHANCE_MAX = 99;
+const ACCURACY_HIT_COEF = 2; // 명중률 1당 명중 확률 +2%p
+const FLEXIBILITY_EVADE_COEF = 2; // 유연성 1당 상대 명중 확률 -2%p
+const PERCEPTION_JAM_COEF = 1.5; // 인식방해 1당 상대 명중 확률 -1.5%p
+
+const BASE_CRIT_CHANCE = 5;
+const FLEXIBILITY_CRIT_COEF = 1; // 유연성 1당 치명타 확률 +1%p
+
+const BASE_CRIT_MULTIPLIER = 1.5;
+const OBSESSION_CRIT_COEF = 0.02; // 집착 1당 치명타 배율 +0.02
+const MAX_CRIT_MULTIPLIER = 2;
+
+function clampPercent(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+// attacker가 defender를 공격할 때의 명중 확률(%). defender의 유연성(회피)과
+// 인식방해(상대 명중률 교란) 둘 다 이 확률을 깎는다.
+function hitChance(attacker: Actor, defender: Actor): number {
+  return clampPercent(
+    BASE_HIT_CHANCE + attacker.accuracy * ACCURACY_HIT_COEF - defender.flexibility * FLEXIBILITY_EVADE_COEF - defender.perceptionJam * PERCEPTION_JAM_COEF,
+    HIT_CHANCE_MIN,
+    HIT_CHANCE_MAX
+  );
+}
+
+function critChance(attacker: Actor): number {
+  return clampPercent(BASE_CRIT_CHANCE + attacker.flexibility * FLEXIBILITY_CRIT_COEF, 0, 100);
+}
+
+function critMultiplier(attacker: Actor): number {
+  return Math.min(MAX_CRIT_MULTIPLIER, BASE_CRIT_MULTIPLIER + attacker.obsession * OBSESSION_CRIT_COEF);
 }
 
 function applyCard(state: GameState, source: ActorId, card: Card): GameState {
@@ -90,7 +155,9 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
 
   switch (card.effect) {
     case 'damage': {
-      const totalDamage = card.value + sourceActor.strength;
+      const isHit = Math.random() * 100 < hitChance(sourceActor, targetActor);
+      const isCrit = isHit && Math.random() * 100 < critChance(sourceActor);
+      const totalDamage = isHit ? Math.round((card.value + sourceActor.strength) * (isCrit ? critMultiplier(sourceActor) : 1)) : 0;
       const absorbed = Math.min(targetActor.shield, totalDamage);
       const remaining = totalDamage - absorbed;
       updatedTarget = {
@@ -98,7 +165,11 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
         shield: targetActor.shield - absorbed,
         hp: Math.max(0, targetActor.hp - remaining),
       };
-      message = `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 ${totalDamage}의 피해!`;
+      message = !isHit
+        ? `${sourceActor.name}이(가) [${card.name}]로 공격했지만 ${targetActor.name}이(가) 회피했다!`
+        : isCrit
+          ? `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 치명타! ${totalDamage}의 피해!`
+          : `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 ${totalDamage}의 피해!`;
       break;
     }
     case 'heal': {
