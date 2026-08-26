@@ -53,7 +53,12 @@ export interface ResumeSession {
   // `state` alone only covers the latter). Full HP on a brand-new dungeon
   // entry, null once there's no active run (mirrors `maze`).
   dungeonHp: number | null;
-  skipEligible: boolean;
+  // Raw estimateWinProbability() result (0-1) from this battle's start —
+  // kept as the raw probability (not just a threshold boolean) so the
+  // auto-battle mode's "예상 승률 N%" button label survives a reload.
+  // null when not in a battle, or for sessions saved before this field
+  // existed (see sanitizeResumeSession's default below).
+  winProbability: number | null;
   expResult: ExpGrantResult | null;
   expChecked: boolean;
   dropChecked: boolean;
@@ -131,7 +136,7 @@ export function sanitizeResumeSession(raw: unknown): ResumeSession | null {
     currentMonsterId: typeof r.currentMonsterId === 'string' ? r.currentMonsterId : null,
     state: r.state && typeof r.state === 'object' ? (r.state as GameState) : null,
     dungeonHp: typeof r.dungeonHp === 'number' ? r.dungeonHp : null,
-    skipEligible: typeof r.skipEligible === 'boolean' ? r.skipEligible : false,
+    winProbability: typeof r.winProbability === 'number' ? r.winProbability : null,
     expResult: r.expResult && typeof r.expResult === 'object' ? (r.expResult as ExpGrantResult) : null,
     expChecked: typeof r.expChecked === 'boolean' ? r.expChecked : false,
     dropChecked: typeof r.dropChecked === 'boolean' ? r.dropChecked : false,
