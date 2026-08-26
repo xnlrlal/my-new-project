@@ -21,6 +21,7 @@ import {
   isClockVisible,
   exchangeManaStonesForGrade,
   completeComingOfAge,
+  stripDungeonOnlyGear,
   type PlayerProfile,
   type ExpGrantResult,
 } from './engine/profile';
@@ -123,6 +124,10 @@ let deathReason: 'battle' | 'tax' | null = null;
 // set when a tax payment actually goes through, consumed (read once, then
 // cleared) the next time the village screen renders.
 let lastTaxMessage: string | null = null;
+// Same one-shot pattern for "네 미궁 한정 장비가 사라졌다" — set only when
+// forceReturnFromDungeon() actually removed something, independent of
+// lastTaxMessage so both can show together on the same forced return.
+let lastDungeonGearLossMessage: string | null = null;
 
 const SKIP_WIN_PROBABILITY_THRESHOLD = 0.99;
 
@@ -263,11 +268,14 @@ function render() {
   if (screen === 'village') {
     const taxMessage = lastTaxMessage;
     lastTaxMessage = null;
+    const gearLossMessage = lastDungeonGearLossMessage;
+    lastDungeonGearLossMessage = null;
     renderVillage(
       app,
       profile.raceId != null,
       profile.hasVisitedDungeonExchange,
       taxMessage,
+      gearLossMessage,
       {
         dateTime: gameDateTimeFromElapsed(profile.villageElapsedSeconds),
         speed: profile.clockSpeed,
@@ -449,8 +457,11 @@ function enterDungeon() {
 
 // Time's up: the dungeon closes around the player regardless of what
 // they're doing — "전투 중이라도 즉시 강제귀환, 유예 없음". Progress earned
-// so far (profile: level/items/gear/essences/mana stones) is kept; this
-// isn't a loss, just an abrupt, involuntary end to the run, unlike death.
+// so far (profile: level/exp/essences/mana stones/permanent gear) is kept;
+// this isn't a loss, just an abrupt, involuntary end to the run, unlike
+// death. Non-permanent gear (ordinary monster drops — see isPermanent in
+// gear.ts) does NOT survive the trip back: it's dungeon-only by design and
+// gets stripped below, the one point where a visit truly ends.
 // Village time is set to "그날 정오" (entry's 06:00 + 6h) regardless of how
 // many in-dungeon days actually passed, per spec — not the same kind of
 // exit exitDungeonToMenu used to be (that was a player-triggered escape
@@ -492,9 +503,13 @@ function forceReturnFromDungeon() {
     handleDeath('tax');
     return;
   }
-  profile = { ...taxOutcome.profile, villageElapsedSeconds: newElapsed, hasVisitedDungeonExchange: true };
+  const gearOutcome = stripDungeonOnlyGear(taxOutcome.profile);
+  profile = { ...gearOutcome.profile, villageElapsedSeconds: newElapsed, hasVisitedDungeonExchange: true };
   if (taxOutcome.taxedYear !== null) {
     lastTaxMessage = `${taxOutcome.taxedYear + 2}년차 세금 ${ANNUAL_TAX_AMOUNT.toLocaleString()}스톤이 징수되었습니다. (잔액: ${profile.gold.toLocaleString()}스톤)`;
+  }
+  if (gearOutcome.removedCount > 0) {
+    lastDungeonGearLossMessage = '미궁에서 얻은 장비는 미궁 밖에서는 사용할 수 없어 사라졌다.';
   }
   goTo('village');
 }

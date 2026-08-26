@@ -33,7 +33,9 @@ export function renderInventory(
             (gear) => `
         <div class="item-row gear-row">
           <div>
-            <div>${gear.name} <span class="grade-tag">${slotLabel(gear.slot)}</span></div>
+            <div>${gear.name} <span class="grade-tag">${slotLabel(gear.slot)}</span>${
+              gear.isPermanent !== true ? ' <span class="race-locked-badge">미궁 한정</span>' : ''
+            }</div>
             <div class="essence-stat">${statBonusText(gear.statBonus)}</div>
           </div>
         </div>
@@ -60,7 +62,7 @@ export function renderInventory(
         <div class="stat-line" style="font-weight:600">미착용 장비 (장비창에서 장착 가능)</div>
         ${gearHtml}
       </div>
-      <p class="inventory-note">마석과 장비는 몬스터 처치 시 드물게 드랍되어 자동으로 인벤토리에 담깁니다. 스톤은 드랍되지 않으며, 표시만 됩니다.</p>
+      <p class="inventory-note">마석과 장비는 몬스터 처치 시 드물게 드랍되어 자동으로 인벤토리에 담깁니다. 스톤은 드랍되지 않으며, 표시만 됩니다. "미궁 한정" 장비는 미궁에서 마을로 귀환하는 순간 사라집니다.</p>
       <button class="menu-return" id="back-btn">뒤로</button>
     </div>
   `;

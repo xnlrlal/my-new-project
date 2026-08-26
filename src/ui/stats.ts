@@ -26,7 +26,9 @@ export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerPro
 
   const gearHtml = EQUIPMENT_SLOTS.map((slot) => {
     const gear = profile.equippedGear[slot];
-    return `<div class="stat-line">· ${slotLabel(slot)}: ${gear ? gear.name : '비어있음'}</div>`;
+    if (!gear) return `<div class="stat-line">· ${slotLabel(slot)}: 비어있음</div>`;
+    const badge = gear.isPermanent !== true ? ' <span class="race-locked-badge">미궁 한정</span>' : '';
+    return `<div class="stat-line">· ${slotLabel(slot)}: ${gear.name}${badge}</div>`;
   }).join('');
 
   root.innerHTML = `

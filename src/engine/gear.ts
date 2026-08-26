@@ -11,10 +11,14 @@ export interface GearDef {
   slot: EquipmentSlot;
   statBonus: StatBonus;
   description: string;
-  // Marks gear granted outright (character-creation rituals, ...) rather
-  // than dropped by a monster. Not read anywhere yet — reserved for an
-  // upcoming dungeon-drop decay system that needs to spare permanent gear.
-  // Always true when set; omitted (undefined/falsy) for ordinary drops.
+  // Whether this instance survives leaving the dungeon. A live state, not a
+  // fixed record of origin: granted gear (character-creation rituals, ...)
+  // starts true and monster drops start false, but a future skill/scroll is
+  // expected to flip a drop's isPermanent to true in place — so always read
+  // this field fresh (=== true) rather than inferring it from where the
+  // item came from. stripDungeonOnlyGear() (profile.ts) is the reader;
+  // called from forceReturnFromDungeon() (main.ts) whenever a dungeon visit
+  // truly ends (not on floor transitions/backtracking, which keep drops).
   isPermanent?: boolean;
 }
 
@@ -58,6 +62,11 @@ export function createGearFromMonster(monsterId: string, template: GearTemplate)
     slot: template.slot,
     statBonus: template.statBonus,
     description: template.description,
+    // Explicit false (not left undefined) — every monster drop starts
+    // dungeon-only. A future skill/scroll can flip a specific instance's
+    // isPermanent to true; stripDungeonOnlyGear() (profile.ts) always reads
+    // this live, so that flip is all it takes to spare an item later.
+    isPermanent: false,
   };
 }
 

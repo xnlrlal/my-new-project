@@ -1,7 +1,7 @@
 import type { MonsterDef, MonsterGrade } from './monsters';
 import { expForGrade, stoneValueForGrade } from './monsters';
 import type { EquippedEssence } from './essence';
-import { createGrantedGear, type EquipmentSlot, type GearInstance } from './gear';
+import { createGrantedGear, EQUIPMENT_SLOTS, type EquipmentSlot, type GearInstance } from './gear';
 import type { EquippedGear } from './stats-calc';
 import type { RaceId } from './races';
 import { sanitizeResumeSession, type ResumeSession } from './session';
@@ -192,6 +192,39 @@ export function completeComingOfAge(profile: PlayerProfile, weaponChoiceId: stri
   }
 
   return { ...profile, equippedGear, hasCompletedComingOfAge: true };
+}
+
+export interface StripDungeonOnlyGearResult {
+  profile: PlayerProfile;
+  removedCount: number;
+}
+
+// Removes every non-permanent (dungeon-only, see isPermanent's doc comment
+// in gear.ts) gear instance from both inventoryGear and equippedGear.
+// Called exactly once a dungeon visit truly ends (forceReturnFromDungeon()
+// in main.ts) — never on floor transitions/backtracking, which are still
+// "the same visit" and must leave drops untouched. Death doesn't need this
+// either: resetProfile() already wipes everything. No slot is auto-refilled
+// from inventory afterward — a slot left empty here (e.g. a permanent
+// weapon that was unequipped in favor of a drop) behaves like any other
+// empty slot the player equips manually.
+export function stripDungeonOnlyGear(profile: PlayerProfile): StripDungeonOnlyGearResult {
+  const isKeeper = (gear: GearInstance) => gear.isPermanent === true;
+
+  const inventoryGear = profile.inventoryGear.filter(isKeeper);
+  const equippedGear: EquippedGear = {};
+  for (const slot of EQUIPMENT_SLOTS) {
+    const gear = profile.equippedGear[slot];
+    if (gear && isKeeper(gear)) equippedGear[slot] = gear;
+  }
+
+  const removedFromInventory = profile.inventoryGear.length - inventoryGear.length;
+  const removedFromEquipped = EQUIPMENT_SLOTS.filter((slot) => profile.equippedGear[slot] && !equippedGear[slot]).length;
+
+  return {
+    profile: { ...profile, inventoryGear, equippedGear },
+    removedCount: removedFromInventory + removedFromEquipped,
+  };
 }
 
 export function expToNextLevel(level: number): number {
