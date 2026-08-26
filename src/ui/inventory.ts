@@ -1,7 +1,7 @@
 import type { PlayerProfile } from '../engine/profile';
 import { totalManaStones } from '../engine/profile';
 import { slotLabel } from '../engine/gear';
-import { statBonusText } from '../engine/stat-bonus';
+import { statBonusText, statBonusMagnitude } from '../engine/stat-bonus';
 
 export interface InventoryHandlers {
   onBack: () => void;
@@ -33,7 +33,7 @@ export function renderInventory(
             (gear) => `
         <div class="item-row gear-row">
           <div>
-            <div>${gear.name} <span class="grade-tag">${slotLabel(gear.slot)}</span>${
+            <div>${gear.name} <span class="grade-tag">${slotLabel(gear.slot)}</span> <span class="grade-tag">Lv.${statBonusMagnitude(gear.statBonus)}</span>${
               gear.isPermanent !== true ? ' <span class="race-locked-badge">미궁 한정</span>' : ''
             }</div>
             <div class="essence-stat">${statBonusText(gear.statBonus)}</div>

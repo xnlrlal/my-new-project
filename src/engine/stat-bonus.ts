@@ -85,6 +85,41 @@ const STAT_LABELS: Record<keyof RaceStatsLike, string> = {
   obsession: '집착',
 };
 
+// "아이템 레벨"(3단계 UI 갱신) — 장비마다 별도 authored 필드를 두지 않고,
+// 그 장비의 statBonus가 부여하는 모든 필드값의 단순 합으로 파생시킨다.
+// 캐릭터의 아이템 레벨은 장착된 슬롯들의 이 값을 합산한 것(ui/stats.ts).
+export function statBonusMagnitude(statBonus: StatBonus): number {
+  return STAT_FIELDS.reduce((sum, field) => sum + (statBonus[field] ?? 0), 0);
+}
+
+// "종합 전투 지수" — 표시 전용 파생 점수. 전투 판정(engine.ts)이 실제로
+// 소비하는 값이 아니라, 캐릭터 정보 화면에서 한눈에 비교할 "전투력" 감각을
+// 주기 위한 가중합이다. 가중치는 설계 논의에서 제안된 초안 값 — 실제
+// 밸런스는 플레이테스트로 조정될 수 있다.
+const COMBAT_INDEX_WEIGHTS: Record<keyof RaceStatsLike, number> = {
+  maxHp: 1,
+  maxMana: 5,
+  body: 10,
+  mind: 10,
+  arcane: 10,
+  strength: 8,
+  dexterity: 8,
+  accuracy: 4,
+  flexibility: 4,
+  obsession: 6,
+  perceptionJam: 6,
+  sight: 2,
+  cognition: 2,
+  willpower: 2,
+  agility: 2,
+  smell: 2,
+  poisonResist: 2,
+};
+
+export function combatPowerIndex(stats: RaceStatsLike): number {
+  return Math.round(STAT_FIELDS.reduce((sum, field) => sum + stats[field] * COMBAT_INDEX_WEIGHTS[field], 0));
+}
+
 export function statBonusText(statBonus: StatBonus): string {
   const parts: string[] = [];
   for (const field of STAT_FIELDS) {
