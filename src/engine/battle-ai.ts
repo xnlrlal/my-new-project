@@ -49,7 +49,9 @@ export function estimateWinProbability(
   bonusCards: Card[],
   monster: MonsterDef,
   startingHp?: number,
-  trials = 150
+  // 2단계(명중/치명타 확률 판정) 도입 이후 전투 결과 분산이 커져, 150회로는
+  // 승률 추정치가 흔들리기 쉬워 300회로 상향(설계 논의에서 제안된 값).
+  trials = 300
 ): number {
   let wins = 0;
   for (let i = 0; i < trials; i++) {
