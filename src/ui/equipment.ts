@@ -1,6 +1,6 @@
 import type { PlayerProfile } from '../engine/profile';
 import { EQUIPMENT_SLOTS, slotLabel, type EquipmentSlot } from '../engine/gear';
-import { statBonusText } from '../engine/stat-bonus';
+import { statBonusText, statBonusMagnitude } from '../engine/stat-bonus';
 
 export interface EquipmentHandlers {
   onBack: () => void;
@@ -23,7 +23,7 @@ export function renderEquipment(
       return `
         <div class="essence-slot filled">
           <div class="essence-slot-header">
-            <span class="essence-name">${slotLabel(slot)}: ${gear.name}${
+            <span class="essence-name">${slotLabel(slot)}: ${gear.name} <span class="grade-tag">Lv.${statBonusMagnitude(gear.statBonus)}</span>${
               gear.isPermanent !== true ? ' <span class="race-locked-badge">미궁 한정</span>' : ''
             }</span>
             <button class="menu-return small" data-unequip-slot="${slot}">해제</button>
@@ -47,7 +47,7 @@ export function renderEquipment(
             (gear) => `
         <div class="item-row gear-row">
           <div>
-            <div>${gear.name} <span class="grade-tag">${slotLabel(gear.slot)}</span>${
+            <div>${gear.name} <span class="grade-tag">${slotLabel(gear.slot)}</span> <span class="grade-tag">Lv.${statBonusMagnitude(gear.statBonus)}</span>${
               gear.isPermanent !== true ? ' <span class="race-locked-badge">미궁 한정</span>' : ''
             }</div>
             <div class="essence-stat">${statBonusText(gear.statBonus)}</div>
