@@ -19,8 +19,8 @@ export interface Actor {
   shield: number;
   mana: number;
   maxMana: number;
-  attackBonus: number;
-  defenseBonus: number;
+  strength: number;
+  dexterity: number;
   hand: Card[];
   deck: Card[];
   discard: Card[];

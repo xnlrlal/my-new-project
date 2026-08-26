@@ -11,6 +11,13 @@ import { STARTER_ARMOR, findWeaponChoice } from './ritual';
 const STORAGE_KEY = 'my-new-project:profile';
 const EXP_PER_LEVEL = 20;
 
+// Bumped whenever a save-incompatible change lands (e.g. the 4필드→육체/정신/
+// 이능+세부스탯 스탯 체계 교체) — sanitizeProfile() below forces a full reset
+// on mismatch rather than trying to field-by-field migrate, since the old
+// GearInstance/EquippedEssence.statBonus objects it holds use a different
+// calculation entirely (see CURRENT_SCHEMA_VERSION's usage below).
+const CURRENT_SCHEMA_VERSION = 2;
+
 export type ManaStoneCounts = Partial<Record<number, number>>;
 
 export interface PlayerProfile {
@@ -58,10 +65,15 @@ export interface PlayerProfile {
   // re-defaults it on death since it just returns defaultProfile() —
   // a new character always goes through the ritual again.
   hasCompletedComingOfAge: boolean;
+  // See CURRENT_SCHEMA_VERSION's comment above. Written on every save;
+  // checked on every load (sanitizeProfile) to decide whether a save-
+  // incompatible change means this save must be reset rather than parsed.
+  schemaVersion: number;
 }
 
 function defaultProfile(): PlayerProfile {
   return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     raceId: null,
     session: null,
     villageElapsedSeconds: 0,
@@ -260,7 +272,17 @@ export function addExp(profile: PlayerProfile, amount: number): AddExpResult {
 export function sanitizeProfile(raw: unknown): PlayerProfile {
   if (!raw || typeof raw !== 'object') return defaultProfile();
   const parsed = raw as Record<string, unknown>;
+  // A schema-incompatible save (e.g. one written before the stat-system
+  // rewrite) is reset wholesale rather than migrated field-by-field — see
+  // CURRENT_SCHEMA_VERSION's comment. Unlike every other field below, this
+  // isn't a "fill in a safe default and keep going" case: the old
+  // GearInstance/EquippedEssence.statBonus objects nested inside raceId/
+  // equippedGear/essences/inventoryGear use a different calculation
+  // entirely, so partial recovery would silently drop stat bonuses instead
+  // of failing loudly.
+  if (parsed.schemaVersion !== CURRENT_SCHEMA_VERSION) return defaultProfile();
   return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     raceId: typeof parsed.raceId === 'string' ? (parsed.raceId as RaceId) : null,
     session: sanitizeResumeSession(parsed.session),
     villageElapsedSeconds: typeof parsed.villageElapsedSeconds === 'number' ? parsed.villageElapsedSeconds : 0,

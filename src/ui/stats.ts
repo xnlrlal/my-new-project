@@ -42,8 +42,8 @@ export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerPro
         <div class="stats-grid">
           <div class="stat-box"><span>최대 체력</span><strong>${totalStats.maxHp}</strong></div>
           <div class="stat-box"><span>최대 마나</span><strong>${totalStats.maxMana}</strong></div>
-          <div class="stat-box"><span>공격력 보너스</span><strong>+${totalStats.attackBonus}</strong></div>
-          <div class="stat-box"><span>방어력 보너스</span><strong>+${totalStats.defenseBonus}</strong></div>
+          <div class="stat-box"><span>근력</span><strong>+${totalStats.strength}</strong></div>
+          <div class="stat-box"><span>손재주</span><strong>+${totalStats.dexterity}</strong></div>
         </div>
         <div class="stat-line">기본 종족 스텟에 장비·정수 보너스가 합산된 값입니다.</div>
         <div class="stat-line">처치한 몬스터 종류: ${profile.defeatedMonsterNames.length}</div>

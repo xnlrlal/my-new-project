@@ -20,7 +20,7 @@ export const WEAPON_CHOICES: GrantedGearChoice[] = [
     template: {
       name: '성지의 창',
       slot: 'weapon',
-      statBonus: { attackBonus: 2 },
+      statBonus: { strength: 2 },
       description: '바바리안 성지에서 전수받은 창. 사거리로 안정적으로 적을 견제한다.',
       isPermanent: true,
     },
@@ -30,7 +30,7 @@ export const WEAPON_CHOICES: GrantedGearChoice[] = [
     template: {
       name: '성지의 검',
       slot: 'weapon',
-      statBonus: { attackBonus: 1, defenseBonus: 1 },
+      statBonus: { strength: 1, dexterity: 1 },
       description: '바바리안 성지에서 전수받은 검. 공격과 방어의 균형이 잡혀 있다.',
       isPermanent: true,
     },
@@ -40,7 +40,7 @@ export const WEAPON_CHOICES: GrantedGearChoice[] = [
     template: {
       name: '성지의 둔기',
       slot: 'weapon',
-      statBonus: { attackBonus: 2, maxHp: 1 },
+      statBonus: { strength: 2, maxHp: 1 },
       description: '바바리안 성지에서 전수받은 묵직한 둔기. 강한 힘과 함께 맷집도 따라온다.',
       isPermanent: true,
     },
@@ -50,7 +50,7 @@ export const WEAPON_CHOICES: GrantedGearChoice[] = [
     template: {
       name: '수호의 방패',
       slot: 'weapon',
-      statBonus: { defenseBonus: 2 },
+      statBonus: { dexterity: 2 },
       description: '바바리안 성지에서 전수받은 방패. 몬스터가 떨어뜨리는 낡은 "부서진 방패"와는 다른, 성지의 축복이 깃든 물건이다.',
       isPermanent: true,
     },
@@ -64,7 +64,7 @@ export const STARTER_ARMOR: GrantedGearChoice[] = [
     template: {
       name: '성지의 천 상의',
       slot: 'armor',
-      statBonus: { defenseBonus: 1 },
+      statBonus: { dexterity: 1 },
       description: '성인식에서 받는 기본 천 상의.',
       isPermanent: true,
     },
