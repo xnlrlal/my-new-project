@@ -2,10 +2,13 @@ import type { Actor, GameState } from '../engine/types';
 import type { ExpGrantResult } from '../engine/profile';
 import type { EquippedEssence } from '../engine/essence';
 
+export type BattleMode = 'manual' | 'auto';
+
 export interface BattleHandlers {
   onPlayCard: (cardId: string) => void;
   onEndTurn: () => void;
-  onSkip: () => void;
+  onSwitchToAuto: () => void;
+  onSwitchToManual: () => void;
   onContinue: () => void;
   onAcknowledgeDeath: () => void;
   onAbsorbEssence: () => void;
@@ -19,6 +22,11 @@ export interface EssenceDropState {
   pending: EquippedEssence | null;
   outcome: string | null;
 }
+
+// Only used to pick the auto-battle button's wording/style ("안전" vs
+// "위험할 수 있습니다") — never to gate it, since auto-battle is always
+// available regardless of the estimated odds (see renderBattle's doc comment).
+const SAFE_WIN_PROBABILITY = 0.99;
 
 function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number): string {
   const hpPct = Math.round((actor.hp / actor.maxHp) * 100);
@@ -34,12 +42,19 @@ function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number): st
   `;
 }
 
+// battleMode/winProbability replace the old boolean skipEligible + one-shot
+// "스킵" button: auto-battle is now a proper mode the player can switch into
+// and back out of at any time mid-fight (not just once, not gated behind a
+// win-probability threshold) — winProbability only changes the button's
+// wording/style, computed once at battle start (see startZoneBattle in
+// main.ts) so it still reflects the HP the battle actually began at.
 export function renderBattle(
   root: HTMLElement,
   state: GameState,
   floorLabel: string,
   dungeonClockLabel: string | null,
-  skipEligible: boolean,
+  battleMode: BattleMode,
+  winProbability: number | null,
   expResult: ExpGrantResult | null,
   essenceDrop: EssenceDropState,
   handlers: BattleHandlers
@@ -90,10 +105,27 @@ export function renderBattle(
           </div>`
         : '';
 
-  const skipButton =
-    skipEligible && status === 'playing'
-      ? `<button class="menu-return small" id="skip-btn">전투 스킵 (예상 승률 99%+)</button>`
-      : '';
+  const isManual = battleMode === 'manual';
+  const cardsDisabled = !isManual || status !== 'playing';
+
+  let modeControls = '';
+  if (status === 'playing') {
+    if (isManual) {
+      const probabilityLabel = winProbability !== null ? `${Math.round(winProbability * 100)}%` : null;
+      const safe = winProbability !== null && winProbability >= SAFE_WIN_PROBABILITY;
+      const label = probabilityLabel
+        ? safe
+          ? `자동전투 시작 (예상 승률 ${probabilityLabel})`
+          : `자동전투 시작 (예상 승률 ${probabilityLabel} — 위험할 수 있습니다)`
+        : '자동전투 시작';
+      modeControls = `<button class="menu-return small" id="switch-to-auto">${label}</button>`;
+    } else {
+      modeControls = `
+        <div class="stat-line" style="text-align:center">자동전투 진행 중...</div>
+        <button class="menu-return small" id="switch-to-manual">수동으로 전환</button>
+      `;
+    }
+  }
 
   root.innerHTML = `
     <div class="battle-nav">
@@ -115,7 +147,7 @@ export function renderBattle(
       ${player.hand
         .map(
           (card) => `
-        <button class="card" data-card-id="${card.id}" ${card.cost > player.mana || status !== 'playing' ? 'disabled' : ''}>
+        <button class="card" data-card-id="${card.id}" ${card.cost > player.mana || cardsDisabled ? 'disabled' : ''}>
           <div class="card-name"><span>${card.name}</span><span>${card.cost}</span></div>
           <div class="card-desc">${card.description}</div>
         </button>
@@ -125,9 +157,9 @@ export function renderBattle(
     </div>
     <div class="actions">
       <div class="stat-line">${status === 'playing' ? `${state.turn}턴 진행 중` : '전투 종료'}</div>
-      <button class="end-turn" id="end-turn" ${status !== 'playing' ? 'disabled' : ''}>턴 종료</button>
+      <button class="end-turn" id="end-turn" ${cardsDisabled ? 'disabled' : ''}>턴 종료</button>
     </div>
-    ${skipButton}
+    ${modeControls}
   `;
 
   const logEl = document.getElementById('log');
@@ -138,7 +170,8 @@ export function renderBattle(
   });
 
   document.getElementById('end-turn')?.addEventListener('click', handlers.onEndTurn);
-  document.getElementById('skip-btn')?.addEventListener('click', handlers.onSkip);
+  document.getElementById('switch-to-auto')?.addEventListener('click', handlers.onSwitchToAuto);
+  document.getElementById('switch-to-manual')?.addEventListener('click', handlers.onSwitchToManual);
   document.getElementById('continue-btn')?.addEventListener('click', handlers.onContinue);
   document.getElementById('acknowledge-death')?.addEventListener('click', handlers.onAcknowledgeDeath);
   document.getElementById('absorb-essence')?.addEventListener('click', handlers.onAbsorbEssence);

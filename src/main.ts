@@ -27,7 +27,7 @@ import {
 } from './engine/profile';
 import { createEssenceFromMonster, essenceSkillCards, type EquippedEssence } from './engine/essence';
 import { computeTotalStats } from './engine/stats-calc';
-import { autoPlayBattle, estimateWinProbability } from './engine/battle-ai';
+import { autoPlayOneTurn, estimateWinProbability } from './engine/battle-ai';
 import { rollGearDrop, createGearFromMonster, type EquipmentSlot } from './engine/gear';
 import {
   generateMaze,
@@ -115,7 +115,20 @@ let dropChecked = false;
 let pendingEssence: EquippedEssence | null = null;
 let essenceOutcome: string | null = null;
 let returnScreen: Screen = 'stats';
-let skipEligible = false;
+// Raw estimateWinProbability() result for the current battle, computed once
+// in startZoneBattle — the auto-battle button (battle.ts) reads this to
+// show "예상 승률 N%" and to decide its safe/risky wording, but auto-battle
+// itself is never gated by it (see battleMode below).
+let winProbability: number | null = null;
+// 'manual' | 'auto' — never persisted (see captureSession's comment below):
+// a reload always resumes into manual, so auto-battle never silently keeps
+// running in the background after a refresh the player didn't expect.
+let battleMode: 'manual' | 'auto' = 'manual';
+// Pending "advance one more turn" callback for auto-battle mode. Only ever
+// one in flight; startAutoBattleTurnLoop()/stopAutoBattleTurnLoop() are the
+// sole writers, so there's never a need to track more than a single handle.
+let autoBattleTimer: ReturnType<typeof setTimeout> | null = null;
+const AUTO_BATTLE_TURN_DELAY_MS = 450;
 // Why the last permadeath happened — transient, never persisted, shown
 // once on the menu screen after a tax death (battle death already has its
 // own on-screen banner before handleDeath() runs, so it doesn't need this).
@@ -128,8 +141,6 @@ let lastTaxMessage: string | null = null;
 // forceReturnFromDungeon() actually removed something, independent of
 // lastTaxMessage so both can show together on the same forced return.
 let lastDungeonGearLossMessage: string | null = null;
-
-const SKIP_WIN_PROBABILITY_THRESHOLD = 0.99;
 
 let dungeonFloor: 1 | 2 = 1;
 let dungeonThemeZone: ArmZone | null = null;
@@ -372,21 +383,30 @@ function render() {
       state,
       floorLabel,
       dungeonClockLabel,
-      skipEligible,
+      battleMode,
+      winProbability,
       expResult,
       { pending: pendingEssence, outcome: essenceOutcome },
       {
         onPlayCard: (cardId) => {
+          if (battleMode !== 'manual') return;
           state = playCard(state!, cardId);
           afterStateChange();
         },
         onEndTurn: () => {
+          if (battleMode !== 'manual') return;
           state = endTurn(state!);
           afterStateChange();
         },
-        onSkip: () => {
-          state = autoPlayBattle(state!);
-          afterStateChange();
+        onSwitchToAuto: () => {
+          battleMode = 'auto';
+          render();
+          startAutoBattleTurnLoop();
+        },
+        onSwitchToManual: () => {
+          battleMode = 'manual';
+          stopAutoBattleTurnLoop();
+          render();
         },
         onContinue: () => {
           dungeonMessage = '전투에서 승리했다.';
@@ -436,9 +456,45 @@ function afterStateChange() {
 }
 
 function goTo(next: Screen) {
+  // Centralized so every way of leaving the battle screen (winning,
+  // acknowledging death, opening a subscreen, a forced return interrupting
+  // mid-fight, ...) reliably stops any in-flight auto-battle turn — a
+  // single check here instead of one at each individual exit path. Also
+  // resets battleMode back to manual, so e.g. opening the inventory mid-auto
+  // and returning to the battle screen doesn't show a stale "자동전투 진행
+  // 중..." label with nothing actually progressing (the timer stays stopped
+  // either way; this just keeps what's on screen honest about it).
+  if (screen === 'battle' && next !== 'battle') {
+    stopAutoBattleTurnLoop();
+    battleMode = 'manual';
+  }
   screen = next;
   persistProfile();
   render();
+}
+
+// Schedules the next automatic turn (see AUTO_BATTLE_TURN_DELAY_MS) while
+// battleMode is 'auto' and the battle is still playing; self-terminates
+// once the fight ends (win/lose) or the player switches back to manual, so
+// callers never need to explicitly stop it except via stopAutoBattleTurnLoop
+// (switching to manual, or leaving the battle screen — see goTo above).
+function startAutoBattleTurnLoop() {
+  stopAutoBattleTurnLoop();
+  if (battleMode !== 'auto' || !state || state.status !== 'playing') return;
+  autoBattleTimer = setTimeout(() => {
+    autoBattleTimer = null;
+    if (battleMode !== 'auto' || !state || state.status !== 'playing') return;
+    state = autoPlayOneTurn(state);
+    afterStateChange();
+    startAutoBattleTurnLoop();
+  }, AUTO_BATTLE_TURN_DELAY_MS);
+}
+
+function stopAutoBattleTurnLoop() {
+  if (autoBattleTimer !== null) {
+    clearTimeout(autoBattleTimer);
+    autoBattleTimer = null;
+  }
 }
 
 function enterDungeon() {
@@ -484,7 +540,8 @@ function forceReturnFromDungeon() {
   state = null;
   dungeonHp = null;
   currentMonster = null;
-  skipEligible = false;
+  winProbability = null;
+  battleMode = 'manual';
   expResult = null;
   expChecked = false;
   dropChecked = false;
@@ -627,7 +684,9 @@ function startZoneBattle(zone: Zone) {
   const startingHp = dungeonHp ?? undefined;
   state = initGame(totalStats, currentMonster, bonusCards, startingHp);
   dungeonHp = state.player.hp;
-  skipEligible = estimateWinProbability(totalStats, bonusCards, currentMonster, startingHp) >= SKIP_WIN_PROBABILITY_THRESHOLD;
+  winProbability = estimateWinProbability(totalStats, bonusCards, currentMonster, startingHp);
+  battleMode = 'manual';
+  stopAutoBattleTurnLoop();
   expResult = null;
   expChecked = false;
   dropChecked = false;
@@ -663,7 +722,8 @@ function handleDeath(reason: 'battle' | 'tax') {
   floor1Maze = null;
   floor1Pos = null;
   floor2Zones = {};
-  skipEligible = false;
+  winProbability = null;
+  battleMode = 'manual';
   expResult = null;
   expChecked = false;
   dropChecked = false;
@@ -766,7 +826,7 @@ function captureSession(): ResumeSession | undefined {
     currentMonsterId: currentMonster?.id ?? null,
     state,
     dungeonHp,
-    skipEligible,
+    winProbability,
     expResult,
     expChecked,
     dropChecked,
@@ -849,7 +909,10 @@ function resumeCharacter() {
     currentMonster = session.currentMonsterId ? getMonsterById(session.currentMonsterId) : null;
     state = session.state;
     dungeonHp = session.dungeonHp;
-    skipEligible = session.skipEligible;
+    winProbability = session.winProbability;
+    // battleMode is intentionally not restored from the session — resuming
+    // always starts in manual, per design (see battleMode's declaration).
+    battleMode = 'manual';
     expResult = session.expResult;
     expChecked = session.expChecked;
     dropChecked = session.dropChecked;

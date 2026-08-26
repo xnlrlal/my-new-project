@@ -12,9 +12,12 @@ function pickBestCard(hand: Card[], mana: number): Card | null {
 }
 
 // Plays out a battle to completion using a simple greedy policy (always play
-// the highest-value affordable card, otherwise end the turn). Used both to
-// actually resolve a skipped battle and, via estimateWinProbability, to
-// gauge how one-sided a matchup is before it starts.
+// the highest-value affordable card, otherwise end the turn). Used only by
+// estimateWinProbability's simulation now — the real-time auto-battle mode
+// uses autoPlayOneTurn below instead, so it can pause and render between
+// turns. Left as its own step-counted loop (rather than rewritten in terms
+// of autoPlayOneTurn) to avoid touching the exact behavior the 150-trial
+// simulation already relies on.
 export function autoPlayBattle(initial: GameState): GameState {
   let state = initial;
   let steps = 0;
@@ -24,6 +27,21 @@ export function autoPlayBattle(initial: GameState): GameState {
     steps++;
   }
   return state;
+}
+
+// Plays exactly one player turn with the same greedy policy as
+// autoPlayBattle (play every affordable card, highest value first, then end
+// the turn once) — used by the real-time auto-battle mode so each turn can
+// be rendered and the player can switch back to manual between turns.
+export function autoPlayOneTurn(state: GameState): GameState {
+  let next = state;
+  while (next.status === 'playing') {
+    const card = pickBestCard(next.player.hand, next.player.mana);
+    if (!card) break;
+    next = playCard(next, card.id);
+  }
+  if (next.status === 'playing') next = endTurn(next);
+  return next;
 }
 
 export function estimateWinProbability(
