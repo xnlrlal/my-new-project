@@ -36,7 +36,7 @@ function drawCards(actor: Actor, count: number): Actor {
 function createActor(
   id: ActorId,
   name: string,
-  stats: { maxHp: number; maxMana: number; attackBonus: number; defenseBonus: number },
+  stats: { maxHp: number; maxMana: number; strength: number; dexterity: number },
   bonusCards: Card[] = []
 ): Actor {
   const base: Actor = {
@@ -47,8 +47,8 @@ function createActor(
     shield: 0,
     mana: stats.maxMana,
     maxMana: stats.maxMana,
-    attackBonus: stats.attackBonus,
-    defenseBonus: stats.defenseBonus,
+    strength: stats.strength,
+    dexterity: stats.dexterity,
     hand: [],
     deck: shuffle(buildDeck(bonusCards)),
     discard: [],
@@ -69,7 +69,7 @@ export function initGame(playerStats: RaceStats, monster: MonsterDef, bonusCards
   return {
     turn: 1,
     player: { ...player, hp },
-    enemy: createActor('enemy', monster.name, { maxHp: monster.maxHp, maxMana: monster.maxMana, attackBonus: 0, defenseBonus: 0 }),
+    enemy: createActor('enemy', monster.name, { maxHp: monster.maxHp, maxMana: monster.maxMana, strength: 0, dexterity: 0 }),
     enemyGrade: monster.grade,
     log: [{ turn: 1, actor: 'player', message: `${monster.name}(을)를 만났다! 전투 시작!` }],
     status: 'playing',
@@ -90,7 +90,7 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
 
   switch (card.effect) {
     case 'damage': {
-      const totalDamage = card.value + sourceActor.attackBonus;
+      const totalDamage = card.value + sourceActor.strength;
       const absorbed = Math.min(targetActor.shield, totalDamage);
       const remaining = totalDamage - absorbed;
       updatedTarget = {
@@ -107,7 +107,7 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
       break;
     }
     case 'shield': {
-      const totalShield = card.value + sourceActor.defenseBonus;
+      const totalShield = card.value + sourceActor.dexterity;
       updatedTarget = { ...targetActor, shield: targetActor.shield + totalShield };
       message = `${sourceActor.name}이(가) [${card.name}]로 방어막 ${totalShield}을 얻음!`;
       break;

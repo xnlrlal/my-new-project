@@ -1,34 +1,95 @@
-export interface StatBonus {
-  maxHp?: number;
-  maxMana?: number;
-  attackBonus?: number;
-  defenseBonus?: number;
+// 3대 메인스탯(육체/정신/이능). 세부스탯과 별개로 그 자체가 파생값의 입력이 되는
+// 축 — 예: 이능은 essence.ts에서 정수 스킬 카드의 위력 배율로 쓰임(engine.ts).
+export interface CoreStats {
+  body: number; // 육체
+  mind: number; // 정신
+  arcane: number; // 이능 — 정수 스킬 카드가 아직 없어 현재는 전투에 영향 없음
 }
 
-export interface RaceStatsLike {
+// 세부스탯 12종. 전투 확률 판정(명중/회피/치명타 등)에 개입하는 로직은 2단계에서
+// engine.ts에 추가될 예정 — 이 인터페이스 자체는 스키마만 정의한다.
+export interface SubStats {
+  strength: number; // 근력 — 육체. 피해량 보정(구 attackBonus 계승)
+  flexibility: number; // 유연성 — 육체. 회피율·치명타율
+  sight: number; // 시각 — 육체. (2단계 이후) 정보성 보너스
+  accuracy: number; // 명중률 — 육체. 명중 판정
+  cognition: number; // 인지력 — 정신. 카드 코스트 경감 확률
+  dexterity: number; // 손재주 — 정신. 방어막 보정(구 defenseBonus 계승)
+  willpower: number; // 인내심 — 정신. (잠정) 체력 소폭 가산
+  agility: number; // 민첩성 — 정신. 추가 드로우 확률
+  smell: number; // 후각 — 이능. 마석/정수 드랍률 보정(전투 외)
+  poisonResist: number; // 독내성 — 이능. (예약) 상태이상 피해 경감
+  perceptionJam: number; // 인식방해 — 이능. 적 명중률 저하
+  obsession: number; // 집착 — 이능. 치명타 피해 배율 보정
+}
+
+// races.ts의 RaceStats와 구조적으로 동일한 셰이프를 stat-bonus.ts 안에서 독립적으로
+// 유지해, 이 파일이 races.ts를 import하지 않아도 되게 한다(원래 4필드 시절부터의
+// 관례 — gear.ts/monsters.ts 등도 races.ts에 의존하지 않고 이 파일만 참조).
+export interface RaceStatsLike extends CoreStats, SubStats {
   maxHp: number;
   maxMana: number;
-  attackBonus: number;
-  defenseBonus: number;
 }
 
+// 장비/정수가 부여하는 보너스 — RaceStatsLike의 모든 필드를 선택적으로 가산할 수
+// 있다. 기존 StatBonus(4필드 선택적)의 자연스러운 확장.
+export type StatBonus = Partial<RaceStatsLike>;
+
+const STAT_FIELDS: (keyof RaceStatsLike)[] = [
+  'maxHp',
+  'maxMana',
+  'body',
+  'mind',
+  'arcane',
+  'strength',
+  'flexibility',
+  'sight',
+  'accuracy',
+  'cognition',
+  'dexterity',
+  'willpower',
+  'agility',
+  'smell',
+  'poisonResist',
+  'perceptionJam',
+  'obsession',
+];
+
 export function applyStatBonuses(base: RaceStatsLike, sources: { statBonus: StatBonus }[]): RaceStatsLike {
-  return sources.reduce<RaceStatsLike>(
-    (acc, source) => ({
-      maxHp: acc.maxHp + (source.statBonus.maxHp ?? 0),
-      maxMana: acc.maxMana + (source.statBonus.maxMana ?? 0),
-      attackBonus: acc.attackBonus + (source.statBonus.attackBonus ?? 0),
-      defenseBonus: acc.defenseBonus + (source.statBonus.defenseBonus ?? 0),
-    }),
-    { ...base }
-  );
+  const result = { ...base } as Record<keyof RaceStatsLike, number>;
+  for (const source of sources) {
+    for (const field of STAT_FIELDS) {
+      result[field] += source.statBonus[field] ?? 0;
+    }
+  }
+  return result;
 }
+
+const STAT_LABELS: Record<keyof RaceStatsLike, string> = {
+  maxHp: '체력',
+  maxMana: '마나',
+  body: '육체',
+  mind: '정신',
+  arcane: '이능',
+  strength: '근력',
+  flexibility: '유연성',
+  sight: '시각',
+  accuracy: '명중률',
+  cognition: '인지력',
+  dexterity: '손재주',
+  willpower: '인내심',
+  agility: '민첩성',
+  smell: '후각',
+  poisonResist: '독내성',
+  perceptionJam: '인식방해',
+  obsession: '집착',
+};
 
 export function statBonusText(statBonus: StatBonus): string {
   const parts: string[] = [];
-  if (statBonus.maxHp) parts.push(`체력 +${statBonus.maxHp}`);
-  if (statBonus.maxMana) parts.push(`마나 +${statBonus.maxMana}`);
-  if (statBonus.attackBonus) parts.push(`공격 +${statBonus.attackBonus}`);
-  if (statBonus.defenseBonus) parts.push(`방어 +${statBonus.defenseBonus}`);
+  for (const field of STAT_FIELDS) {
+    const value = statBonus[field];
+    if (value) parts.push(`${STAT_LABELS[field]} +${value}`);
+  }
   return parts.join(' · ') || '보너스 없음';
 }
