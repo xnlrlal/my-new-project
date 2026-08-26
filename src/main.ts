@@ -588,12 +588,24 @@ function arriveAt(id: CellId, battleChance: number, safeMessage: string) {
   }
 }
 
+// Rewards only the very first portal opened in this floor's maze, regardless
+// of direction — "누가 이 층에서 제일 먼저 포탈에 도달했는가"에는 층당 답이
+// 하나뿐이어야 한다 (지금은 싱글플레이라 항상 본인이지만, 이 "층당 유일한
+// 보상" 규칙 자체는 지금부터 정확히 지켜져야 함). portalsFound는 그대로
+// 방향별 방문 기록으로 계속 채워지지만(이 함수 밖에서 쓰이는 곳은 없고
+// 순수 기록용), 보상 지급 여부는 "이 미로에서 어떤 방향이든 이미 하나라도
+// 열렸는가"(portalsFound.size, 추가 직전에 확인)로만 판단한다. 층간 역행은
+// 같은 DungeonMaze 인스턴스(따라서 같은 portalsFound)를 재사용하므로
+// 별도 처리 없이 자연히 중복 지급이 막히고, 새 미궁 진입은 generateMaze()가
+// 매번 빈 Set을 새로 만들어주므로 마찬가지로 자연히 초기화된다.
 function handlePortalArrival(cell: DungeonCell) {
   dungeonMessage = null;
   if (!maze || !cell.portal) return;
 
-  if (!maze.portalsFound.has(cell.portal)) {
-    maze.portalsFound.add(cell.portal);
+  const alreadyRewardedThisFloor = maze.portalsFound.size > 0;
+  maze.portalsFound.add(cell.portal);
+
+  if (!alreadyRewardedThisFloor) {
     const result = addExp(profile, PORTAL_EXP_BONUS);
     profile = result.profile;
     persistProfile();
