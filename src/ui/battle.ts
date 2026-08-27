@@ -1,6 +1,7 @@
 import type { Actor, GameState } from '../engine/types';
 import type { ExpGrantResult } from '../engine/profile';
 import type { EquippedEssence } from '../engine/essence';
+import { statusEffectsText } from '../engine/status-effects';
 
 export type BattleMode = 'manual' | 'auto';
 
@@ -31,6 +32,10 @@ const SAFE_WIN_PROBABILITY = 0.99;
 function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number): string {
   const hpPct = Math.round((actor.hp / actor.maxHp) * 100);
   const manaPct = Math.round((actor.mana / actor.maxMana) * 100);
+  // statusEffects는 순수 데이터(status-effects.ts)이고, 이 한 줄 텍스트는
+  // 지금 UI가 그걸 보여주는 방식일 뿐이다 — 나중에 아이콘으로 바뀌어도
+  // 데이터 구조 자체는 그대로 재사용 가능.
+  const statusText = statusEffectsText(actor.statusEffects);
   return `
     <div class="actor ${role}">
       <div class="actor-name">${actor.name}${grade ? ` <span class="grade-tag">${grade}등급</span>` : ''}</div>
@@ -38,6 +43,7 @@ function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number): st
       <div class="stat-line">HP ${actor.hp}/${actor.maxHp} ${actor.shield > 0 ? `· 방어막 ${actor.shield}` : ''}</div>
       <div class="bar"><div class="bar-fill mana" style="width:${manaPct}%"></div></div>
       <div class="stat-line">마나 ${actor.mana}/${actor.maxMana}</div>
+      ${statusText ? `<div class="stat-line status-effects">${statusText}</div>` : ''}
     </div>
   `;
 }

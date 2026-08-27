@@ -1,5 +1,13 @@
 export type CardEffect = 'damage' | 'heal' | 'shield';
 
+export type StatusEffectType = 'poison' | 'bleed' | 'stun';
+
+export interface StatusEffect {
+  type: StatusEffectType;
+  stacks: number;
+  remainingTurns: number;
+}
+
 export interface Card {
   id: string;
   name: string;
@@ -7,6 +15,10 @@ export interface Card {
   effect: CardEffect;
   value: number;
   description: string;
+  // 명중 시(applyCard의 damage 분기에서만 확인) 대상에게 상태이상을 부여한다.
+  // 지금은 '관통'(cards.ts) 하나만 이 필드를 쓴다 — 상태이상 시스템의 최소
+  // 실사용 경로(status-effects.ts 설계 문서 참고).
+  appliesStatusEffect?: { type: StatusEffectType; duration: number };
 }
 
 export type ActorId = 'player' | 'enemy';
@@ -29,6 +41,8 @@ export interface Actor {
   flexibility: number; // 유연성 — 상대 명중 판정 회피 + 내 치명타 확률
   perceptionJam: number; // 인식방해 — 상대가 나를 공격할 때 상대 명중률 저하
   obsession: number; // 집착 — 내 치명타 피해 배율
+  poisonResist: number; // 독내성 — 독 상태이상 피해 경감(status-effects.ts)
+  statusEffects: StatusEffect[];
   hand: Card[];
   deck: Card[];
   discard: Card[];

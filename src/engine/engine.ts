@@ -2,6 +2,7 @@ import type { Actor, ActorId, Card, GameState, LogEntry } from './types';
 import { buildDeck } from './cards';
 import type { RaceStats } from './races';
 import type { MonsterDef } from './monsters';
+import { applyStatusEffect, bleedHealMultiplier, isStunned, tickStatusEffects } from './status-effects';
 
 const HAND_SIZE = 4;
 
@@ -45,6 +46,7 @@ function createActor(
     flexibility: number;
     perceptionJam: number;
     obsession: number;
+    poisonResist: number;
   },
   bonusCards: Card[] = []
 ): Actor {
@@ -62,6 +64,8 @@ function createActor(
     flexibility: stats.flexibility,
     perceptionJam: stats.perceptionJam,
     obsession: stats.obsession,
+    poisonResist: stats.poisonResist,
+    statusEffects: [],
     hand: [],
     deck: shuffle(buildDeck(bonusCards)),
     discard: [],
@@ -98,6 +102,7 @@ export function initGame(playerStats: RaceStats, monster: MonsterDef, bonusCards
       flexibility: 0,
       perceptionJam: 0,
       obsession: 0,
+      poisonResist: 0,
     }),
     enemyGrade: monster.grade,
     log: [{ turn: 1, actor: 'player', message: `${monster.name}(을)를 만났다! 전투 시작!` }],
@@ -164,21 +169,29 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
       const totalDamage = isHit ? Math.round((card.value + sourceActor.strength) * (isCrit ? critMultiplier(sourceActor) : 1)) : 0;
       const absorbed = Math.min(targetActor.shield, totalDamage);
       const remaining = totalDamage - absorbed;
+      const inflicted = isHit && card.appliesStatusEffect;
       updatedTarget = {
         ...targetActor,
         shield: targetActor.shield - absorbed,
         hp: Math.max(0, targetActor.hp - remaining),
+        statusEffects: inflicted
+          ? applyStatusEffect(targetActor.statusEffects, card.appliesStatusEffect!.type, card.appliesStatusEffect!.duration)
+          : targetActor.statusEffects,
       };
+      const statusSuffix = inflicted
+        ? ` (${card.appliesStatusEffect!.type === 'poison' ? '독' : card.appliesStatusEffect!.type === 'bleed' ? '출혈' : '기절'} 부여)`
+        : '';
       message = !isHit
         ? `${sourceActor.name}이(가) [${card.name}]로 공격했지만 ${targetActor.name}이(가) 회피했다!`
         : isCrit
-          ? `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 치명타! ${totalDamage}의 피해!`
-          : `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 ${totalDamage}의 피해!`;
+          ? `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 치명타! ${totalDamage}의 피해!${statusSuffix}`
+          : `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 ${totalDamage}의 피해!${statusSuffix}`;
       break;
     }
     case 'heal': {
-      updatedTarget = { ...targetActor, hp: Math.min(targetActor.maxHp, targetActor.hp + card.value) };
-      message = `${sourceActor.name}이(가) [${card.name}]로 체력을 ${card.value} 회복!`;
+      const healValue = Math.floor(card.value * bleedHealMultiplier(targetActor));
+      updatedTarget = { ...targetActor, hp: Math.min(targetActor.maxHp, targetActor.hp + healValue) };
+      message = `${sourceActor.name}이(가) [${card.name}]로 체력을 ${healValue} 회복!`;
       break;
     }
     case 'shield': {
@@ -214,6 +227,7 @@ function trackLowestPlayerHp(state: GameState): GameState {
 
 export function playCard(state: GameState, cardId: string): GameState {
   if (state.status !== 'playing') return state;
+  if (isStunned(state.player)) return state;
   const card = state.player.hand.find((c) => c.id === cardId);
   if (!card || card.cost > state.player.mana) return state;
   return applyCard(state, 'player', card);
@@ -233,16 +247,38 @@ function enemyAct(state: GameState): GameState {
   return applyCard(state, 'enemy', card);
 }
 
+// 상태이상 틱은 턴이 "끝날 때"가 아니라 이 함수 맨 앞, 적의 행동 페이즈보다
+// 먼저 처리한다. 그래야 이번 호출의 적 행동 중에 방금 건 상태이상(예:
+// 기절)이 이번 틱에 휩쓸려 즉시 사라지지 않고, 다음 endTurn() 호출까지
+// 고스란히 남아있다가 그때 가서야 감소/소멸한다 — 즉 "적이 이번 턴 끝에
+// 기절을 걸면 정확히 다음 한 턴을 통째로 막는다"는 의도가 스냅샷 없이
+// 자연히 성립한다(status-effects.ts의 tickStatusEffects 문서 참고).
 export function endTurn(state: GameState): GameState {
   if (state.status !== 'playing') return state;
 
-  let next = state;
-  while (next.status === 'playing' && next.enemy.hand.some((c) => c.cost <= next.enemy.mana)) {
-    const before = next;
-    next = enemyAct(next);
-    if (next === before) break;
-  }
+  const playerTick = tickStatusEffects(state.player, '플레이어');
+  const enemyTick = tickStatusEffects(state.enemy, state.enemy.name);
+  let next: GameState = {
+    ...state,
+    player: playerTick.actor,
+    enemy: enemyTick.actor,
+    log: [
+      ...state.log,
+      ...playerTick.messages.map((message) => ({ turn: state.turn, actor: 'player' as const, message })),
+      ...enemyTick.messages.map((message) => ({ turn: state.turn, actor: 'enemy' as const, message })),
+    ],
+  };
+  next = trackLowestPlayerHp(checkGameOver(next));
   if (next.status !== 'playing') return next;
+
+  if (!enemyTick.wasStunned) {
+    while (next.status === 'playing' && next.enemy.hand.some((c) => c.cost <= next.enemy.mana)) {
+      const before = next;
+      next = enemyAct(next);
+      if (next === before) break;
+    }
+    if (next.status !== 'playing') return next;
+  }
 
   const nextTurn = next.turn + 1;
   const refreshedPlayer = drawCards({ ...next.player, mana: next.player.maxMana }, HAND_SIZE - next.player.hand.length);
