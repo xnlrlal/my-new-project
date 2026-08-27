@@ -1,4 +1,4 @@
-import type { Actor, ActorId, Card, GameState, LogEntry } from './types';
+import type { Actor, ActorId, Card, GameState, LogEntry, StatusEffect } from './types';
 import { buildDeck } from './cards';
 import type { RaceStats } from './races';
 import type { MonsterDef } from './monsters';
@@ -80,12 +80,27 @@ function createActor(
 // (or undefined) means "start at full", which is what every other caller
 // (a brand-new dungeon entry, or the skip-probability simulation with no
 // carried HP to pass) still gets.
-export function initGame(playerStats: RaceStats, monster: MonsterDef, bonusCards: Card[] = [], startingHp?: number): GameState {
+// initialStatusEffects lets a caller fold in status effects the player
+// already picked up outside of battle (e.g. the bleed from stepping on a
+// goblin trap — see main.ts's pendingStatusEffects) so they apply from turn
+// 1 of whichever real fight follows. ambush pre-applies a 1-turn stun to
+// represent being caught off guard (see status-effects.ts's isStunned/
+// endTurn ordering — this works correctly because the stun is present in
+// the very first GameState, before any playCard/endTurn call ever runs).
+export function initGame(
+  playerStats: RaceStats,
+  monster: MonsterDef,
+  bonusCards: Card[] = [],
+  startingHp?: number,
+  initialStatusEffects: StatusEffect[] = [],
+  ambush = false
+): GameState {
   const player = createActor('player', '플레이어', playerStats, bonusCards);
   const hp = startingHp === undefined ? player.maxHp : Math.min(Math.max(0, startingHp), player.maxHp);
+  const statusEffects = ambush ? applyStatusEffect(initialStatusEffects, 'stun', 1) : initialStatusEffects;
   return {
     turn: 1,
-    player: { ...player, hp },
+    player: { ...player, hp, statusEffects },
     // A dungeon-carried-over low HP counts as already having been "at that
     // level during this battle" — the player is genuinely at risk from the
     // first card played, not just from damage dealt after this point.

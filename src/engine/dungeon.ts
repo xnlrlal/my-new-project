@@ -25,6 +25,12 @@ function ring2Id(i: number): CellId {
   return `ring2-${((i % RING_SIZE) + RING_SIZE) % RING_SIZE}`;
 }
 
+// 고블린 필드 함정(남쪽 구역 전용, 1층 한정 — generateMaze의 allowTraps 참고).
+// 저 멀리서도 눈치챌 수 있는 함정이라, 이동할 때마다 새로 굴리는 게 아니라
+// 미궁 생성 시점에 그 칸의 고정 속성으로 확정된다. 2D 탑다운 전환 시에도
+// 이 필드 하나로 타일 위 시각 표시를 대체할 수 있도록 순수 데이터로만 둔다.
+export type TrapType = 'goblin';
+
 export interface DungeonCell {
   id: CellId;
   ring: 0 | 1 | 2;
@@ -32,6 +38,7 @@ export interface DungeonCell {
   open: Set<CellId>;
   zone: Zone;
   portal: ArmZone | null;
+  trap: TrapType | null;
 }
 
 export interface DungeonMaze {
@@ -86,6 +93,7 @@ export interface SerializedDungeonCell {
   open: CellId[];
   zone: Zone;
   portal: ArmZone | null;
+  trap: TrapType | null;
 }
 
 export interface SerializedDungeonMaze {
@@ -110,16 +118,26 @@ export function deserializeMaze(serialized: SerializedDungeonMaze): DungeonMaze 
   };
 }
 
-export function generateMaze(themeZone: ArmZone | null): DungeonMaze {
+// 남쪽 구역(고블린 서식지)의 포탈이 아닌 칸마다 이 확률로 함정이 고정 배치됨
+// — allowTraps=true(1층 진입)일 때만. 2층은 애초에 9등급(고블린)이 절대
+// 등장하지 않는 목표 등급 분포라(rollTargetGrade 참고) 대상에서 제외한다.
+const GOBLIN_TRAP_CHANCE = 0.25;
+
+export function generateMaze(themeZone: ArmZone | null, allowTraps = false): DungeonMaze {
   const cells = new Map<CellId, DungeonCell>();
 
-  cells.set('center', { id: 'center', ring: 0, index: -1, open: new Set(), zone: 'center', portal: null });
+  const rollTrap = (zone: Zone, portal: ArmZone | null): TrapType | null =>
+    allowTraps && zone === 'south' && !portal && Math.random() < GOBLIN_TRAP_CHANCE ? 'goblin' : null;
+
+  cells.set('center', { id: 'center', ring: 0, index: -1, open: new Set(), zone: 'center', portal: null, trap: null });
   for (let i = 0; i < RING_SIZE; i++) {
-    cells.set(ring1Id(i), { id: ring1Id(i), ring: 1, index: i, open: new Set(), zone: themeZone ?? zoneForIndex(i), portal: null });
+    const zone = themeZone ?? zoneForIndex(i);
+    cells.set(ring1Id(i), { id: ring1Id(i), ring: 1, index: i, open: new Set(), zone, portal: null, trap: rollTrap(zone, null) });
   }
   for (let i = 0; i < RING_SIZE; i++) {
+    const zone = themeZone ?? zoneForIndex(i);
     const portal = (Object.keys(PORTAL_INDEX) as ArmZone[]).find((z) => PORTAL_INDEX[z] === i) ?? null;
-    cells.set(ring2Id(i), { id: ring2Id(i), ring: 2, index: i, open: new Set(), zone: themeZone ?? zoneForIndex(i), portal });
+    cells.set(ring2Id(i), { id: ring2Id(i), ring: 2, index: i, open: new Set(), zone, portal, trap: rollTrap(zone, portal) });
   }
 
   const uf = new UnionFind();
@@ -183,19 +201,27 @@ export interface DungeonMove {
   label: string;
   next: CellId;
   battleChance: number;
+  // 함정이 있는 칸으로의 이동만 'trigger'(밟는다)/'avoid'(우회한다) 두 개의
+  // 별도 선택지로 나뉜다 — 그 외 모든 이동은 null(기존과 동일한 단일 선택지).
+  trapChoice: 'trigger' | 'avoid' | null;
 }
 
 export function availableMoves(maze: DungeonMaze, pos: CellId): DungeonMove[] {
   const cell = cellAt(maze, pos);
-  return [...cell.open].map((neighborId) => {
+  return [...cell.open].flatMap((neighborId): DungeonMove[] => {
     const neighbor = cellAt(maze, neighborId);
     const battleChance = neighbor.portal ? 0 : BASE_BATTLE_CHANCE;
     const chanceLabel = neighbor.portal ? '전투 없음' : `전투 확률 ${Math.round(BASE_BATTLE_CHANCE * 100)}%`;
-    return {
-      label: `${cellLabel(neighbor)}로 이동 · ${chanceLabel}`,
-      next: neighborId,
-      battleChance,
-    };
+
+    if (neighbor.trap) {
+      const label = cellLabel(neighbor);
+      return [
+        { label: `${label} (고블린 덫 감지) · 덫을 밟고 이동 · 전투 없음, 출혈`, next: neighborId, battleChance: 0, trapChoice: 'trigger' },
+        { label: `${label} (고블린 덫 감지) · 우회해서 이동 · 기습당할 수 있음`, next: neighborId, battleChance: 1, trapChoice: 'avoid' },
+      ];
+    }
+
+    return [{ label: `${cellLabel(neighbor)}로 이동 · ${chanceLabel}`, next: neighborId, battleChance, trapChoice: null }];
   });
 }
 
