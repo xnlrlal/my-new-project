@@ -82,6 +82,10 @@ export function initGame(playerStats: RaceStats, monster: MonsterDef, bonusCards
   return {
     turn: 1,
     player: { ...player, hp },
+    // A dungeon-carried-over low HP counts as already having been "at that
+    // level during this battle" — the player is genuinely at risk from the
+    // first card played, not just from damage dealt after this point.
+    lowestPlayerHpRatio: hp / player.maxHp,
     enemy: createActor('enemy', monster.name, {
       maxHp: monster.maxHp,
       maxMana: monster.maxMana,
@@ -197,7 +201,15 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
     log: appendLog(state, { actor: source, message }),
   };
 
-  return checkGameOver(next);
+  return trackLowestPlayerHp(checkGameOver(next));
+}
+
+// Keeps lowestPlayerHpRatio current after every single card resolution (not
+// just at turn boundaries) — see its doc comment on GameState. Cheap no-op
+// once the ratio stops improving (min never increases).
+function trackLowestPlayerHp(state: GameState): GameState {
+  const ratio = state.player.hp / state.player.maxHp;
+  return ratio < state.lowestPlayerHpRatio ? { ...state, lowestPlayerHpRatio: ratio } : state;
 }
 
 export function playCard(state: GameState, cardId: string): GameState {

@@ -449,6 +449,7 @@ function afterStateChange() {
   // its end, so an interrupting forced return (which can fire mid-turn)
   // captures the right value.
   if (state) dungeonHp = state.player.hp;
+  checkForAchievements();
   checkForExp();
   checkForDrop();
   persistProfile();
@@ -507,7 +508,7 @@ function enterDungeon() {
   floor2Zones = {};
   // Brand-new dungeon entry is the only place HP resets to full — floor
   // transitions and backtracking leave whatever's left in dungeonHp alone.
-  dungeonHp = selectedRace ? computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear).maxHp : null;
+  dungeonHp = selectedRace ? computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus).maxHp : null;
   arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, '미궁에 들어섰다. 주변을 살핀다.');
 }
 
@@ -676,7 +677,7 @@ function startZoneBattle(zone: Zone) {
   if (!selectedRace) return;
   currentMonster = pickMonsterForFloorAndZone(dungeonFloor, zone);
   const bonusCards = essenceSkillCards(profile.essences);
-  const totalStats = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear);
+  const totalStats = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus);
   // Carry HP left over from the previous battle in this run (clamped inside
   // initGame against the just-recomputed maxHp, in case gear/essences
   // changed mid-run); a brand-new run has no carried HP yet, so fall back to
@@ -732,11 +733,51 @@ function handleDeath(reason: 'battle' | 'tax') {
   goTo('menu');
 }
 
+// HP-crisis achievements: checked on every state change regardless of
+// win/lose/still-playing, since the condition is "HP dropped to X% at some
+// point during the fight," not "you won after it happened." Both can grant
+// independently in the same battle (0.1% implies 2% was also crossed) — a
+// deliberate design choice, not an oversight. Uses state.lowestPlayerHpRatio
+// (engine.ts) rather than the live current HP so a mid-turn dip that got
+// healed before this function runs is still caught.
+function checkForAchievements() {
+  if (!state) return;
+  const lowest = state.lowestPlayerHpRatio;
+  const grants: string[] = [];
+  let bonus = profile.achievementStatBonus;
+
+  if (lowest <= 0.001 && !profile.achievementHp01PctGranted) {
+    profile = { ...profile, achievementHp01PctGranted: true };
+    bonus = { ...bonus, mind: (bonus.mind ?? 0) + 3 };
+    grants.push('업적 달성: 사경을 헤매다 (생명력 0.1% 이하) — 정신 영구 +3!');
+  }
+  if (lowest <= 0.02 && !profile.achievementHp2PctGranted) {
+    profile = { ...profile, achievementHp2PctGranted: true };
+    bonus = { ...bonus, mind: (bonus.mind ?? 0) + 1 };
+    grants.push('업적 달성: 위기 극복 (생명력 2% 이하) — 정신 영구 +1!');
+  }
+  if (grants.length === 0) return;
+
+  profile = { ...profile, achievementStatBonus: bonus };
+  state = { ...state, log: [...state.log, ...grants.map((message) => ({ turn: state!.turn, actor: 'player' as const, message }))] };
+}
+
 function checkForExp() {
   if (!state || !currentMonster || state.status !== 'win' || expChecked) return;
   expChecked = true;
+  // "생애 첫 처치" 업적: defeatedMonsterNames가 비어있는 상태에서 벌어지는
+  // 다음 성공 처치가 정확히 그 첫 처치다(3번 조사 결과 참고) — 별도 플래그
+  // 없이 이 길이 자체가 유일하게 정확한 시점을 알려준다.
+  const wasBeforeFirstKill = profile.defeatedMonsterNames.length === 0;
   expResult = grantExpForKill(profile, currentMonster);
   profile = expResult.profile;
+  if (wasBeforeFirstKill && !expResult.alreadyDefeated) {
+    profile = {
+      ...profile,
+      achievementStatBonus: { ...profile.achievementStatBonus, mind: (profile.achievementStatBonus.mind ?? 0) + 1 },
+    };
+    state = { ...state, log: [...state.log, { turn: state.turn, actor: 'player', message: '업적 달성: 첫 사냥 — 정신 영구 +1!' }] };
+  }
   persistProfile();
 }
 
