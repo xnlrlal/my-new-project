@@ -17,7 +17,10 @@ const EXP_PER_LEVEL = 20;
 // on mismatch rather than trying to field-by-field migrate, since the old
 // GearInstance/EquippedEssence.statBonus objects it holds use a different
 // calculation entirely (see CURRENT_SCHEMA_VERSION's usage below).
-const CURRENT_SCHEMA_VERSION = 2;
+// v3: 오크를 플레이어 종족에서 완전히 제거 + 수인 추가 + 메인스탯 스케일
+// 재조정(races.ts) — raceId: 'orc'인 구세이브가 getRace()에서 더는 유효하지
+// 않으므로, 이 버전 상승만으로 그런 세이브까지 전부 안전하게 초기화된다.
+const CURRENT_SCHEMA_VERSION = 3;
 
 export type ManaStoneCounts = Partial<Record<number, number>>;
 

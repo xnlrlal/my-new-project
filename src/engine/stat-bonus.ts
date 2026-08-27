@@ -96,12 +96,16 @@ export function statBonusMagnitude(statBonus: StatBonus): number {
 // 소비하는 값이 아니라, 캐릭터 정보 화면에서 한눈에 비교할 "전투력" 감각을
 // 주기 위한 가중합이다. 가중치는 설계 논의에서 제안된 초안 값 — 실제
 // 밸런스는 플레이테스트로 조정될 수 있다.
+// body/mind/arcane 가중치는 maxHp와 동일하게 1 — 메인스탯이 1~3에서 수십단위
+// 스케일로 재조정되면서(races.ts 참고) 예전 가중치 10을 유지하면 종합 전투
+// 지수가 메인스탯 총합에 압도돼(예: 바바리안 기준 전체의 약 89%) 세부스탯·
+// 장비 기여가 사실상 안 보이게 되는 것을 막기 위함.
 const COMBAT_INDEX_WEIGHTS: Record<keyof RaceStatsLike, number> = {
   maxHp: 1,
   maxMana: 5,
-  body: 10,
-  mind: 10,
-  arcane: 10,
+  body: 1,
+  mind: 1,
+  arcane: 1,
   strength: 8,
   dexterity: 8,
   accuracy: 4,
