@@ -23,7 +23,11 @@ export function autoPlayBattle(initial: GameState): GameState {
   let steps = 0;
   while (state.status === 'playing' && steps < MAX_AUTO_STEPS) {
     const card = pickBestCard(state.player.hand, state.player.mana);
-    state = card ? playCard(state, card.id) : endTurn(state);
+    const afterCard = card ? playCard(state, card.id) : state;
+    // playCard no-ops (unchanged reference) when the player is stunned —
+    // fall through to endTurn() instead of retrying the same no-op card
+    // every step until MAX_AUTO_STEPS is exhausted.
+    state = afterCard === state ? endTurn(state) : afterCard;
     steps++;
   }
   return state;
@@ -38,7 +42,11 @@ export function autoPlayOneTurn(state: GameState): GameState {
   while (next.status === 'playing') {
     const card = pickBestCard(next.player.hand, next.player.mana);
     if (!card) break;
-    next = playCard(next, card.id);
+    const afterCard = playCard(next, card.id);
+    // Stunned (or any other no-op) -> stop retrying and fall through to
+    // endTurn() below, same reasoning as autoPlayBattle above.
+    if (afterCard === next) break;
+    next = afterCard;
   }
   if (next.status === 'playing') next = endTurn(next);
   return next;
