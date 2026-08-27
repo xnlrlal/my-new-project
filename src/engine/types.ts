@@ -49,4 +49,10 @@ export interface GameState {
   enemyGrade: number;
   log: LogEntry[];
   status: GameStatus;
+  // 이 전투 동안 player.hp/maxHp가 도달한 최저 비율(0~1). initGame이 시작
+  // HP 기준으로 세팅하고, applyCard가 데미지 적용 직후마다 갱신한다 — 턴
+  // 중간에 위기를 겪었다가 같은 턴에 회복 카드로 버텨낸 경우도 놓치지 않기
+  // 위해, 최종 HP가 아니라 "그동안 본 최저치"를 계속 들고 다니는 값이다.
+  // HP 위기 업적(main.ts의 checkForAchievements) 판정에 쓰인다.
+  lowestPlayerHpRatio: number;
 }

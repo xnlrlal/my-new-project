@@ -16,7 +16,7 @@ export interface StatsHandlers {
 export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerProfile, secondsUntilJudgment: number, handlers: StatsHandlers) {
   const expNeeded = expToNextLevel(profile.level);
   const expPct = Math.round((profile.exp / expNeeded) * 100);
-  const totalStats = computeTotalStats(race.stats, profile.essences, profile.equippedGear);
+  const totalStats = computeTotalStats(race.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus);
 
   const skillsHtml =
     profile.essences.length > 0

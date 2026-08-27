@@ -7,6 +7,7 @@ import type { RaceId } from './races';
 import { sanitizeResumeSession, type ResumeSession } from './session';
 import type { ClockSpeed } from './village-clock';
 import { STARTER_ARMOR, findWeaponChoice } from './ritual';
+import type { StatBonus } from './stat-bonus';
 
 const STORAGE_KEY = 'my-new-project:profile';
 const EXP_PER_LEVEL = 20;
@@ -69,6 +70,20 @@ export interface PlayerProfile {
   // checked on every load (sanitizeProfile) to decide whether a save-
   // incompatible change means this save must be reset rather than parsed.
   schemaVersion: number;
+  // Permanent stat bonus accumulated from achievements (currently only ever
+  // touches `mind`), fed into computeTotalStats() as one more StatBonus
+  // source alongside essences/gear. Defaults to {} and resetProfile()
+  // naturally wipes it on death like every other achievement field below —
+  // permadeath means every achievement must be earned again from scratch.
+  achievementStatBonus: StatBonus;
+  // One-shot gates for the two HP-crisis achievements (see GameState.
+  // lowestPlayerHpRatio / checkForAchievements in main.ts) — each can only
+  // ever grant its bonus once per character lifetime. The third achievement
+  // ("첫 처치") needs no such flag: profile.defeatedMonsterNames.length === 0
+  // is already an exact, naturally-resetting proxy for "this character has
+  // never defeated anything yet" (see checkForExp in main.ts).
+  achievementHp2PctGranted: boolean;
+  achievementHp01PctGranted: boolean;
 }
 
 function defaultProfile(): PlayerProfile {
@@ -94,6 +109,9 @@ function defaultProfile(): PlayerProfile {
     hasVisitedDungeonExchange: false,
     lastTaxedYear: null,
     hasCompletedComingOfAge: false,
+    achievementStatBonus: {},
+    achievementHp2PctGranted: false,
+    achievementHp01PctGranted: false,
   };
 }
 
@@ -304,6 +322,10 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
     hasVisitedDungeonExchange: typeof parsed.hasVisitedDungeonExchange === 'boolean' ? parsed.hasVisitedDungeonExchange : false,
     lastTaxedYear: typeof parsed.lastTaxedYear === 'number' ? parsed.lastTaxedYear : null,
     hasCompletedComingOfAge: typeof parsed.hasCompletedComingOfAge === 'boolean' ? parsed.hasCompletedComingOfAge : false,
+    achievementStatBonus:
+      parsed.achievementStatBonus && typeof parsed.achievementStatBonus === 'object' ? (parsed.achievementStatBonus as StatBonus) : {},
+    achievementHp2PctGranted: typeof parsed.achievementHp2PctGranted === 'boolean' ? parsed.achievementHp2PctGranted : false,
+    achievementHp01PctGranted: typeof parsed.achievementHp01PctGranted === 'boolean' ? parsed.achievementHp01PctGranted : false,
   };
 }
 
