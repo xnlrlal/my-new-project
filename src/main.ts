@@ -1,5 +1,6 @@
 import './style.css';
-import type { GameState } from './engine/types';
+import type { GameState, StatusEffect } from './engine/types';
+import { applyStatusEffect } from './engine/status-effects';
 import { getRace, type RaceDef } from './engine/races';
 import type { MonsterDef, MonsterGrade } from './engine/monsters';
 import { getMonsterById, pickMonsterForFloorAndZone, rollEssenceDrop, rollManaStoneDrop } from './engine/monsters';
@@ -156,6 +157,12 @@ let dungeonEntryVillageSeconds = 0;
 // untouched. Kept in sync with the live battle state in afterStateChange()
 // so it's current even if a forced return interrupts a fight mid-turn.
 let dungeonHp: number | null = null;
+// 고블린 덫을 밟았지만 아직 전투로 이어지지 않은 상태이상(현재는 출혈만) —
+// 그 다음 정상 전투가 발동하는 순간 startZoneBattle()이 initGame에 접어
+// 넣고 비운다. trackedByGoblin은 그 전투의 몬스터가 랜덤 대신 고블린으로
+// 강제되어야 하는지를 나타낸다. 둘 다 강제 귀환/사망/층 이동 시 초기화됨.
+let pendingStatusEffects: StatusEffect[] = [];
+let trackedByGoblin = false;
 // Snapshot of floor 1 taken at the moment of entering floor 2, so
 // backtracking (while unlocked) resumes it exactly instead of regenerating.
 let floor1Maze: DungeonMaze | null = null;
@@ -501,11 +508,13 @@ function stopAutoBattleTurnLoop() {
 function enterDungeon() {
   dungeonFloor = 1;
   dungeonThemeZone = null;
-  maze = generateMaze(null);
+  maze = generateMaze(null, true);
   dungeonElapsedSeconds = 0;
   floor1Maze = null;
   floor1Pos = null;
   floor2Zones = {};
+  pendingStatusEffects = [];
+  trackedByGoblin = false;
   // Brand-new dungeon entry is the only place HP resets to full — floor
   // transitions and backtracking leave whatever's left in dungeonHp alone.
   dungeonHp = selectedRace ? computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus).maxHp : null;
@@ -549,6 +558,8 @@ function forceReturnFromDungeon() {
   pendingEssence = null;
   essenceOutcome = null;
   dungeonEntryVillageSeconds = 0;
+  pendingStatusEffects = [];
+  trackedByGoblin = false;
 
   // villageElapsedSeconds is frozen for the entire dungeon visit and then
   // jumps straight from prevElapsed to newElapsed here — a normal tick-based
@@ -583,6 +594,9 @@ function enterFloorTwo(themeZone: ArmZone) {
   floor1Pos = pos;
   dungeonFloor = 2;
   dungeonThemeZone = themeZone;
+  // 고블린 추적/덫 상태는 층을 넘어가면 끊긴다는 단순화 규칙(설계 문서 참고).
+  pendingStatusEffects = [];
+  trackedByGoblin = false;
 
   const saved = floor2Zones[themeZone];
   if (saved) {
@@ -617,16 +631,34 @@ function revertToFloor1() {
   floor1Pos = null;
   dungeonMessage = '1층으로 돌아왔다.';
   portalMessage = null;
+  // 층을 넘어가면 고블린 추적/덫 상태가 끊긴다는 단순화 규칙(설계 문서 참고).
+  pendingStatusEffects = [];
+  trackedByGoblin = false;
   goTo('dungeon-map');
 }
 
+// 고블린 덫이 있는 칸으로의 이동은 "밟는다"/"우회한다" 두 선택지로 갈린다
+// (availableMoves가 만든 두 DungeonMove, 같은 next 목적지). 밟으면 그
+// 자리에서 즉시 전투 없이 출혈만 쌓이고(battleChance=0), 우회하면 고블린이
+// 먼저 뛰쳐나와 기습한다(battleChance=1로 항상 전투, ambush=true로 1턴
+// 기절 선적용). 둘 다 몬스터를 'goblin'으로 강제 지정한다.
 function handleMove(move: DungeonMove) {
+  if (move.trapChoice === 'trigger') {
+    pendingStatusEffects = applyStatusEffect(pendingStatusEffects, 'bleed', 3);
+    trackedByGoblin = true;
+    arriveAt(move.next, 0, '고블린 덫을 밟았다! 출혈을 입었다. 뒤에서 인기척이 느껴진다...');
+    return;
+  }
+  if (move.trapChoice === 'avoid') {
+    arriveAt(move.next, 1, '조용히 이동했다.', { forcedMonsterId: 'goblin', ambush: true });
+    return;
+  }
   arriveAt(move.next, move.battleChance, '조용히 이동했다.');
 }
 
 // Shared by both entering a fresh maze and moving within one, so the very
 // first placement in a dungeon rolls for a battle just like any other step.
-function arriveAt(id: CellId, battleChance: number, safeMessage: string) {
+function arriveAt(id: CellId, battleChance: number, safeMessage: string, options?: { forcedMonsterId?: string; ambush?: boolean }) {
   if (!maze) return;
   pos = id;
   const cell = cellAt(maze, id);
@@ -639,7 +671,16 @@ function arriveAt(id: CellId, battleChance: number, safeMessage: string) {
 
   portalMessage = null;
   if (rollBattle(battleChance)) {
-    startZoneBattle(cell.zone);
+    let forcedMonsterId = options?.forcedMonsterId;
+    const ambush = options?.ambush ?? false;
+    // 명시적으로 강제된 몬스터가 없는 정상 전투인데 덫 이후로 추적당하는
+    // 중이라면, 이번이 "고블린이 따라잡는" 그 전투다 — 기습이 아니라
+    // 정상 판정(이미 경계하고 있었으므로)이며, 추적은 여기서 해소된다.
+    if (!forcedMonsterId && trackedByGoblin) {
+      forcedMonsterId = 'goblin';
+      trackedByGoblin = false;
+    }
+    startZoneBattle(cell.zone, { forcedMonsterId, ambush });
   } else {
     dungeonMessage = safeMessage;
     goTo('dungeon-map');
@@ -673,9 +714,9 @@ function handlePortalArrival(cell: DungeonCell) {
   }
 }
 
-function startZoneBattle(zone: Zone) {
+function startZoneBattle(zone: Zone, options?: { forcedMonsterId?: string; ambush?: boolean }) {
   if (!selectedRace) return;
-  currentMonster = pickMonsterForFloorAndZone(dungeonFloor, zone);
+  currentMonster = options?.forcedMonsterId ? getMonsterById(options.forcedMonsterId) : pickMonsterForFloorAndZone(dungeonFloor, zone);
   const bonusCards = essenceSkillCards(profile.essences);
   const totalStats = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus);
   // Carry HP left over from the previous battle in this run (clamped inside
@@ -683,9 +724,15 @@ function startZoneBattle(zone: Zone) {
   // changed mid-run); a brand-new run has no carried HP yet, so fall back to
   // full via undefined.
   const startingHp = dungeonHp ?? undefined;
-  state = initGame(totalStats, currentMonster, bonusCards, startingHp);
+  const ambush = options?.ambush ?? false;
+  // Any bleed banked from stepping on a goblin trap folds into this fight
+  // (whichever monster it turns out to be) right now, then is cleared —
+  // it's spent the moment a real battle actually starts.
+  const initialStatusEffects = pendingStatusEffects;
+  pendingStatusEffects = [];
+  state = initGame(totalStats, currentMonster, bonusCards, startingHp, initialStatusEffects, ambush);
   dungeonHp = state.player.hp;
-  winProbability = estimateWinProbability(totalStats, bonusCards, currentMonster, startingHp);
+  winProbability = estimateWinProbability(totalStats, bonusCards, currentMonster, startingHp, initialStatusEffects, ambush);
   battleMode = 'manual';
   stopAutoBattleTurnLoop();
   expResult = null;
@@ -730,6 +777,8 @@ function handleDeath(reason: 'battle' | 'tax') {
   dropChecked = false;
   pendingEssence = null;
   essenceOutcome = null;
+  pendingStatusEffects = [];
+  trackedByGoblin = false;
   goTo('menu');
 }
 
@@ -873,6 +922,8 @@ function captureSession(): ResumeSession | undefined {
     dropChecked,
     pendingEssence,
     essenceOutcome,
+    pendingStatusEffects,
+    trackedByGoblin,
   };
 }
 
@@ -959,6 +1010,8 @@ function resumeCharacter() {
     dropChecked = session.dropChecked;
     pendingEssence = session.pendingEssence;
     essenceOutcome = session.essenceOutcome;
+    pendingStatusEffects = session.pendingStatusEffects;
+    trackedByGoblin = session.trackedByGoblin;
     goTo(session.screen);
   } catch (err) {
     console.error('Failed to resume saved session, falling back to village:', err);

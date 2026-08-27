@@ -1,4 +1,4 @@
-import type { Card, GameState } from './types';
+import type { Card, GameState, StatusEffect } from './types';
 import type { RaceStats } from './races';
 import type { MonsterDef } from './monsters';
 import { initGame, playCard, endTurn } from './engine';
@@ -57,13 +57,17 @@ export function estimateWinProbability(
   bonusCards: Card[],
   monster: MonsterDef,
   startingHp?: number,
+  // 고블린 덫/기습 등 전투 시작 전부터 붙어있는 상태이상을 시뮬레이션에도
+  // 반영해, 그런 상황의 "예상 승률" 표시가 정직하게 낮게 나오도록 한다.
+  initialStatusEffects: StatusEffect[] = [],
+  ambush = false,
   // 2단계(명중/치명타 확률 판정) 도입 이후 전투 결과 분산이 커져, 150회로는
   // 승률 추정치가 흔들리기 쉬워 300회로 상향(설계 논의에서 제안된 값).
   trials = 300
 ): number {
   let wins = 0;
   for (let i = 0; i < trials; i++) {
-    const result = autoPlayBattle(initGame(playerStats, monster, bonusCards, startingHp));
+    const result = autoPlayBattle(initGame(playerStats, monster, bonusCards, startingHp, initialStatusEffects, ambush));
     if (result.status === 'win') wins++;
   }
   return wins / trials;

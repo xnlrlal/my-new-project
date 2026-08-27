@@ -1,4 +1,4 @@
-import type { GameState } from './types';
+import type { GameState, StatusEffect } from './types';
 import type { ArmZone, CellId, SerializedDungeonMaze } from './dungeon';
 import type { EquippedEssence } from './essence';
 import type { ExpGrantResult } from './profile';
@@ -64,6 +64,14 @@ export interface ResumeSession {
   dropChecked: boolean;
   pendingEssence: EquippedEssence | null;
   essenceOutcome: string | null;
+  // 고블린 덫을 밟았지만 아직 전투로 이어지지 않은 상태이상(현재는 출혈만
+  // 쌓임) — 그 다음 정상 전투가 발동하는 순간 initGame에 접혀 들어가고
+  // 비워진다(main.ts의 startZoneBattle 참고).
+  pendingStatusEffects: StatusEffect[];
+  // 덫을 밟은 뒤 고블린이 "뒤따라오는" 지연된 위협 상태 — true면 그 다음
+  // 정상 전투 발동 시 몬스터가 랜덤 대신 고블린으로 강제 지정된다. 강제
+  // 귀환/사망/층 이동 시 모두 초기화됨(체이스가 그 즉시 끊긴다는 단순화).
+  trackedByGoblin: boolean;
 }
 
 const RESUMABLE_SCREENS: readonly ResumableScreen[] = [
@@ -142,5 +150,7 @@ export function sanitizeResumeSession(raw: unknown): ResumeSession | null {
     dropChecked: typeof r.dropChecked === 'boolean' ? r.dropChecked : false,
     pendingEssence: r.pendingEssence && typeof r.pendingEssence === 'object' ? (r.pendingEssence as EquippedEssence) : null,
     essenceOutcome: typeof r.essenceOutcome === 'string' ? r.essenceOutcome : null,
+    pendingStatusEffects: Array.isArray(r.pendingStatusEffects) ? (r.pendingStatusEffects as StatusEffect[]) : [],
+    trackedByGoblin: typeof r.trackedByGoblin === 'boolean' ? r.trackedByGoblin : false,
   };
 }
