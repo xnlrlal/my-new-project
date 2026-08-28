@@ -539,7 +539,7 @@ export function pickMonsterForFloorAndZone(floor: number, zone: Zone): MonsterDe
 }
 
 const ESSENCE_DROP_CHANCE = 0.001;
-const MANA_STONE_DROP_CHANCE = 0.5;
+const MANA_STONE_DROP_CHANCE = 0.9;
 
 export function rollEssenceDrop(): boolean {
   return Math.random() < ESSENCE_DROP_CHANCE;
