@@ -5,7 +5,7 @@ import { createGrantedGear, EQUIPMENT_SLOTS, type EquipmentSlot, type GearInstan
 import type { EquippedGear } from './stats-calc';
 import type { RaceId } from './races';
 import { sanitizeResumeSession, type ResumeSession } from './session';
-import type { ClockSpeed } from './village-clock';
+import { SECONDS_PER_HOUR, type ClockSpeed } from './village-clock';
 import { STARTER_ARMOR, findWeaponChoice } from './ritual';
 import type { StatBonus } from './stat-bonus';
 
@@ -213,6 +213,17 @@ export function unequipGear(profile: PlayerProfile, slot: EquipmentSlot): Player
 // the ritual done. No-op (returns profile unchanged) if the weapon id isn't
 // recognized or the ritual was already completed, so a stray double-call
 // can't re-grant gear onto an already-equipped character.
+//
+// Also pins villageElapsedSeconds to exactly 21:00 on day 1 (21 * SECONDS_
+// PER_HOUR — formatGameDateTime's existing 1-indexed day math already reads
+// that as "1일차 21:00" with no new "0일차" concept needed) regardless of
+// how long the player lingered on the ritual screen first. Narrative
+// reason: exactly 3 hours of walk-to-the-dungeon time before the next
+// midnight dungeon opening, for the future 2D top-down transition. This is
+// deliberately barbarian-only — scoped to this ritual-completion function,
+// not defaultProfile()/character-select's raceId-setting — since other
+// races will get their own character-creation flow (and own start time)
+// later.
 export function completeComingOfAge(profile: PlayerProfile, weaponChoiceId: string): PlayerProfile {
   if (profile.hasCompletedComingOfAge) return profile;
   const weaponChoice = findWeaponChoice(weaponChoiceId);
@@ -224,7 +235,7 @@ export function completeComingOfAge(profile: PlayerProfile, weaponChoiceId: stri
     equippedGear[gear.slot] = gear;
   }
 
-  return { ...profile, equippedGear, hasCompletedComingOfAge: true };
+  return { ...profile, equippedGear, hasCompletedComingOfAge: true, villageElapsedSeconds: 21 * SECONDS_PER_HOUR };
 }
 
 export interface StripDungeonOnlyGearResult {

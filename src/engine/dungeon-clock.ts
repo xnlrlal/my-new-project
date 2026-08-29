@@ -42,10 +42,14 @@ export function isFloor1RevertLocked(elapsedSeconds: number): boolean {
   return dungeonDayCount(elapsedSeconds) >= FLOOR1_FORCE_RETURN_DAY;
 }
 
-const VILLAGE_NOON_OFFSET_SECONDS = 6 * SECONDS_PER_HOUR;
+// 마스터 설정 반영: 미궁 개방(입장 가능 시각)이 자정(00:00)으로 바뀌면서
+// 이 오프셋도 6시간→12시간으로 조정됨 — 실제 목적은 "그날 정오로 고정"
+// (README 참고)이지, 특정 시간값을 더하는 것 자체가 아니다. 입장 시각이
+// 바뀔 때마다 이 오프셋도 "자정~정오" 간격에 맞춰 함께 조정해야 한다.
+const VILLAGE_NOON_OFFSET_SECONDS = 12 * SECONDS_PER_HOUR;
 
 // However many in-dungeon days a run actually took, the village clock only
-// ever advances a flat 6 hours from the moment of entry (06:00 -> that same
+// ever advances a flat 12 hours from the moment of entry (00:00 -> that same
 // day's noon) once a forced return happens.
 export function villageNoonAfterForcedReturn(entryVillageSeconds: number): number {
   return entryVillageSeconds + VILLAGE_NOON_OFFSET_SECONDS;
