@@ -30,15 +30,26 @@ export function advanceVillageClock(elapsedSeconds: number, realDeltaSeconds: nu
 }
 
 export interface GameDateTime {
-  day: number; // 1-indexed
+  day: number; // 1-indexed — but 0 is possible too, see gameDateTimeFromElapsed
   hour: number;
   minute: number;
 }
 
+// elapsedSeconds can be negative: completeComingOfAge() pins a fresh
+// barbarian's villageElapsedSeconds to -3h ("0일차 21:00", 3 hours before
+// the very first midnight) so the first judgment window lands exactly on
+// day 1 00:00 instead of skipping a whole 30-day cycle ahead (see
+// nextJudgmentPointSeconds — starting positive-but-past-cycle-0 made it
+// search for the *next* cycle, landing on day 31). Math.floor already
+// floors negative numbers correctly (day math below relies on that), but
+// JS's `%` returns a result with the dividend's sign for a negative
+// dividend (e.g. -10800 % 86400 === -10800, not the 75600 we want) — the
+// extra `+ SECONDS_PER_GAME_DAY) % SECONDS_PER_GAME_DAY` turns that into
+// proper Euclidean modulo. No behavior change for non-negative input.
 export function gameDateTimeFromElapsed(elapsedSeconds: number): GameDateTime {
-  const totalSeconds = Math.floor(Math.max(0, elapsedSeconds));
+  const totalSeconds = Math.floor(elapsedSeconds);
   const day = Math.floor(totalSeconds / SECONDS_PER_GAME_DAY) + 1;
-  const secondsIntoDay = totalSeconds % SECONDS_PER_GAME_DAY;
+  const secondsIntoDay = ((totalSeconds % SECONDS_PER_GAME_DAY) + SECONDS_PER_GAME_DAY) % SECONDS_PER_GAME_DAY;
   const hour = Math.floor(secondsIntoDay / SECONDS_PER_HOUR);
   const minute = Math.floor((secondsIntoDay % SECONDS_PER_HOUR) / 60);
   return { day, hour, minute };
