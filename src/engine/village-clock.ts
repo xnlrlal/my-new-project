@@ -14,7 +14,8 @@ const REAL_SECONDS_PER_VILLAGE_DAY = 120;
 const VILLAGE_CLOCK_SCALE = SECONDS_PER_GAME_DAY / REAL_SECONDS_PER_VILLAGE_DAY;
 
 const JUDGMENT_CYCLE_DAYS = 30;
-const JUDGMENT_HOUR = 6;
+// 마스터 설정 반영: 미궁 개방(판단창)은 자정(00:00)에 뜬다 — 예전엔 06:00였음.
+const JUDGMENT_HOUR = 0;
 const JUDGMENT_CYCLE_SECONDS = JUDGMENT_CYCLE_DAYS * SECONDS_PER_GAME_DAY;
 const JUDGMENT_OFFSET_SECONDS = JUDGMENT_HOUR * SECONDS_PER_HOUR;
 
@@ -51,7 +52,7 @@ export function formatGameDateTime(dt: GameDateTime): string {
   return `${dt.day}일차 ${pad2(dt.hour)}:${pad2(dt.minute)}`;
 }
 
-// The next elapsed-seconds value at which a 30-day cycle reaches 06:00 —
+// The next elapsed-seconds value at which a 30-day cycle reaches 00:00 —
 // i.e. where the judgment window appears. Always strictly greater than the
 // input, so repeated skips keep advancing one cycle at a time.
 export function nextJudgmentPointSeconds(elapsedSeconds: number): number {
@@ -60,7 +61,7 @@ export function nextJudgmentPointSeconds(elapsedSeconds: number): number {
 }
 
 // Absolute villageElapsedSeconds value at which a given judgment cycle's
-// 06:00 falls. Used when a player accepts a judgment: the dungeon "entry
+// 00:00 falls. Used when a player accepts a judgment: the dungeon "entry
 // time" is defined as this boundary, not whatever villageElapsedSeconds has
 // drifted to by the moment they click (the clock keeps advancing during the
 // 30-second decision window).
@@ -70,7 +71,7 @@ export function judgmentBoundarySeconds(cycleIndex: number): number {
 
 // Detects whether a tick's elapsed-time advance (prevElapsed -> newElapsed)
 // crossed an unanswered judgment boundary, and if so returns that boundary's
-// cycle index (0-indexed: cycle 0 is the very first 06:00, 30 days in).
+// cycle index (0-indexed: cycle 0 is the very first 00:00, 30 days in).
 // Returns null if no unanswered boundary was crossed. Walking forward one
 // cycle at a time (rather than a closed-form check) keeps this correct even
 // if a single tick's delta happens to leap over more than one 30-day cycle.
@@ -85,10 +86,12 @@ export function crossedJudgmentCycle(prevElapsed: number, newElapsed: number, la
   return null;
 }
 
-// 1년 = 30일 판단 주기 12번 분량(360일). 12번째 판단창(361일차 06:00)이 뜨는
-// 바로 그 날 자정에 첫 세금 경계가 겹치도록 의도적으로 맞춘 값 — 30과 360이
+// 1년 = 30일 판단 주기 12번 분량(360일). 12번째 판단창(361일차 00:00)이 뜨는
+// 바로 그 순간에 첫 세금 경계도 함께 겹치도록 의도적으로 맞춘 값 — 30과 360이
 // 정확히 나누어떨어지므로 이 겹침은 매 12번째 판단 사이클마다 규칙적으로
-// 발생한다 (tax.ts의 연간 세금 시스템 설계 참고).
+// 발생한다 (tax.ts의 연간 세금 시스템 설계 참고). 판단창이 자정에 뜨도록
+// 바뀌기 전(구 06:00)에는 "같은 날, 다른 시각"에 겹쳤지만 지금은 정확히
+// 같은 순간에 겹친다.
 export const TAX_YEAR_DAYS = 360;
 const TAX_YEAR_SECONDS = SECONDS_PER_GAME_DAY * TAX_YEAR_DAYS;
 
