@@ -528,7 +528,7 @@ function enterDungeon() {
 // death. Non-permanent gear (ordinary monster drops — see isPermanent in
 // gear.ts) does NOT survive the trip back: it's dungeon-only by design and
 // gets stripped below, the one point where a visit truly ends.
-// Village time is set to "그날 정오" (entry's 06:00 + 6h) regardless of how
+// Village time is set to "그날 정오" (entry's 00:00 + 12h) regardless of how
 // many in-dungeon days actually passed, per spec — not the same kind of
 // exit exitDungeonToMenu used to be (that was a player-triggered escape
 // hatch and was removed entirely to close the portal-farming exploit; this
@@ -1071,7 +1071,7 @@ async function handleLogout() {
 
 // Moves villageElapsedSeconds to newElapsed, opening a judgment window
 // (30 real-second decision timer) if doing so crosses an unanswered 30-day/
-// 06:00 boundary. Shared by the tick (gradual advance) and the skip button
+// 00:00 boundary. Shared by the tick (gradual advance) and the skip button
 // (jumps straight to the next boundary) so both go through the same
 // crossing-detection logic instead of duplicating it.
 // Returns true if this advance triggered a tax death (profile has already
@@ -1099,9 +1099,9 @@ function advanceProfileVillageTime(newElapsed: number): boolean {
   const crossedCycle = crossedJudgmentCycle(profile.villageElapsedSeconds, newElapsed, profile.lastAnsweredCycle);
   profile =
     crossedCycle !== null
-      ? // Snap to the cycle's exact 06:00 boundary rather than `newElapsed`
+      ? // Snap to the cycle's exact 00:00 boundary rather than `newElapsed`
         // (which may have overshot it within this tick) — the judgment
-        // window is meant to freeze the display at exactly 06:00 from the
+        // window is meant to freeze the display at exactly 00:00 from the
         // moment it opens, not just once tickGameClock's pending-judgment
         // branch takes over on the next tick.
         {
@@ -1143,7 +1143,7 @@ function tickGameClock() {
   }
 
   if (profile.pendingJudgmentRemainingSeconds !== null) {
-    // The village clock is frozen at this cycle's 06:00 boundary for the
+    // The village clock is frozen at this cycle's 00:00 boundary for the
     // whole decision window ("멈춘 시간" — the player hasn't answered yet,
     // so no game time passes). Only the 30-second decision countdown itself
     // moves, and it's real time, not scaled by clockSpeed — it's decision
