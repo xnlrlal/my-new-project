@@ -214,13 +214,25 @@ export function unequipGear(profile: PlayerProfile, slot: EquipmentSlot): Player
 // recognized or the ritual was already completed, so a stray double-call
 // can't re-grant gear onto an already-equipped character.
 //
-// Also pins villageElapsedSeconds to exactly 21:00 on day 1 (21 * SECONDS_
-// PER_HOUR — formatGameDateTime's existing 1-indexed day math already reads
-// that as "1일차 21:00" with no new "0일차" concept needed) regardless of
-// how long the player lingered on the ritual screen first. Narrative
-// reason: exactly 3 hours of walk-to-the-dungeon time before the next
-// midnight dungeon opening, for the future 2D top-down transition. This is
-// deliberately barbarian-only — scoped to this ritual-completion function,
+// Also pins villageElapsedSeconds to exactly -3h ("0일차 21:00", 3 hours
+// before the very first midnight) regardless of how long the player
+// lingered on the ritual screen first. Narrative reason: exactly 3 hours of
+// walk-to-the-dungeon time before the next midnight dungeon opening, for
+// the future 2D top-down transition.
+//
+// This used to be +21h ("1일차 21:00", a positive value past day 1's own
+// midnight) — but nextJudgmentPointSeconds/crossedJudgmentCycle treat
+// elapsed=0 as cycle 0's boundary, so starting *after* it made the game
+// search for the *next* 30-day cycle instead, skipping the character's
+// first-ever judgment window a full 30 days ahead (to day 31, not day 1).
+// Starting negative (before elapsed=0) instead means the character simply
+// hasn't reached cycle 0's boundary yet, so the first judgment correctly
+// lands 3 hours later at day 1 00:00. gameDateTimeFromElapsed
+// (village-clock.ts) handles negative input correctly (Euclidean modulo,
+// not JS's sign-preserving `%`) so this displays as "0일차 21:00", not a
+// crash or a clamped "1일차 00:00".
+//
+// Deliberately barbarian-only — scoped to this ritual-completion function,
 // not defaultProfile()/character-select's raceId-setting — since other
 // races will get their own character-creation flow (and own start time)
 // later.
@@ -235,7 +247,7 @@ export function completeComingOfAge(profile: PlayerProfile, weaponChoiceId: stri
     equippedGear[gear.slot] = gear;
   }
 
-  return { ...profile, equippedGear, hasCompletedComingOfAge: true, villageElapsedSeconds: 21 * SECONDS_PER_HOUR };
+  return { ...profile, equippedGear, hasCompletedComingOfAge: true, villageElapsedSeconds: -3 * SECONDS_PER_HOUR };
 }
 
 export interface StripDungeonOnlyGearResult {
