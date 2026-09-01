@@ -102,7 +102,7 @@ const PORTAL_EXP_BONUS = 2;
 // 전투 중 회복(engine.ts의 WILLPOWER_REGEN_COEF, 라운드당)과 별개 축이라
 // 계수도 따로 둔다. 인내심이 없으면(장비/정수를 얻기 전) 0이라 아무 효과
 // 없음 — 지금은 성지의 샌들(ritual.ts)이 유일한 원천.
-const OUT_OF_COMBAT_REGEN_COEF = 1; // 인내심 1당 안전한 이동 1칸당 최대체력의 +1%
+const OUT_OF_COMBAT_REGEN_COEF = 2; // 인내심 1당 안전한 이동 1칸당 최대체력의 +2% (engine.ts의 WILLPOWER_REGEN_COEF와 같은 이유로 재상향)
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 

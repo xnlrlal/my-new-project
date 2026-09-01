@@ -161,7 +161,10 @@ const STRENGTH_ATTACK_COEF = 0.1; // 근력 1당 카드 피해 +10%
 // 기존 방어막 카드 보정과 별개로, 카드를 쓰지 않아도 매번 적용되는 상시
 // 방어를 제공한다 — 방어막(shield)은 이 경감이 끝난 뒤의 최종 피해를
 // 흡수하는 순서(먼저 %로 깎고, 남은 값을 shield가 흡수)로 처리된다.
-const DEXTERITY_DEFENSE_COEF = 3; // 손재주 1당 상시 피해 감소 -3%p
+// 1차값(2→3%p)으로 시뮬레이션했을 때 1층 9등급 몬스터 기준 평균 4~5마리
+// 밖에 못 버텨서, 디자인 노트(3-1번)의 "1층 체류 7일 동안 20마리 안팎은
+// 버텨야 한다"는 그림에 크게 못 미침이 확인되어 재상향.
+const DEXTERITY_DEFENSE_COEF = 5; // 손재주 1당 상시 피해 감소 -5%p
 const MAX_DEFENSE_REDUCTION = 60; // 최대 60%까지만 경감 — 완전 무적 방지(명중/치명타 캡과 같은 원칙)
 
 function defenseReduction(defender: Actor): number {
@@ -172,7 +175,7 @@ function defenseReduction(defender: Actor): number {
 // 회복시킨다 — 전투 사이에 회복 수단이 사실상 없어 체력이 그대로 누적
 // 소모되던 문제(설계 논의 참고)를 완화하기 위한 축. 인내심이 0인 몬스터는
 // (아직 세부스탯이 없어 전원 0 고정) 지금은 영향받지 않는다.
-const WILLPOWER_REGEN_COEF = 1; // 인내심 1당 라운드 종료 시 최대체력의 +1%
+const WILLPOWER_REGEN_COEF = 2; // 인내심 1당 라운드 종료 시 최대체력의 +2% (재상향, DEXTERITY_DEFENSE_COEF와 같은 이유)
 
 function applyRegenTick(actor: Actor): { actor: Actor; healed: number } {
   const healed = Math.round(actor.maxHp * ((actor.willpower * WILLPOWER_REGEN_COEF) / 100));
