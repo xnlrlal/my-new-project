@@ -64,6 +64,7 @@ import {
 import {
   advanceDungeonClock,
   isFloor1RevertLocked,
+  packSizeForDay,
   shouldForceDungeonReturn,
   villageNoonAfterForcedReturn,
 } from './engine/dungeon-clock';
@@ -168,6 +169,16 @@ let dungeonHp: number | null = null;
 // 강제되어야 하는지를 나타낸다. 둘 다 강제 귀환/사망/층 이동 시 초기화됨.
 let pendingStatusEffects: StatusEffect[] = [];
 let trackedByGoblin = false;
+// 몬스터 무리 스폰(dungeon-clock.ts의 packSizeForDay) — 무작위 전투가
+// 발동하는 순간 packSizeForDay로 정해진 마릿수를 packTotal에 담고,
+// packRemaining은 "이번 전투 이후로 몇 마리가 더 남았는지"를 센다.
+// 배틀 화면의 "탐험 계속하기"가 packRemaining>0이면 dungeon-map으로
+// 돌아가는 대신 같은 구역에서 다음 전투를 바로 연다(startZoneBattle).
+// 함정 발동/기습처럼 몬스터가 특정 개체로 강제되는 조우는 무리 취급하지
+// 않는다(packTotal=1). 트랙된 고블린과 같은 이유로 강제 귀환/사망/층
+// 이동 시 둘 다 초기화됨.
+let packTotal = 1;
+let packRemaining = 0;
 // Snapshot of floor 1 taken at the moment of entering floor 2, so
 // backtracking (while unlocked) resumes it exactly instead of regenerating.
 let floor1Maze: DungeonMaze | null = null;
@@ -389,7 +400,9 @@ function render() {
   }
 
   if (screen === 'battle' && state) {
-    const floorLabel = dungeonFloor === 1 ? '미궁 1층' : `${zoneLabel(dungeonThemeZone!)} 미궁 2층`;
+    const baseFloorLabel = dungeonFloor === 1 ? '미궁 1층' : `${zoneLabel(dungeonThemeZone!)} 미궁 2층`;
+    // 무리 조우일 때만 진행률을 덧붙인다(packTotal===1이면 평범한 1:1 전투).
+    const floorLabel = packTotal > 1 ? `${baseFloorLabel} · 무리 ${packTotal - packRemaining}/${packTotal}` : baseFloorLabel;
     renderBattle(
       app,
       state,
@@ -421,6 +434,16 @@ function render() {
           render();
         },
         onContinue: () => {
+          // 무리가 아직 남아있으면 지도로 돌아가지 않고 같은 구역에서 바로
+          // 다음 전투를 연다 — "무리 자체는 개별적으로 쉽고, 반복되는
+          // 소모전이 진짜 위협"이라는 설계 의도(designnotes.md 3-1번)대로
+          // 도중에 쉴 틈 없이 이어지는 게 핵심이라 안전한 이동 취급을 하지
+          // 않는다(applyOutOfCombatRegen 미적용).
+          if (packRemaining > 0 && maze && pos) {
+            packRemaining -= 1;
+            startZoneBattle(cellAt(maze, pos).zone);
+            return;
+          }
           dungeonMessage = '전투에서 승리했다.';
           goTo('dungeon-map');
         },
@@ -520,6 +543,8 @@ function enterDungeon() {
   floor2Zones = {};
   pendingStatusEffects = [];
   trackedByGoblin = false;
+  packTotal = 1;
+  packRemaining = 0;
   // Brand-new dungeon entry is the only place HP resets to full — floor
   // transitions and backtracking leave whatever's left in dungeonHp alone.
   dungeonHp = selectedRace ? computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus).maxHp : null;
@@ -565,6 +590,8 @@ function forceReturnFromDungeon() {
   dungeonEntryVillageSeconds = 0;
   pendingStatusEffects = [];
   trackedByGoblin = false;
+  packTotal = 1;
+  packRemaining = 0;
 
   // villageElapsedSeconds is frozen for the entire dungeon visit and then
   // jumps straight from prevElapsed to newElapsed here — a normal tick-based
@@ -602,6 +629,8 @@ function enterFloorTwo(themeZone: ArmZone) {
   // 고블린 추적/덫 상태는 층을 넘어가면 끊긴다는 단순화 규칙(설계 문서 참고).
   pendingStatusEffects = [];
   trackedByGoblin = false;
+  packTotal = 1;
+  packRemaining = 0;
 
   const saved = floor2Zones[themeZone];
   if (saved) {
@@ -639,6 +668,8 @@ function revertToFloor1() {
   // 층을 넘어가면 고블린 추적/덫 상태가 끊긴다는 단순화 규칙(설계 문서 참고).
   pendingStatusEffects = [];
   trackedByGoblin = false;
+  packTotal = 1;
+  packRemaining = 0;
   goTo('dungeon-map');
 }
 
@@ -696,6 +727,10 @@ function arriveAt(id: CellId, battleChance: number, safeMessage: string, options
       forcedMonsterId = 'goblin';
       trackedByGoblin = false;
     }
+    // 몬스터가 특정 개체로 강제된 조우(함정 우회 기습, 추적하던 고블린)는
+    // 무리로 취급하지 않는다 — 무리는 무작위 조우에만 적용된다.
+    packTotal = forcedMonsterId ? 1 : packSizeForDay(dungeonFloor, dungeonElapsedSeconds);
+    packRemaining = packTotal - 1;
     startZoneBattle(cell.zone, { forcedMonsterId, ambush });
   } else {
     applyOutOfCombatRegen();
@@ -796,6 +831,8 @@ function handleDeath(reason: 'battle' | 'tax') {
   essenceOutcome = null;
   pendingStatusEffects = [];
   trackedByGoblin = false;
+  packTotal = 1;
+  packRemaining = 0;
   goTo('menu');
 }
 
@@ -941,6 +978,8 @@ function captureSession(): ResumeSession | undefined {
     essenceOutcome,
     pendingStatusEffects,
     trackedByGoblin,
+    packTotal,
+    packRemaining,
   };
 }
 
@@ -1029,6 +1068,8 @@ function resumeCharacter() {
     essenceOutcome = session.essenceOutcome;
     pendingStatusEffects = session.pendingStatusEffects;
     trackedByGoblin = session.trackedByGoblin;
+    packTotal = session.packTotal;
+    packRemaining = session.packRemaining;
     goTo(session.screen);
   } catch (err) {
     console.error('Failed to resume saved session, falling back to village:', err);

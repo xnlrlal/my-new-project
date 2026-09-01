@@ -72,6 +72,12 @@ export interface ResumeSession {
   // 정상 전투 발동 시 몬스터가 랜덤 대신 고블린으로 강제 지정된다. 강제
   // 귀환/사망/층 이동 시 모두 초기화됨(체이스가 그 즉시 끊긴다는 단순화).
   trackedByGoblin: boolean;
+  // 몬스터 무리 스폰(dungeon-clock.ts의 packSizeForDay 참고) — 이번 조우의
+  // 전체 마릿수(packTotal, 무리가 아니면 1)와 현재 전투 이후로 남은
+  // 마릿수(packRemaining). trackedByGoblin과 같은 이유로 층 이동/강제
+  // 귀환/사망 시 모두 초기화된다.
+  packTotal: number;
+  packRemaining: number;
 }
 
 const RESUMABLE_SCREENS: readonly ResumableScreen[] = [
@@ -152,5 +158,7 @@ export function sanitizeResumeSession(raw: unknown): ResumeSession | null {
     essenceOutcome: typeof r.essenceOutcome === 'string' ? r.essenceOutcome : null,
     pendingStatusEffects: Array.isArray(r.pendingStatusEffects) ? (r.pendingStatusEffects as StatusEffect[]) : [],
     trackedByGoblin: typeof r.trackedByGoblin === 'boolean' ? r.trackedByGoblin : false,
+    packTotal: typeof r.packTotal === 'number' ? r.packTotal : 1,
+    packRemaining: typeof r.packRemaining === 'number' ? r.packRemaining : 0,
   };
 }

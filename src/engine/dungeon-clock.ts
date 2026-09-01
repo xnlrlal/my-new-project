@@ -54,3 +54,27 @@ const VILLAGE_NOON_OFFSET_SECONDS = 12 * SECONDS_PER_HOUR;
 export function villageNoonAfterForcedReturn(entryVillageSeconds: number): number {
   return entryVillageSeconds + VILLAGE_NOON_OFFSET_SECONDS;
 }
+
+// 몬스터 무리 스폰(designnotes.md 3-1번, 원래 "미착수"로 표시돼 있었으나
+// 요청으로 1차 구현) — 미궁 체류 일수가 늘수록 한 번의 조우에서 연속으로
+// 싸워야 하는 몬스터 수가 늘어난다. 노트의 제안대로("다중 몬스터 동시
+// 전투 엔진 없이도 기존 1:1 전투를 연속 트리거하는 것만으로 구현 가능")
+// 실제 전투는 여전히 1:1이고, main.ts가 한 마리를 이기면 남은 마릿수만큼
+// 같은 구역에서 다음 전투를 바로 이어서 연다.
+//
+// 1층 수치는 노트에 명시된 그대로다: 1일차 단독 → 2일차 2마리 → 3일차
+// 이후 3~4마리, 7일차 폐쇄까지 유지. 2층 수치("1층에선 서너 마리씩 나오던
+// 게 열댓 마리로 늘어나고" — 정확한 조건은 노트에서도 미정)는 방향성만
+// 가져온 1차 추정 곡선이라 요청하면 언제든 바꿀 수 있다.
+export function packSizeForDay(floor: 1 | 2, elapsedSeconds: number): number {
+  const day = dungeonDayCount(elapsedSeconds); // 0-indexed: 0 = "1일차"
+  if (floor === 1) {
+    if (day <= 0) return 1;
+    if (day === 1) return 2;
+    return 3 + Math.floor(Math.random() * 2); // 3~4마리
+  }
+  if (day <= 0) return 2;
+  if (day === 1) return 4;
+  if (day === 2) return 6;
+  return 8 + Math.floor(Math.random() * 5); // 8~12마리("열댓 마리" 근사)
+}
