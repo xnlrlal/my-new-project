@@ -19,7 +19,7 @@ export function renderCharacterSelect(root: HTMLElement, handlers: CharacterSele
             <div class="race-name">${race.name}${locked ? ' <span class="race-locked-badge">잠김</span>' : ''}</div>
             <div class="race-desc">${race.description}</div>
             <div class="race-stats">
-              HP ${race.stats.maxHp} · 마나 ${race.stats.maxMana} · 근력 +${race.stats.strength} · 손재주 +${race.stats.dexterity}
+              마나 ${race.stats.maxMana} · 근력 +${race.stats.strength} · 손재주 +${race.stats.dexterity} · 인내심 +${race.stats.willpower}
             </div>
           </button>
         `;

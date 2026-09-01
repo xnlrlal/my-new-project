@@ -1,7 +1,9 @@
 import type { Actor, StatusEffect, StatusEffectType } from './types';
 
-const POISON_DAMAGE_PER_STACK = 2;
-const BLEED_DAMAGE_PER_STACK = 3;
+// 카드 값과 같은 이유로(engine.ts/cards.ts 참고, 체력 풀 100 통일) 3배
+// 스케일업했다 — 그대로 뒀으면 100 체력 기준으로 스택당 2~3은 무의미한 수치.
+const POISON_DAMAGE_PER_STACK = 6;
+const BLEED_DAMAGE_PER_STACK = 9;
 const MAX_STACKS = 5;
 const POISON_RESIST_COEF = 5; // 독내성 1당 독 피해 -5%p
 const POISON_RESIST_MAX = 80; // 최대 80% 경감 — 완전 면역은 없음(명중/치명타 캡과 같은 원칙)

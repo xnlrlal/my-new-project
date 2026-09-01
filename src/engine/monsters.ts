@@ -13,10 +13,20 @@ export interface EssenceTemplate {
 // 1 = 최강(가장 강함), 9 = 최약(가장 약함) — 숫자가 작을수록 강한 등급제.
 export type MonsterGrade = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
+const STRONGEST_GRADE: MonsterGrade = 1;
+const WEAKEST_GRADE: MonsterGrade = 9;
+
 export interface MonsterDef {
   id: string;
   name: string;
   grade: MonsterGrade;
+  // 체력 풀 통일(전 몬스터 100) 이후, 등급에 따른 강함 차이는 전부 아래 세
+  // 필드로 표현된다 — combatStatsForGrade()가 이 셋을 등급 하나로부터
+  // 도출한다. 명중/치명타 관련 세부스탯(accuracy/flexibility/perceptionJam/
+  // obsession/poisonResist)은 여전히 미부여라 engine.ts에서 0 고정.
+  strength: number; // 공격력 — engine.ts의 STRENGTH_ATTACK_COEF로 카드 피해 %가산
+  dexterity: number; // 방어력 — 상시 피해 감소 %(engine.ts)
+  willpower: number; // 자연재생력 — 라운드당 최대체력 회복 %(engine.ts)
   maxHp: number;
   maxMana: number;
   zone: ArmZone;
@@ -24,12 +34,30 @@ export interface MonsterDef {
   gearDrop: GearTemplate;
 }
 
+// 체력을 전부 100으로 통일하면서, "몬스터가 세다"는 감각을 체력 풀 크기
+// 대신 공격력/방어력/재생력 세 스탯의 등급별 선형 증가로 재구성한 1차
+// 초안 — 정확한 체감은 플레이테스트로 다시 맞출 필요가 있다(설계 논의
+// 참고). tier=0(9등급, 최약)~8(1등급, 최강)을 기준으로:
+//   - 공격력(strength): tier당 +1 — engine.ts에서 카드 피해에 10%p씩 가산
+//   - 방어력(dexterity): tier당 +2 — 상시 피해 감소 %p(최대 48%, 60% 캡 안쪽)
+//   - 재생력(willpower): 5등급 이하(더 강한 절반)에만 부여 — 최상위 몬스터일수록
+//     장기전에서 더 버티는 쪽을 재생력으로 표현
+function combatStatsForGrade(grade: MonsterGrade): { strength: number; dexterity: number; willpower: number } {
+  const tier = WEAKEST_GRADE - grade;
+  return {
+    strength: tier,
+    dexterity: tier * 2,
+    willpower: grade <= 5 ? (6 - grade) * 2 : 0,
+  };
+}
+
 export const MONSTERS: MonsterDef[] = [
   {
     id: 'slime',
     name: '슬라임',
     grade: 9,
-    maxHp: 18,
+    ...combatStatsForGrade(9),
+    maxHp: 100,
     maxMana: 2,
     zone: 'south',
     essence: {
@@ -47,7 +75,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'bat',
     name: '박쥐',
     grade: 9,
-    maxHp: 16,
+    ...combatStatsForGrade(9),
+    maxHp: 100,
     maxMana: 3,
     zone: 'north',
     essence: {
@@ -65,7 +94,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'goblin',
     name: '고블린',
     grade: 9,
-    maxHp: 24,
+    ...combatStatsForGrade(9),
+    maxHp: 100,
     maxMana: 2,
     zone: 'south',
     essence: {
@@ -83,7 +113,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'rat-pack',
     name: '들쥐 떼',
     grade: 9,
-    maxHp: 22,
+    ...combatStatsForGrade(9),
+    maxHp: 100,
     maxMana: 2,
     zone: 'east',
     essence: {
@@ -101,7 +132,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'wisp',
     name: '도깨비불',
     grade: 9,
-    maxHp: 20,
+    ...combatStatsForGrade(9),
+    maxHp: 100,
     maxMana: 3,
     zone: 'west',
     essence: {
@@ -119,7 +151,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'wolf',
     name: '늑대',
     grade: 8,
-    maxHp: 30,
+    ...combatStatsForGrade(8),
+    maxHp: 100,
     maxMana: 3,
     zone: 'east',
     essence: {
@@ -137,7 +170,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'kobold',
     name: '코볼트',
     grade: 8,
-    maxHp: 28,
+    ...combatStatsForGrade(8),
+    maxHp: 100,
     maxMana: 3,
     zone: 'south',
     essence: {
@@ -155,7 +189,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'bandit',
     name: '도적',
     grade: 7,
-    maxHp: 36,
+    ...combatStatsForGrade(7),
+    maxHp: 100,
     maxMana: 3,
     zone: 'south',
     essence: {
@@ -173,7 +208,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'skeleton-soldier',
     name: '해골 병사',
     grade: 7,
-    maxHp: 34,
+    ...combatStatsForGrade(7),
+    maxHp: 100,
     maxMana: 3,
     zone: 'north',
     essence: {
@@ -191,7 +227,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'orc-warrior',
     name: '오크 전사',
     grade: 6,
-    maxHp: 42,
+    ...combatStatsForGrade(6),
+    maxHp: 100,
     maxMana: 3,
     zone: 'south',
     essence: {
@@ -209,7 +246,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'orc',
     name: '오크',
     grade: 5,
-    maxHp: 50,
+    ...combatStatsForGrade(5),
+    maxHp: 100,
     maxMana: 3,
     zone: 'south',
     essence: {
@@ -227,7 +265,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'orc-grand-warrior',
     name: '오크 대전사',
     grade: 4,
-    maxHp: 58,
+    ...combatStatsForGrade(4),
+    maxHp: 100,
     maxMana: 4,
     zone: 'south',
     essence: {
@@ -245,7 +284,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'dark-knight',
     name: '암흑 기사',
     grade: 2,
-    maxHp: 62,
+    ...combatStatsForGrade(2),
+    maxHp: 100,
     maxMana: 5,
     zone: 'south',
     essence: {
@@ -263,7 +303,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'harpy',
     name: '하피',
     grade: 6,
-    maxHp: 40,
+    ...combatStatsForGrade(6),
+    maxHp: 100,
     maxMana: 4,
     zone: 'east',
     essence: {
@@ -281,7 +322,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'dark-mage',
     name: '다크 메이지',
     grade: 5,
-    maxHp: 40,
+    ...combatStatsForGrade(5),
+    maxHp: 100,
     maxMana: 5,
     zone: 'west',
     essence: {
@@ -299,7 +341,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'spectre',
     name: '스펙터',
     grade: 5,
-    maxHp: 38,
+    ...combatStatsForGrade(5),
+    maxHp: 100,
     maxMana: 5,
     zone: 'north',
     essence: {
@@ -317,7 +360,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'troll',
     name: '트롤',
     grade: 4,
-    maxHp: 55,
+    ...combatStatsForGrade(4),
+    maxHp: 100,
     maxMana: 3,
     zone: 'west',
     essence: {
@@ -335,7 +379,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'ogre',
     name: '오우거',
     grade: 4,
-    maxHp: 58,
+    ...combatStatsForGrade(4),
+    maxHp: 100,
     maxMana: 3,
     zone: 'east',
     essence: {
@@ -353,7 +398,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'wyvern',
     name: '와이번',
     grade: 3,
-    maxHp: 60,
+    ...combatStatsForGrade(3),
+    maxHp: 100,
     maxMana: 4,
     zone: 'west',
     essence: {
@@ -371,7 +417,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'griffon',
     name: '그리폰',
     grade: 3,
-    maxHp: 58,
+    ...combatStatsForGrade(3),
+    maxHp: 100,
     maxMana: 4,
     zone: 'east',
     essence: {
@@ -389,7 +436,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'lich',
     name: '리치',
     grade: 2,
-    maxHp: 62,
+    ...combatStatsForGrade(2),
+    maxHp: 100,
     maxMana: 6,
     zone: 'north',
     essence: {
@@ -407,7 +455,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'vampire-lord',
     name: '뱀파이어 로드',
     grade: 2,
-    maxHp: 60,
+    ...combatStatsForGrade(2),
+    maxHp: 100,
     maxMana: 6,
     zone: 'north',
     essence: {
@@ -425,7 +474,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'dragon',
     name: '드래곤',
     grade: 1,
-    maxHp: 80,
+    ...combatStatsForGrade(1),
+    maxHp: 100,
     maxMana: 6,
     zone: 'west',
     essence: {
@@ -443,7 +493,8 @@ export const MONSTERS: MonsterDef[] = [
     id: 'hellfire-spirit',
     name: '지옥불 정령',
     grade: 1,
-    maxHp: 85,
+    ...combatStatsForGrade(1),
+    maxHp: 100,
     maxMana: 6,
     zone: 'west',
     essence: {
@@ -458,9 +509,6 @@ export const MONSTERS: MonsterDef[] = [
     },
   },
 ];
-
-const STRONGEST_GRADE: MonsterGrade = 1;
-const WEAKEST_GRADE: MonsterGrade = 9;
 
 // Grade 1 (strongest) is worth the most exp, grade 9 (weakest) the least —
 // the inverse of the raw grade number, since grade itself now runs the

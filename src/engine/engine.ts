@@ -110,17 +110,17 @@ export function initGame(
     enemy: createActor('enemy', monster.name, {
       maxHp: monster.maxHp,
       maxMana: monster.maxMana,
-      strength: 0,
-      dexterity: 0,
-      // 몬스터는 아직 명중/치명타 관련 세부스탯 데이터가 없음(MonsterDef에
-      // 필드 자체가 없음) — 근력과 동일하게 0 고정. 향후 밸런스 패스에서
-      // 몬스터별 데이터를 부여할 때 여기 하드코딩을 대체하면 됨.
+      strength: monster.strength,
+      dexterity: monster.dexterity,
+      willpower: monster.willpower,
+      // 명중/치명타 관련 세부스탯은 여전히 몬스터에 부여되지 않은 축(MonsterDef에
+      // 필드 자체가 없음) — 0 고정. 향후 밸런스 패스에서 몬스터별 데이터를
+      // 부여할 때 여기 하드코딩을 대체하면 됨.
       accuracy: 0,
       flexibility: 0,
       perceptionJam: 0,
       obsession: 0,
       poisonResist: 0,
-      willpower: 0,
     }),
     enemyGrade: monster.grade,
     log: [{ turn: 1, actor: 'player', message: `${monster.name}(을)를 만났다! 전투 시작!` }],
@@ -150,11 +150,18 @@ const BASE_CRIT_MULTIPLIER = 1.5;
 const OBSESSION_CRIT_COEF = 0.02; // 집착 1당 치명타 배율 +0.02
 const MAX_CRIT_MULTIPLIER = 2;
 
+// 근력은 카드 값에 그대로 더하던 구 방식(flat add)에서 %가산으로 바뀌었다 —
+// 체력 풀을 전부 100으로 통일하면서 카드 값 자체도 함께 스케일업했는데
+// (cards.ts), flat add로 남겨두면 종족/장비가 주는 근력 +1~+3 같은 보너스가
+// 커진 카드 값 대비 상대적으로 무의미해진다. %가산은 카드 값 크기와 무관하게
+// 항상 같은 비율로 작동해 이 문제가 없다.
+const STRENGTH_ATTACK_COEF = 0.1; // 근력 1당 카드 피해 +10%
+
 // 3단계: 명중/치명타 판정을 통과한 피해에 방어력 경감을 얹는다. 손재주는
 // 기존 방어막 카드 보정과 별개로, 카드를 쓰지 않아도 매번 적용되는 상시
 // 방어를 제공한다 — 방어막(shield)은 이 경감이 끝난 뒤의 최종 피해를
 // 흡수하는 순서(먼저 %로 깎고, 남은 값을 shield가 흡수)로 처리된다.
-const DEXTERITY_DEFENSE_COEF = 2; // 손재주 1당 상시 피해 감소 -2%p
+const DEXTERITY_DEFENSE_COEF = 3; // 손재주 1당 상시 피해 감소 -3%p
 const MAX_DEFENSE_REDUCTION = 60; // 최대 60%까지만 경감 — 완전 무적 방지(명중/치명타 캡과 같은 원칙)
 
 function defenseReduction(defender: Actor): number {
@@ -165,7 +172,7 @@ function defenseReduction(defender: Actor): number {
 // 회복시킨다 — 전투 사이에 회복 수단이 사실상 없어 체력이 그대로 누적
 // 소모되던 문제(설계 논의 참고)를 완화하기 위한 축. 인내심이 0인 몬스터는
 // (아직 세부스탯이 없어 전원 0 고정) 지금은 영향받지 않는다.
-const WILLPOWER_REGEN_COEF = 0.5; // 인내심 1당 라운드 종료 시 최대체력의 +0.5%
+const WILLPOWER_REGEN_COEF = 1; // 인내심 1당 라운드 종료 시 최대체력의 +1%
 
 function applyRegenTick(actor: Actor): { actor: Actor; healed: number } {
   const healed = Math.round(actor.maxHp * ((actor.willpower * WILLPOWER_REGEN_COEF) / 100));
@@ -208,7 +215,9 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
     case 'damage': {
       const isHit = Math.random() * 100 < hitChance(sourceActor, targetActor);
       const isCrit = isHit && Math.random() * 100 < critChance(sourceActor);
-      const rawDamage = isHit ? Math.round((card.value + sourceActor.strength) * (isCrit ? critMultiplier(sourceActor) : 1)) : 0;
+      const rawDamage = isHit
+        ? Math.round(card.value * (1 + sourceActor.strength * STRENGTH_ATTACK_COEF) * (isCrit ? critMultiplier(sourceActor) : 1))
+        : 0;
       const reductionPct = defenseReduction(targetActor);
       const totalDamage = Math.round(rawDamage * (1 - reductionPct / 100));
       const absorbed = Math.min(targetActor.shield, totalDamage);

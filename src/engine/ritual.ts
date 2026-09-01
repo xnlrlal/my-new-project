@@ -99,8 +99,10 @@ export const STARTER_ARMOR: GrantedGearChoice[] = [
     template: {
       name: '성지의 천 하의',
       slot: 'legwear',
-      // maxHp 대신 손재주(=상시 피해 감소%) — 기본 방어구 슬롯이라 방어 축과 자연스럽게 연결.
-      statBonus: { dexterity: 1 },
+      // maxHp 대신 손재주(=상시 피해 감소%) — 기본 방어구 슬롯이라 방어 축과
+      // 자연스럽게 연결. 체력 풀 통일 이후 레벨 1 생존력이 너무 낮게
+      // 시뮬레이션되어 1(=maxHp 대체값)에서 2로 상향(races.ts 참고).
+      statBonus: { dexterity: 2 },
       description: '성인식에서 받는 기본 천 하의.',
       isPermanent: true,
     },
@@ -111,8 +113,8 @@ export const STARTER_ARMOR: GrantedGearChoice[] = [
       name: '성지의 샌들',
       slot: 'footwear',
       // maxHp 대신 인내심(=자연재생력%) — 두 기본 방어구가 각각 방어/재생 한
-      // 축씩 맡도록 나눔.
-      statBonus: { willpower: 1 },
+      // 축씩 맡도록 나눔. 천 하의와 같은 이유로 1→2 상향.
+      statBonus: { willpower: 2 },
       description: '성인식에서 받는 기본 샌들.',
       isPermanent: true,
     },
