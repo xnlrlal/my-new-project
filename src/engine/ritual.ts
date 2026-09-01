@@ -40,7 +40,9 @@ export const WEAPON_CHOICES: GrantedGearChoice[] = [
     template: {
       name: '성지의 둔기',
       slot: 'weapon',
-      statBonus: { strength: 2, maxHp: 1 },
+      // maxHp 대신 손재주(=상시 피해 감소%, engine.ts) — "맷집"이라는 서술은
+      // 체력을 불리는 게 아니라 얻어맞아도 덜 아픈 쪽에 더 가깝다는 판단.
+      statBonus: { strength: 2, dexterity: 1 },
       description: '바바리안 성지에서 전수받은 묵직한 둔기. 강한 힘과 함께 맷집도 따라온다.',
       isPermanent: true,
     },
@@ -97,7 +99,8 @@ export const STARTER_ARMOR: GrantedGearChoice[] = [
     template: {
       name: '성지의 천 하의',
       slot: 'legwear',
-      statBonus: { maxHp: 1 },
+      // maxHp 대신 손재주(=상시 피해 감소%) — 기본 방어구 슬롯이라 방어 축과 자연스럽게 연결.
+      statBonus: { dexterity: 1 },
       description: '성인식에서 받는 기본 천 하의.',
       isPermanent: true,
     },
@@ -107,7 +110,9 @@ export const STARTER_ARMOR: GrantedGearChoice[] = [
     template: {
       name: '성지의 샌들',
       slot: 'footwear',
-      statBonus: { maxHp: 1 },
+      // maxHp 대신 인내심(=자연재생력%) — 두 기본 방어구가 각각 방어/재생 한
+      // 축씩 맡도록 나눔.
+      statBonus: { willpower: 1 },
       description: '성인식에서 받는 기본 샌들.',
       isPermanent: true,
     },

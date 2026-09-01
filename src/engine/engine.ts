@@ -47,6 +47,7 @@ function createActor(
     perceptionJam: number;
     obsession: number;
     poisonResist: number;
+    willpower: number;
   },
   bonusCards: Card[] = []
 ): Actor {
@@ -65,6 +66,7 @@ function createActor(
     perceptionJam: stats.perceptionJam,
     obsession: stats.obsession,
     poisonResist: stats.poisonResist,
+    willpower: stats.willpower,
     statusEffects: [],
     hand: [],
     deck: shuffle(buildDeck(bonusCards)),
@@ -118,6 +120,7 @@ export function initGame(
       perceptionJam: 0,
       obsession: 0,
       poisonResist: 0,
+      willpower: 0,
     }),
     enemyGrade: monster.grade,
     log: [{ turn: 1, actor: 'player', message: `${monster.name}(을)를 만났다! 전투 시작!` }],
@@ -146,6 +149,30 @@ const FLEXIBILITY_CRIT_COEF = 1; // 유연성 1당 치명타 확률 +1%p
 const BASE_CRIT_MULTIPLIER = 1.5;
 const OBSESSION_CRIT_COEF = 0.02; // 집착 1당 치명타 배율 +0.02
 const MAX_CRIT_MULTIPLIER = 2;
+
+// 3단계: 명중/치명타 판정을 통과한 피해에 방어력 경감을 얹는다. 손재주는
+// 기존 방어막 카드 보정과 별개로, 카드를 쓰지 않아도 매번 적용되는 상시
+// 방어를 제공한다 — 방어막(shield)은 이 경감이 끝난 뒤의 최종 피해를
+// 흡수하는 순서(먼저 %로 깎고, 남은 값을 shield가 흡수)로 처리된다.
+const DEXTERITY_DEFENSE_COEF = 2; // 손재주 1당 상시 피해 감소 -2%p
+const MAX_DEFENSE_REDUCTION = 60; // 최대 60%까지만 경감 — 완전 무적 방지(명중/치명타 캡과 같은 원칙)
+
+function defenseReduction(defender: Actor): number {
+  return clampPercent(defender.dexterity * DEXTERITY_DEFENSE_COEF, 0, MAX_DEFENSE_REDUCTION);
+}
+
+// 인내심을 자연재생력으로 삼아, 매 라운드 종료 시 최대체력의 일정 %를
+// 회복시킨다 — 전투 사이에 회복 수단이 사실상 없어 체력이 그대로 누적
+// 소모되던 문제(설계 논의 참고)를 완화하기 위한 축. 인내심이 0인 몬스터는
+// (아직 세부스탯이 없어 전원 0 고정) 지금은 영향받지 않는다.
+const WILLPOWER_REGEN_COEF = 0.5; // 인내심 1당 라운드 종료 시 최대체력의 +0.5%
+
+function applyRegenTick(actor: Actor): { actor: Actor; healed: number } {
+  const healed = Math.round(actor.maxHp * ((actor.willpower * WILLPOWER_REGEN_COEF) / 100));
+  if (healed <= 0 || actor.hp >= actor.maxHp) return { actor, healed: 0 };
+  const cappedHeal = Math.min(healed, actor.maxHp - actor.hp);
+  return { actor: { ...actor, hp: actor.hp + cappedHeal }, healed: cappedHeal };
+}
 
 function clampPercent(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -181,7 +208,9 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
     case 'damage': {
       const isHit = Math.random() * 100 < hitChance(sourceActor, targetActor);
       const isCrit = isHit && Math.random() * 100 < critChance(sourceActor);
-      const totalDamage = isHit ? Math.round((card.value + sourceActor.strength) * (isCrit ? critMultiplier(sourceActor) : 1)) : 0;
+      const rawDamage = isHit ? Math.round((card.value + sourceActor.strength) * (isCrit ? critMultiplier(sourceActor) : 1)) : 0;
+      const reductionPct = defenseReduction(targetActor);
+      const totalDamage = Math.round(rawDamage * (1 - reductionPct / 100));
       const absorbed = Math.min(targetActor.shield, totalDamage);
       const remaining = totalDamage - absorbed;
       const inflicted = isHit && card.appliesStatusEffect;
@@ -196,11 +225,14 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
       const statusSuffix = inflicted
         ? ` (${card.appliesStatusEffect!.type === 'poison' ? '독' : card.appliesStatusEffect!.type === 'bleed' ? '출혈' : '기절'} 부여)`
         : '';
+      // 방어력으로 실제로 뭔가 깎였을 때만 그 사실을 로그에 덧붙인다(0%면
+      // rawDamage===totalDamage라 문구가 안 붙음).
+      const defenseSuffix = rawDamage > totalDamage ? ` (방어로 ${rawDamage - totalDamage} 경감)` : '';
       message = !isHit
         ? `${sourceActor.name}이(가) [${card.name}]로 공격했지만 ${targetActor.name}이(가) 회피했다!`
         : isCrit
-          ? `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 치명타! ${totalDamage}의 피해!${statusSuffix}`
-          : `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 ${totalDamage}의 피해!${statusSuffix}`;
+          ? `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 치명타! ${totalDamage}의 피해!${defenseSuffix}${statusSuffix}`
+          : `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 ${totalDamage}의 피해!${defenseSuffix}${statusSuffix}`;
       break;
     }
     case 'heal': {
@@ -294,6 +326,25 @@ export function endTurn(state: GameState): GameState {
     }
     if (next.status !== 'playing') return next;
   }
+
+  // 라운드(플레이어 턴 + 적 턴)가 완전히 끝난 시점에 자연재생력을 적용한다 —
+  // 다음 라운드 마나 리필과 같은 지점이라, "라운드마다 한 번" 원칙이 자연히
+  // 지켜진다. 인내심이 없는 쪽(현재 모든 몬스터)은 healed===0이라 로그도 안
+  // 붙는다.
+  const playerRegen = applyRegenTick(next.player);
+  const enemyRegen = applyRegenTick(next.enemy);
+  next = {
+    ...next,
+    player: playerRegen.actor,
+    enemy: enemyRegen.actor,
+    log: [
+      ...next.log,
+      ...(playerRegen.healed > 0 ? [{ turn: next.turn, actor: 'player' as const, message: `자연재생력으로 체력을 ${playerRegen.healed} 회복했다.` }] : []),
+      ...(enemyRegen.healed > 0
+        ? [{ turn: next.turn, actor: 'enemy' as const, message: `${next.enemy.name}이(가) 자연재생력으로 체력을 ${enemyRegen.healed} 회복했다.` }]
+        : []),
+    ],
+  };
 
   const nextTurn = next.turn + 1;
   const refreshedPlayer = drawCards({ ...next.player, mana: next.player.maxMana }, HAND_SIZE - next.player.hand.length);

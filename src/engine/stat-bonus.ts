@@ -14,8 +14,8 @@ export interface SubStats {
   sight: number; // 시각 — 육체. (2단계 이후) 정보성 보너스
   accuracy: number; // 명중률 — 육체. 명중 판정
   cognition: number; // 인지력 — 정신. 카드 코스트 경감 확률
-  dexterity: number; // 손재주 — 정신. 방어막 보정(구 defenseBonus 계승)
-  willpower: number; // 인내심 — 정신. (잠정) 체력 소폭 가산
+  dexterity: number; // 손재주 — 정신. 방어막 보정(구 defenseBonus 계승) + 상시 피해 감소(%, engine.ts)
+  willpower: number; // 인내심 — 정신. 자연재생력 — 라운드 종료 시 최대체력의 %를 회복(engine.ts)
   agility: number; // 민첩성 — 정신. 추가 드로우 확률
   smell: number; // 후각 — 이능. 마석/정수 드랍률 보정(전투 외)
   poisonResist: number; // 독내성 — 이능. (예약) 상태이상 피해 경감
