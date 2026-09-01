@@ -29,6 +29,13 @@ export interface MonsterDef {
   willpower: number; // 자연재생력 — 라운드당 최대체력 회복 %(engine.ts)
   maxHp: number;
   maxMana: number;
+  // 이 몬스터가 등장하는 층. 디자인 노트(designnotes.md 4-1/4-3번)가 1층과
+  // 2층에 완전히 다른 로스터를 배정하고 있어서 도입한 필드 — zone만으로는
+  // "1층 북쪽의 노움"과 "2층 북쪽(고블린 숲)의 고블린 검사/궁수"를 구분할
+  // 수 없다(둘 다 zone: 'north'). pickMonsterForFloorAndZone이 zone과 함께
+  // 이 필드로도 걸러내 층별 로스터가 섞이지 않게 한다. 3층 이상이 아직
+  // 없어 1|2로만 좁혀뒀다 — 나중에 층이 늘어나면 그때 확장.
+  floor: 1 | 2;
   zone: ArmZone;
   essence: EssenceTemplate;
   gearDrop: GearTemplate;
@@ -51,45 +58,13 @@ function combatStatsForGrade(grade: MonsterGrade): { strength: number; dexterity
   };
 }
 
+// 디자인 노트(designnotes.md)의 몬스터 로스터를 그대로 따른다 — 이전의
+// 24종은 코드 작성 시점에 임의로 지어낸 것이라 디자인 노트와 무관했다.
+// 디자인 노트는 이름/등급/구역만 정하고 있고 실제 전투 수치(마나/스킬 값/
+// 정수·장비 보너스)는 전혀 언급하지 않으므로, 그 부분은 전부 이 파일에서
+// 새로 임의 작성한 1차 초안이다 — 요청하면 언제든 값만 바꾸면 된다.
 export const MONSTERS: MonsterDef[] = [
-  {
-    id: 'slime',
-    name: '슬라임',
-    grade: 9,
-    ...combatStatsForGrade(9),
-    maxHp: 100,
-    maxMana: 2,
-    zone: 'south',
-    essence: {
-      statBonus: { maxHp: 2 },
-      skill: { name: '산성 방울', cost: 1, effect: 'damage', value: 4, description: '적에게 4의 산성 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '끈적한 젤리 장갑',
-      slot: 'accessory',
-      statBonus: { maxHp: 1 },
-      description: '슬라임의 끈적한 점액이 굳어 만들어진 장갑. 체력이 소폭 오른다.',
-    },
-  },
-  {
-    id: 'bat',
-    name: '박쥐',
-    grade: 9,
-    ...combatStatsForGrade(9),
-    maxHp: 100,
-    maxMana: 3,
-    zone: 'north',
-    essence: {
-      statBonus: { maxMana: 1 },
-      skill: { name: '날카로운 이빨', cost: 1, effect: 'damage', value: 5, description: '적에게 5의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '박쥐 날개 장식',
-      slot: 'accessory',
-      statBonus: { maxMana: 1 },
-      description: '박쥐의 날개로 만든 장식. 마나가 오른다.',
-    },
-  },
+  // ── 1층: 수정동굴 (designnotes.md 4-3번) — 전부 9등급, 구역당 1종뿐 ──
   {
     id: 'goblin',
     name: '고블린',
@@ -97,10 +72,11 @@ export const MONSTERS: MonsterDef[] = [
     ...combatStatsForGrade(9),
     maxHp: 100,
     maxMana: 2,
+    floor: 1,
     zone: 'south',
     essence: {
       statBonus: { strength: 1 },
-      skill: { name: '기습', cost: 1, effect: 'damage', value: 7, description: '적에게 7의 피해를 준다.' },
+      skill: { name: '기습', cost: 1, effect: 'damage', value: 12, description: '적에게 12의 피해를 준다.' },
     },
     gearDrop: {
       name: '고블린의 녹슨 검',
@@ -110,43 +86,301 @@ export const MONSTERS: MonsterDef[] = [
     },
   },
   {
-    id: 'rat-pack',
-    name: '들쥐 떼',
+    id: 'ghoul',
+    name: '구울',
     grade: 9,
     ...combatStatsForGrade(9),
     maxHp: 100,
     maxMana: 2,
-    zone: 'east',
+    floor: 1,
+    zone: 'west',
     essence: {
-      statBonus: { maxHp: 3 },
-      skill: { name: '물어뜯기 연타', cost: 1, effect: 'damage', value: 6, description: '적에게 6의 피해를 준다.' },
+      statBonus: { strength: 1 },
+      skill: { name: '날카로운 손톱', cost: 1, effect: 'damage', value: 13, description: '적에게 13의 피해를 준다.' },
     },
     gearDrop: {
-      name: '쥐가죽 조끼',
-      slot: 'armor',
-      statBonus: { maxHp: 2 },
-      description: '들쥐 가죽으로 만든 조끼. 체력이 오른다.',
+      name: '구울의 손톱',
+      slot: 'weapon',
+      statBonus: { strength: 1 },
+      description: '구울의 날카로운 손톱을 다듬어 만든 무기. 공격력이 오른다.',
     },
   },
   {
-    id: 'wisp',
-    name: '도깨비불',
+    id: 'blade-wolf',
+    name: '칼날늑대',
     grade: 9,
     ...combatStatsForGrade(9),
     maxHp: 100,
     maxMana: 3,
+    floor: 1,
+    zone: 'east',
+    essence: {
+      statBonus: { strength: 1 },
+      skill: { name: '베어물기', cost: 1, effect: 'damage', value: 13, description: '적에게 13의 피해를 준다.' },
+    },
+    gearDrop: {
+      name: '칼날늑대의 이빨',
+      slot: 'accessory',
+      statBonus: { strength: 1 },
+      description: '칼날처럼 예리한 늑대의 이빨. 공격력이 오른다.',
+    },
+  },
+  {
+    id: 'gnome',
+    name: '노움',
+    grade: 9,
+    ...combatStatsForGrade(9),
+    maxHp: 100,
+    maxMana: 2,
+    floor: 1,
+    zone: 'north',
+    essence: {
+      statBonus: { dexterity: 1 },
+      skill: { name: '망치질', cost: 1, effect: 'damage', value: 11, description: '적에게 11의 피해를 준다.' },
+    },
+    gearDrop: {
+      name: '노움의 작은 망치',
+      slot: 'weapon',
+      statBonus: { dexterity: 1 },
+      description: '노움이 쓰던 작업용 망치. 방어력이 오른다.',
+    },
+  },
+
+  // ── 2층: 고블린 숲(북) (designnotes.md 4-3/4-3-2번) ──
+  {
+    id: 'goblin-swordsman',
+    name: '고블린 검사',
+    grade: 8,
+    ...combatStatsForGrade(8),
+    maxHp: 100,
+    maxMana: 3,
+    floor: 2,
+    zone: 'north',
+    essence: {
+      statBonus: { strength: 2 },
+      skill: { name: '베기 연타', cost: 2, effect: 'damage', value: 20, description: '적에게 20의 피해를 준다.' },
+    },
+    gearDrop: {
+      name: '고블린 검사의 장검',
+      slot: 'weapon',
+      statBonus: { strength: 2 },
+      description: '고블린 검사가 쓰던 장검. 일반 고블린의 것보다 훨씬 무겁고 단단하다.',
+    },
+  },
+  {
+    id: 'goblin-archer',
+    name: '고블린 궁수',
+    grade: 8,
+    ...combatStatsForGrade(8),
+    maxHp: 100,
+    maxMana: 3,
+    floor: 2,
+    zone: 'north',
+    essence: {
+      statBonus: { accuracy: 2 },
+      skill: {
+        name: '맹독 화살',
+        cost: 2,
+        effect: 'damage',
+        value: 14,
+        description: '적에게 14의 피해를 주고, 명중 시 독을 부여한다.',
+        appliesStatusEffect: { type: 'poison', duration: 3 },
+      },
+    },
+    gearDrop: {
+      name: '고블린 궁수의 단궁',
+      slot: 'weapon',
+      statBonus: { accuracy: 2 },
+      description: '고블린 궁수가 쓰던 하프 모양의 작은 단궁. 명중률이 오른다.',
+    },
+  },
+
+  // ── 2층: 망자의 땅(서) — 구울 계열 ──
+  {
+    id: 'elder-ghoul',
+    name: '엘더구울',
+    grade: 7,
+    ...combatStatsForGrade(7),
+    maxHp: 100,
+    maxMana: 3,
+    floor: 2,
+    zone: 'west',
+    essence: {
+      statBonus: { strength: 2, maxHp: 3 },
+      skill: { name: '썩은 발톱', cost: 2, effect: 'damage', value: 18, description: '적에게 18의 피해를 준다.' },
+    },
+    gearDrop: {
+      name: '엘더구울의 발톱',
+      slot: 'weapon',
+      statBonus: { strength: 2 },
+      description: '엘더구울의 억센 발톱. 공격력이 크게 오른다.',
+    },
+  },
+  {
+    id: 'skeleton-warrior',
+    name: '스켈레톤 전사',
+    grade: 8,
+    ...combatStatsForGrade(8),
+    maxHp: 100,
+    maxMana: 3,
+    floor: 2,
+    zone: 'west',
+    essence: {
+      statBonus: { dexterity: 2 },
+      skill: { name: '뼈 방패', cost: 1, effect: 'shield', value: 14, description: '방어막 14를 얻는다.' },
+    },
+    gearDrop: {
+      name: '스켈레톤의 낡은 검',
+      slot: 'weapon',
+      statBonus: { strength: 1 },
+      description: '스켈레톤 전사가 휘두르던 검. 공격력이 오른다.',
+    },
+  },
+  {
+    id: 'skeleton-archer',
+    name: '스켈레톤 궁수',
+    grade: 8,
+    ...combatStatsForGrade(8),
+    maxHp: 100,
+    maxMana: 3,
+    floor: 2,
+    zone: 'west',
+    essence: {
+      statBonus: { accuracy: 2 },
+      skill: { name: '뼈 화살', cost: 1, effect: 'damage', value: 13, description: '적에게 13의 피해를 준다.' },
+    },
+    gearDrop: {
+      name: '스켈레톤의 활',
+      slot: 'weapon',
+      statBonus: { accuracy: 1 },
+      description: '스켈레톤 궁수가 쓰던 활. 명중률이 오른다.',
+    },
+  },
+  {
+    id: 'skeleton-mage',
+    name: '스켈레톤 마법사',
+    grade: 7,
+    ...combatStatsForGrade(7),
+    maxHp: 100,
+    maxMana: 4,
+    floor: 2,
     zone: 'west',
     essence: {
       statBonus: { maxMana: 1 },
-      skill: { name: '불꽃 튀기기', cost: 1, effect: 'damage', value: 6, description: '적에게 6의 피해를 준다.' },
+      skill: { name: '냉기 마법', cost: 2, effect: 'damage', value: 19, description: '적에게 냉기 피해 19를 준다.' },
     },
     gearDrop: {
-      name: '도깨비불 부적',
-      slot: 'accessory',
+      name: '스켈레톤 마법사의 지팡이',
+      slot: 'weapon',
       statBonus: { maxMana: 1 },
-      description: '도깨비불의 기운이 깃든 부적. 마나가 오른다.',
+      description: '스켈레톤 마법사가 쓰던 지팡이. 마나가 오른다.',
     },
   },
+  {
+    id: 'banshee',
+    name: '벤시',
+    grade: 6,
+    ...combatStatsForGrade(6),
+    maxHp: 100,
+    maxMana: 5,
+    floor: 2,
+    zone: 'west',
+    essence: {
+      statBonus: { maxMana: 2 },
+      skill: { name: '절규', cost: 2, effect: 'damage', value: 22, description: '적에게 22의 피해를 준다.' },
+    },
+    gearDrop: {
+      name: '벤시의 찢어진 베일',
+      slot: 'armor',
+      statBonus: { maxMana: 1, dexterity: 1 },
+      description: '벤시가 두르던 베일. 마나와 방어력이 오른다.',
+    },
+  },
+  {
+    id: 'death-fiend',
+    name: '데스핀드',
+    grade: 6,
+    ...combatStatsForGrade(6),
+    maxHp: 100,
+    maxMana: 4,
+    floor: 2,
+    zone: 'west',
+    essence: {
+      statBonus: { strength: 2, dexterity: 1 },
+      skill: { name: '죽음의 손아귀', cost: 2, effect: 'damage', value: 22, description: '적에게 22의 피해를 준다.' },
+    },
+    gearDrop: {
+      name: '데스핀드의 사슬',
+      slot: 'accessory',
+      statBonus: { strength: 1, dexterity: 1 },
+      description: '데스핀드가 두르던 사슬. 공격력과 방어력이 오른다.',
+    },
+  },
+
+  // ── 2층: 검은 바위산(남) — designnotes.md의 "2F 바위사막" 메모에서
+  // 이름을 빌려와 노움/코볼트/스톤골렘을 더 구체적인 변종으로 구체화함 ──
+  {
+    id: 'corrupted-gnome',
+    name: '타락한 노움',
+    grade: 8,
+    ...combatStatsForGrade(8),
+    maxHp: 100,
+    maxMana: 3,
+    floor: 2,
+    zone: 'south',
+    essence: {
+      statBonus: { dexterity: 2 },
+      skill: { name: '타락한 망치질', cost: 2, effect: 'damage', value: 16, description: '적에게 16의 피해를 준다.' },
+    },
+    gearDrop: {
+      name: '타락한 노움의 망치',
+      slot: 'weapon',
+      statBonus: { strength: 1, dexterity: 1 },
+      description: '타락한 노움이 휘두르던 망치. 공격력과 방어력이 오른다.',
+    },
+  },
+  {
+    id: 'kobold-shieldbearer',
+    name: '코볼트 방패병',
+    grade: 8,
+    ...combatStatsForGrade(8),
+    maxHp: 100,
+    maxMana: 3,
+    floor: 2,
+    zone: 'south',
+    essence: {
+      statBonus: { dexterity: 3 },
+      skill: { name: '방패 밀치기', cost: 1, effect: 'shield', value: 16, description: '방어막 16을 얻는다.' },
+    },
+    gearDrop: {
+      name: '코볼트의 큰 방패',
+      slot: 'armor',
+      statBonus: { dexterity: 2 },
+      description: '코볼트 방패병이 들던 큰 방패. 방어력이 크게 오른다.',
+    },
+  },
+  {
+    id: 'stone-golem',
+    name: '스톤골렘',
+    grade: 7,
+    ...combatStatsForGrade(7),
+    maxHp: 100,
+    maxMana: 2,
+    floor: 2,
+    zone: 'south',
+    essence: {
+      statBonus: { maxHp: 6, dexterity: 1 },
+      skill: { name: '바위 주먹', cost: 2, effect: 'damage', value: 19, description: '적에게 19의 피해를 준다.' },
+    },
+    gearDrop: {
+      name: '스톤골렘의 파편',
+      slot: 'armor',
+      statBonus: { dexterity: 2, maxHp: 2 },
+      description: '스톤골렘의 몸에서 떨어진 돌 파편으로 만든 갑옷. 방어력과 체력이 오른다.',
+    },
+  },
+
+  // ── 2층: 짐승의 소굴(동) — 늑대·곰·호랑이 계열 ──
   {
     id: 'wolf',
     name: '늑대',
@@ -154,10 +388,11 @@ export const MONSTERS: MonsterDef[] = [
     ...combatStatsForGrade(8),
     maxHp: 100,
     maxMana: 3,
+    floor: 2,
     zone: 'east',
     essence: {
       statBonus: { strength: 1 },
-      skill: { name: '물어뜯기', cost: 2, effect: 'damage', value: 10, description: '적에게 10의 피해를 준다.' },
+      skill: { name: '물어뜯기', cost: 2, effect: 'damage', value: 17, description: '적에게 17의 피해를 준다.' },
     },
     gearDrop: {
       name: '늑대 이빨 목걸이',
@@ -167,345 +402,43 @@ export const MONSTERS: MonsterDef[] = [
     },
   },
   {
-    id: 'kobold',
-    name: '코볼트',
-    grade: 8,
-    ...combatStatsForGrade(8),
-    maxHp: 100,
-    maxMana: 3,
-    zone: 'south',
-    essence: {
-      statBonus: { dexterity: 1 },
-      skill: { name: '창 찌르기', cost: 2, effect: 'damage', value: 9, description: '적에게 9의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '코볼트 가죽 갑옷',
-      slot: 'armor',
-      statBonus: { dexterity: 1 },
-      description: '코볼트가 입던 가죽 갑옷. 방어력이 오른다.',
-    },
-  },
-  {
-    id: 'bandit',
-    name: '도적',
+    id: 'bear',
+    name: '곰',
     grade: 7,
     ...combatStatsForGrade(7),
     maxHp: 100,
     maxMana: 3,
-    zone: 'south',
-    essence: {
-      statBonus: { maxMana: 1 },
-      skill: { name: '은신 일격', cost: 1, effect: 'damage', value: 8, description: '은신 후 기습하여 8의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '도적의 단검',
-      slot: 'weapon',
-      statBonus: { strength: 1, maxMana: 1 },
-      description: '도적이 쓰던 단검. 공격력과 마나가 오른다.',
-    },
-  },
-  {
-    id: 'skeleton-soldier',
-    name: '해골 병사',
-    grade: 7,
-    ...combatStatsForGrade(7),
-    maxHp: 100,
-    maxMana: 3,
-    zone: 'north',
-    essence: {
-      statBonus: { dexterity: 1, maxHp: 2 },
-      skill: { name: '뼈 방패', cost: 1, effect: 'shield', value: 6, description: '방어막 6을 얻는다.' },
-    },
-    gearDrop: {
-      name: '부서진 방패',
-      slot: 'armor',
-      statBonus: { dexterity: 2 },
-      description: '해골 병사가 들던 방패. 방어력이 크게 오른다.',
-    },
-  },
-  {
-    id: 'orc-warrior',
-    name: '오크 전사',
-    grade: 6,
-    ...combatStatsForGrade(6),
-    maxHp: 100,
-    maxMana: 3,
-    zone: 'south',
+    floor: 2,
+    zone: 'east',
     essence: {
       statBonus: { maxHp: 4, strength: 1 },
-      skill: { name: '강타', cost: 2, effect: 'damage', value: 13, description: '적에게 13의 피해를 준다.' },
+      skill: { name: '앞발 강타', cost: 2, effect: 'damage', value: 19, description: '적에게 19의 피해를 준다.' },
     },
     gearDrop: {
-      name: '오크의 전투 도끼',
-      slot: 'weapon',
-      statBonus: { strength: 2 },
-      description: '오크 전사의 도끼. 공격력이 크게 오른다.',
-    },
-  },
-  {
-    id: 'orc',
-    name: '오크',
-    grade: 5,
-    ...combatStatsForGrade(5),
-    maxHp: 100,
-    maxMana: 3,
-    zone: 'south',
-    essence: {
-      statBonus: { strength: 1, maxHp: 3 },
-      skill: { name: '거친 몽둥이질', cost: 2, effect: 'damage', value: 12, description: '적에게 12의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '오크의 뼈 곤봉',
-      slot: 'weapon',
-      statBonus: { strength: 1 },
-      description: '오크가 휘두르던 뼈 곤봉. 공격력이 오른다.',
-    },
-  },
-  {
-    id: 'orc-grand-warrior',
-    name: '오크 대전사',
-    grade: 4,
-    ...combatStatsForGrade(4),
-    maxHp: 100,
-    maxMana: 4,
-    zone: 'south',
-    essence: {
-      statBonus: { strength: 2 },
-      skill: { name: '대지 가르기', cost: 2, effect: 'damage', value: 16, description: '적에게 16의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '대전사의 갑주',
+      name: '곰가죽 갑옷',
       slot: 'armor',
-      statBonus: { dexterity: 2, maxHp: 3 },
-      description: '오크 대전사가 입던 갑주. 방어력과 체력이 오른다.',
+      statBonus: { maxHp: 3 },
+      description: '곰의 두꺼운 가죽으로 만든 갑옷. 체력이 오른다.',
     },
   },
   {
-    id: 'dark-knight',
-    name: '암흑 기사',
-    grade: 2,
-    ...combatStatsForGrade(2),
-    maxHp: 100,
-    maxMana: 5,
-    zone: 'south',
-    essence: {
-      statBonus: { strength: 1, dexterity: 1 },
-      skill: { name: '심판의 일격', cost: 2, effect: 'damage', value: 14, description: '적에게 14의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '암흑기사의 대검',
-      slot: 'weapon',
-      statBonus: { strength: 3, dexterity: 1 },
-      description: '암흑 기사의 대검. 공격력이 매우 크게 오르고 방어력도 오른다.',
-    },
-  },
-  {
-    id: 'harpy',
-    name: '하피',
+    id: 'tiger',
+    name: '호랑이',
     grade: 6,
     ...combatStatsForGrade(6),
     maxHp: 100,
     maxMana: 4,
+    floor: 2,
     zone: 'east',
     essence: {
-      statBonus: { maxMana: 1, strength: 1 },
-      skill: { name: '발톱 할퀴기', cost: 2, effect: 'damage', value: 12, description: '적에게 12의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '하피의 깃털 망토',
-      slot: 'armor',
-      statBonus: { dexterity: 1, maxMana: 1 },
-      description: '하피의 깃털로 짠 망토. 방어력과 마나가 오른다.',
-    },
-  },
-  {
-    id: 'dark-mage',
-    name: '다크 메이지',
-    grade: 5,
-    ...combatStatsForGrade(5),
-    maxHp: 100,
-    maxMana: 5,
-    zone: 'west',
-    essence: {
-      statBonus: { maxMana: 1 },
-      skill: { name: '화염구', cost: 2, effect: 'damage', value: 12, description: '적에게 화염 피해 12를 준다.' },
-    },
-    gearDrop: {
-      name: '어둠의 로브',
-      slot: 'armor',
-      statBonus: { maxMana: 2 },
-      description: '다크 메이지가 입던 로브. 마나가 크게 오른다.',
-    },
-  },
-  {
-    id: 'spectre',
-    name: '스펙터',
-    grade: 5,
-    ...combatStatsForGrade(5),
-    maxHp: 100,
-    maxMana: 5,
-    zone: 'north',
-    essence: {
-      statBonus: { strength: 2 },
-      skill: { name: '저주', cost: 2, effect: 'damage', value: 11, description: '적에게 11의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '유령의 사슬',
-      slot: 'accessory',
-      statBonus: { strength: 1, dexterity: 1 },
-      description: '스펙터가 남긴 사슬. 공격력과 방어력이 오른다.',
-    },
-  },
-  {
-    id: 'troll',
-    name: '트롤',
-    grade: 4,
-    ...combatStatsForGrade(4),
-    maxHp: 100,
-    maxMana: 3,
-    zone: 'west',
-    essence: {
-      statBonus: { maxHp: 6 },
-      skill: { name: '재생', cost: 1, effect: 'heal', value: 8, description: '체력을 8 회복한다.' },
-    },
-    gearDrop: {
-      name: '트롤 가죽 갑옷',
-      slot: 'armor',
-      statBonus: { maxHp: 5 },
-      description: '트롤의 두꺼운 가죽 갑옷. 체력이 크게 오른다.',
-    },
-  },
-  {
-    id: 'ogre',
-    name: '오우거',
-    grade: 4,
-    ...combatStatsForGrade(4),
-    maxHp: 100,
-    maxMana: 3,
-    zone: 'east',
-    essence: {
-      statBonus: { maxHp: 8 },
-      skill: { name: '짓밟기', cost: 2, effect: 'damage', value: 15, description: '적에게 15의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '오우거의 몽둥이',
-      slot: 'weapon',
-      statBonus: { strength: 3 },
-      description: '오우거가 휘두르던 몽둥이. 공격력이 매우 크게 오른다.',
-    },
-  },
-  {
-    id: 'wyvern',
-    name: '와이번',
-    grade: 3,
-    ...combatStatsForGrade(3),
-    maxHp: 100,
-    maxMana: 4,
-    zone: 'west',
-    essence: {
-      statBonus: { dexterity: 2 },
-      skill: { name: '급강하', cost: 2, effect: 'damage', value: 11, description: '적에게 11의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '와이번 가죽 장갑',
-      slot: 'weapon',
-      statBonus: { strength: 1, dexterity: 1 },
-      description: '와이번 가죽으로 만든 장갑. 공격력과 방어력이 오른다.',
-    },
-  },
-  {
-    id: 'griffon',
-    name: '그리폰',
-    grade: 3,
-    ...combatStatsForGrade(3),
-    maxHp: 100,
-    maxMana: 4,
-    zone: 'east',
-    essence: {
-      statBonus: { strength: 1, dexterity: 1 },
-      skill: { name: '폭풍 발톱', cost: 2, effect: 'damage', value: 13, description: '적에게 13의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '그리폰 발톱 장갑',
-      slot: 'weapon',
       statBonus: { strength: 2, dexterity: 1 },
-      description: '그리폰의 발톱으로 만든 장갑. 공격력과 방어력이 오른다.',
-    },
-  },
-  {
-    id: 'lich',
-    name: '리치',
-    grade: 2,
-    ...combatStatsForGrade(2),
-    maxHp: 100,
-    maxMana: 6,
-    zone: 'north',
-    essence: {
-      statBonus: { maxMana: 2, strength: 1 },
-      skill: { name: '죽음의 손길', cost: 2, effect: 'damage', value: 14, description: '적에게 14의 피해를 준다.' },
+      skill: { name: '맹수의 도약', cost: 2, effect: 'damage', value: 22, description: '적에게 22의 피해를 준다.' },
     },
     gearDrop: {
-      name: '리치의 지팡이',
-      slot: 'weapon',
-      statBonus: { strength: 2, maxMana: 1 },
-      description: '리치가 쓰던 지팡이. 공격력과 마나가 오른다.',
-    },
-  },
-  {
-    id: 'vampire-lord',
-    name: '뱀파이어 로드',
-    grade: 2,
-    ...combatStatsForGrade(2),
-    maxHp: 100,
-    maxMana: 6,
-    zone: 'north',
-    essence: {
-      statBonus: { maxHp: 5, maxMana: 1 },
-      skill: { name: '흡혈 일격', cost: 2, effect: 'damage', value: 13, description: '적에게 13의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '흡혈의 망토',
+      name: '호랑이 가죽',
       slot: 'armor',
-      statBonus: { maxHp: 4, strength: 1 },
-      description: '뱀파이어 로드의 망토. 체력과 공격력이 오른다.',
-    },
-  },
-  {
-    id: 'dragon',
-    name: '드래곤',
-    grade: 1,
-    ...combatStatsForGrade(1),
-    maxHp: 100,
-    maxMana: 6,
-    zone: 'west',
-    essence: {
-      statBonus: { maxHp: 8, strength: 2, dexterity: 2 },
-      skill: { name: '브레스', cost: 3, effect: 'damage', value: 20, description: '적에게 20의 강력한 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '용의 비늘 갑옷',
-      slot: 'armor',
-      statBonus: { dexterity: 3, maxHp: 5 },
-      description: '드래곤의 비늘로 만든 갑옷. 방어력과 체력이 매우 크게 오른다.',
-    },
-  },
-  {
-    id: 'hellfire-spirit',
-    name: '지옥불 정령',
-    grade: 1,
-    ...combatStatsForGrade(1),
-    maxHp: 100,
-    maxMana: 6,
-    zone: 'west',
-    essence: {
-      statBonus: { strength: 3 },
-      skill: { name: '화염 채찍', cost: 3, effect: 'damage', value: 22, description: '적에게 22의 화염 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '지옥불의 반지',
-      slot: 'accessory',
-      statBonus: { strength: 2, maxMana: 1 },
-      description: '지옥불 정령의 힘이 깃든 반지. 공격력과 마나가 오른다.',
+      statBonus: { strength: 1, dexterity: 1 },
+      description: '호랑이의 무늬 가죽으로 만든 갑옷. 공격력과 방어력이 오른다.',
     },
   },
 ];
@@ -567,7 +500,12 @@ export function getMonsterById(id: string): MonsterDef {
 
 export function pickMonsterForFloorAndZone(floor: number, zone: Zone): MonsterDef {
   const targetGrade = rollTargetGrade(floor);
-  const pool = zone === 'center' ? MONSTERS : MONSTERS.filter((m) => m.zone === zone);
+  // floor로 먼저 좁힌다 — zone 값(north/east/south/west)이 1층과 2층 사이에
+  // 재사용되기 때문에(디자인 노트가 층마다 완전히 다른 로스터를 배정,
+  // MonsterDef.floor 필드 doc 참고), floor 필터가 없으면 1층 노움 자리에
+  // 2층 고블린 검사가 섞여 나올 수 있다.
+  const floorPool = MONSTERS.filter((m) => m.floor === floor);
+  const pool = zone === 'center' ? floorPool : floorPool.filter((m) => m.zone === zone);
 
   const exact = pool.filter((m) => m.grade === targetGrade);
   if (exact.length > 0) return exact[Math.floor(Math.random() * exact.length)];

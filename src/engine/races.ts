@@ -5,8 +5,11 @@ export type RaceId = 'human' | 'elf' | 'beastkin' | 'dwarf' | 'barbarian';
 // Race ids selectable in character-select, in display order. Ids present
 // here but not 'barbarian' render as locked cards rather than being hidden.
 // Orc has been removed as a playable race entirely (unlike the earlier
-// retirement, which kept it in RACES/RaceId for save compatibility) — the
-// 'orc' monster in monsters.ts is untouched, this is player-race-only.
+// retirement, which kept it in RACES/RaceId for save compatibility) — this
+// is player-race-only and independent of monsters.ts's own roster (which
+// no longer has an 'orc' monster either, since it rewrote MONSTERS to match
+// designnotes.md and orc isn't in that list — pure coincidence, not related
+// to this removal).
 // Old saves carrying raceId: 'orc' are covered by profile.ts's
 // CURRENT_SCHEMA_VERSION bump, which forces a full reset rather than
 // needing getRace('orc') to keep resolving.
