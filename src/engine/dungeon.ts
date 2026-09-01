@@ -240,17 +240,20 @@ export function zoneLabel(zone: Zone): string {
   }
 }
 
+// 디자인 노트(designnotes.md 4-3번)의 1층/2층 로스터에 맞춰 정리한 구역
+// 설명 — 예전 문구(북=언데드, 서=화염/마법)는 옛 24종 로스터 기준이라
+// 지금 몬스터(monsters.ts)와 맞지 않아 전부 다시 씀.
 export function zoneFlavor(zone: Zone): string {
   switch (zone) {
     case 'center':
       return '미궁의 중심부. 사방에서 몰려온 것들의 기척이 뒤섞여 있다.';
     case 'north':
-      return '서늘한 냉기가 감도는 언데드의 영역.';
+      return '땅을 파고 사는 노움들의 영역. 더 깊은 곳은 고블린 숲으로 이어진다.';
     case 'east':
       return '야생 짐승들의 서식지.';
     case 'south':
-      return '도적과 몬스터들이 숨어있는 소굴.';
+      return '고블린들이 숨어있는 소굴. 더 깊은 곳은 검은 바위산으로 이어진다.';
     case 'west':
-      return '뜨거운 열기가 느껴지는 위험한 지역.';
+      return '썩은 내가 진동하는 구울들의 영역. 더 깊은 곳은 망자의 땅으로 이어진다.';
   }
 }
