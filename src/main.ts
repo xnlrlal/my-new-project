@@ -98,6 +98,11 @@ type Screen =
   | 'exchange';
 
 const PORTAL_EXP_BONUS = 2;
+// 전투 없이 안전하게 이동할 때마다 자연재생력(인내심)만큼 소량 회복시킨다 —
+// 전투 중 회복(engine.ts의 WILLPOWER_REGEN_COEF, 라운드당)과 별개 축이라
+// 계수도 따로 둔다. 인내심이 없으면(장비/정수를 얻기 전) 0이라 아무 효과
+// 없음 — 지금은 성지의 샌들(ritual.ts)이 유일한 원천.
+const OUT_OF_COMBAT_REGEN_COEF = 0.5; // 인내심 1당 안전한 이동 1칸당 최대체력의 +0.5%
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -656,6 +661,16 @@ function handleMove(move: DungeonMove) {
   arriveAt(move.next, move.battleChance, '조용히 이동했다.');
 }
 
+// 전투로 이어지지 않은 이동(안전한 이동/포탈 도달)에서만 호출 — 전투로
+// 이어지면 그 전투 자체의 라운드별 재생(engine.ts)이 대신 적용된다.
+function applyOutOfCombatRegen() {
+  if (!selectedRace || dungeonHp === null) return;
+  const totalStats = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus);
+  const healed = Math.round(totalStats.maxHp * ((totalStats.willpower * OUT_OF_COMBAT_REGEN_COEF) / 100));
+  if (healed <= 0) return;
+  dungeonHp = Math.min(totalStats.maxHp, dungeonHp + healed);
+}
+
 // Shared by both entering a fresh maze and moving within one, so the very
 // first placement in a dungeon rolls for a battle just like any other step.
 function arriveAt(id: CellId, battleChance: number, safeMessage: string, options?: { forcedMonsterId?: string; ambush?: boolean }) {
@@ -664,6 +679,7 @@ function arriveAt(id: CellId, battleChance: number, safeMessage: string, options
   const cell = cellAt(maze, id);
 
   if (cell.portal) {
+    applyOutOfCombatRegen();
     handlePortalArrival(cell);
     goTo('dungeon-map');
     return;
@@ -682,6 +698,7 @@ function arriveAt(id: CellId, battleChance: number, safeMessage: string, options
     }
     startZoneBattle(cell.zone, { forcedMonsterId, ambush });
   } else {
+    applyOutOfCombatRegen();
     dungeonMessage = safeMessage;
     goTo('dungeon-map');
   }

@@ -40,7 +40,7 @@ function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number): st
     <div class="actor ${role}">
       <div class="actor-name">${actor.name}${grade ? ` <span class="grade-tag">${grade}등급</span>` : ''}</div>
       <div class="bar"><div class="bar-fill" style="width:${hpPct}%"></div></div>
-      <div class="stat-line">HP ${actor.hp}/${actor.maxHp} ${actor.shield > 0 ? `· 방어막 ${actor.shield}` : ''}</div>
+      <div class="stat-line">HP ${actor.hp}/${actor.maxHp} (${hpPct}%) ${actor.shield > 0 ? `· 방어막 ${actor.shield}` : ''}</div>
       <div class="bar"><div class="bar-fill mana" style="width:${manaPct}%"></div></div>
       <div class="stat-line">마나 ${actor.mana}/${actor.maxMana}</div>
       ${statusText ? `<div class="stat-line status-effects">${statusText}</div>` : ''}

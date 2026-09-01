@@ -32,16 +32,21 @@ export interface Actor {
   mana: number;
   maxMana: number;
   strength: number;
+  // 손재주 — 방어막 카드 보정(구 defenseBonus 계승)에 더해, 상시 피해 감소(%)의
+  // 원천이기도 하다(engine.ts의 DEXTERITY_DEFENSE_COEF).
   dexterity: number;
   // 2단계(확률 판정)에서 추가된 네 필드 — applyCard의 명중/치명타 판정에 쓰임
-  // (engine.ts). 나머지 세부스탯(인지력/민첩성/시각/후각/독내성/인내심)은
-  // 아직 어떤 전투 판정도 소비하지 않아 Actor에 싣지 않았다 — 각각을 실제로
-  // 쓰는 단계에서 필요한 만큼만 추가하는 편이 낫다는 판단.
+  // (engine.ts). 나머지 세부스탯(인지력/민첩성/시각/후각/독내성)은 아직 어떤
+  // 전투 판정도 소비하지 않아 Actor에 싣지 않았다 — 각각을 실제로 쓰는
+  // 단계에서 필요한 만큼만 추가하는 편이 낫다는 판단.
   accuracy: number; // 명중률 — 내 명중 판정 보정
   flexibility: number; // 유연성 — 상대 명중 판정 회피 + 내 치명타 확률
   perceptionJam: number; // 인식방해 — 상대가 나를 공격할 때 상대 명중률 저하
   obsession: number; // 집착 — 내 치명타 피해 배율
   poisonResist: number; // 독내성 — 독 상태이상 피해 경감(status-effects.ts)
+  // 인내심 — 자연재생력. 매 라운드 종료 시 최대체력의 일정 %를 회복시킨다
+  // (engine.ts의 WILLPOWER_REGEN_COEF).
+  willpower: number;
   statusEffects: StatusEffect[];
   hand: Card[];
   deck: Card[];
