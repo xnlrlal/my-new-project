@@ -90,6 +90,7 @@ export function createGrantedGear(id: string, template: GearTemplate): GearInsta
     statBonus: template.statBonus,
     description: template.description,
     isPermanent: template.isPermanent,
+    isClockItem: template.isClockItem,
   };
 }
 
@@ -99,11 +100,11 @@ export function rollGearDrop(): boolean {
   return Math.random() < GEAR_DROP_CHANCE;
 }
 
-// 회중시계 — a generic dungeon find, not tied to any one monster (unlike
-// gearDrop templates in monsters.ts), so it's defined here instead. No
+// 회중시계 — designnotes.md 6-3번: 마을 상점(ui/shop.ts)에서 스톤으로 구매하는
+// 품목이라 몬스터별 gearDrop(monsters.ts)과 달리 여기서 직접 정의한다. No
 // combat statBonus: its only effect is isClockItem gating the in-dungeon
 // clock display (see isClockItem's doc comment above). isPermanent: true so
-// finding it isn't wasted by the next forced dungeon return — see
+// buying it isn't wasted by the next forced dungeon return — see
 // stripDungeonOnlyGear (profile.ts).
 export const POCKET_WATCH_TEMPLATE: GearTemplate = {
   name: '회중시계',
@@ -114,12 +115,10 @@ export const POCKET_WATCH_TEMPLATE: GearTemplate = {
   isClockItem: true,
 };
 
+// 상점 판매가 — 마스터 설정에 구체적인 가격이 없어 잡은 1차 초안, 요청하면
+// 언제든 조정 가능.
+export const POCKET_WATCH_PRICE = 300;
+
 export function createPocketWatch(): GearInstance {
   return createGrantedGear('pocket-watch', POCKET_WATCH_TEMPLATE);
-}
-
-const POCKET_WATCH_DROP_CHANCE = 0.02;
-
-export function rollPocketWatchDrop(): boolean {
-  return Math.random() < POCKET_WATCH_DROP_CHANCE;
 }

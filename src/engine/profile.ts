@@ -1,7 +1,7 @@
 import type { MonsterDef, MonsterGrade } from './monsters';
 import { expForGrade, stoneValueForGrade } from './monsters';
 import type { EquippedEssence } from './essence';
-import { createGrantedGear, EQUIPMENT_SLOTS, type EquipmentSlot, type GearInstance } from './gear';
+import { createGrantedGear, createPocketWatch, POCKET_WATCH_PRICE, EQUIPMENT_SLOTS, type EquipmentSlot, type GearInstance } from './gear';
 import type { EquippedGear } from './stats-calc';
 import type { RaceId } from './races';
 import { sanitizeResumeSession, type ResumeSession } from './session';
@@ -171,6 +171,24 @@ export function exchangeManaStonesForGrade(profile: PlayerProfile, grade: Monste
 
 export function addGearToInventory(profile: PlayerProfile, gear: GearInstance): PlayerProfile {
   return { ...profile, inventoryGear: [...profile.inventoryGear, gear] };
+}
+
+// True once the player owns a 회중시계, equipped or not — used to grey out
+// the shop's "구매" button (ui/shop.ts) so a second copy can't be bought as
+// pointless clutter (it's a one-off tool item, not a stackable resource).
+export function hasPocketWatch(profile: PlayerProfile): boolean {
+  return (
+    profile.inventoryGear.some((gear) => gear.isClockItem === true) ||
+    Object.values(profile.equippedGear).some((gear) => gear?.isClockItem === true)
+  );
+}
+
+// 마을 상점(ui/shop.ts)의 회중시계 구매 — 스톤이 부족하거나 이미 보유 중이면
+// (hasPocketWatch) 아무 것도 하지 않고 profile을 그대로 반환한다. 구매만 할 뿐
+// 자동으로 장착하지는 않음 — 다른 gear와 동일하게 장비창에서 직접 장착한다.
+export function buyPocketWatch(profile: PlayerProfile): PlayerProfile {
+  if (profile.gold < POCKET_WATCH_PRICE || hasPocketWatch(profile)) return profile;
+  return addGearToInventory({ ...profile, gold: profile.gold - POCKET_WATCH_PRICE }, createPocketWatch());
 }
 
 export function equipGear(profile: PlayerProfile, instanceId: string): PlayerProfile {
