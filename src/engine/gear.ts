@@ -20,6 +20,11 @@ export interface GearDef {
   // called from forceReturnFromDungeon() (main.ts) whenever a dungeon visit
   // truly ends (not on floor transitions/backtracking, which keep drops).
   isPermanent?: boolean;
+  // Marks the 회중시계(pocket watch) — designnotes.md 6-3번/우선순위 1번.
+  // profile.ts's isClockVisible() checks equipped gear for this flag instead
+  // of the old always-on clockItemEquipped placeholder, so equipping this
+  // item (any slot) is what actually turns the in-dungeon clock display on.
+  isClockItem?: boolean;
 }
 
 export interface GearInstance extends GearDef {
@@ -32,6 +37,7 @@ export interface GearTemplate {
   statBonus: StatBonus;
   description: string;
   isPermanent?: boolean;
+  isClockItem?: boolean;
 }
 
 export const EQUIPMENT_SLOTS: EquipmentSlot[] = ['weapon', 'armor', 'legwear', 'footwear', 'accessory'];
@@ -91,4 +97,29 @@ const GEAR_DROP_CHANCE = 0.03;
 
 export function rollGearDrop(): boolean {
   return Math.random() < GEAR_DROP_CHANCE;
+}
+
+// 회중시계 — a generic dungeon find, not tied to any one monster (unlike
+// gearDrop templates in monsters.ts), so it's defined here instead. No
+// combat statBonus: its only effect is isClockItem gating the in-dungeon
+// clock display (see isClockItem's doc comment above). isPermanent: true so
+// finding it isn't wasted by the next forced dungeon return — see
+// stripDungeonOnlyGear (profile.ts).
+export const POCKET_WATCH_TEMPLATE: GearTemplate = {
+  name: '회중시계',
+  slot: 'accessory',
+  statBonus: {},
+  description: '문자판에 0시부터 23시까지 새겨진 낡은 회중시계. 장착하면 미궁 안에서도 지금이 며칠째 몇 시인지 확인할 수 있다.',
+  isPermanent: true,
+  isClockItem: true,
+};
+
+export function createPocketWatch(): GearInstance {
+  return createGrantedGear('pocket-watch', POCKET_WATCH_TEMPLATE);
+}
+
+const POCKET_WATCH_DROP_CHANCE = 0.02;
+
+export function rollPocketWatchDrop(): boolean {
+  return Math.random() < POCKET_WATCH_DROP_CHANCE;
 }

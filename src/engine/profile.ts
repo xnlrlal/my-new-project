@@ -41,12 +41,6 @@ export interface PlayerProfile {
   inventoryGear: GearInstance[];
   equippedGear: EquippedGear;
   gold: number;
-  // Temporary stand-in for a future "시계" equipment item gating the
-  // in-dungeon clock display (see isClockVisible below). Defaults to true
-  // (clock on) since there's no equippable item to actually equip/unequip
-  // yet — once that item exists, this field goes away and isClockVisible()
-  // reads the item's equipped state instead; no other call site changes.
-  clockItemEquipped: boolean;
   // Gates the 환전소(exchange) village facility. Set true the first time
   // forceReturnFromDungeon() fires in main.ts — "다녀옴" for this facility
   // is defined as that first forced return, since that's currently the only
@@ -108,7 +102,6 @@ function defaultProfile(): PlayerProfile {
     inventoryGear: [],
     equippedGear: {},
     gold: 0,
-    clockItemEquipped: true,
     hasVisitedDungeonExchange: false,
     lastTaxedYear: null,
     hasCompletedComingOfAge: false,
@@ -122,13 +115,14 @@ export function resetProfile(): PlayerProfile {
   return defaultProfile();
 }
 
-// Single decision point for whether the in-dungeon clock is shown. See the
-// clockItemEquipped field's comment — once a real "시계" equipment item
-// exists, replace this function's body to check its equipped state instead;
-// every call site (dungeon-map/battle/inventory/equipment/essence UI in
-// main.ts) stays the same.
+// Single decision point for whether the in-dungeon clock is shown — true iff
+// the player has a 회중시계(pocket watch, gear.ts) equipped in any slot. Was
+// a standalone always-true placeholder field (clockItemEquipped) before that
+// item existed; every call site (dungeon-map/battle/inventory/equipment/
+// essence UI in main.ts) reads through this function, so none needed to
+// change when the placeholder was replaced.
 export function isClockVisible(profile: PlayerProfile): boolean {
-  return profile.clockItemEquipped;
+  return Object.values(profile.equippedGear).some((gear) => gear?.isClockItem === true);
 }
 
 export function maxEssenceSlots(profile: PlayerProfile): number {
@@ -344,7 +338,6 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
     inventoryGear: Array.isArray(parsed.inventoryGear) ? (parsed.inventoryGear as GearInstance[]) : [],
     equippedGear: parsed.equippedGear && typeof parsed.equippedGear === 'object' ? (parsed.equippedGear as EquippedGear) : {},
     gold: typeof parsed.gold === 'number' ? parsed.gold : 0,
-    clockItemEquipped: typeof parsed.clockItemEquipped === 'boolean' ? parsed.clockItemEquipped : true,
     hasVisitedDungeonExchange: typeof parsed.hasVisitedDungeonExchange === 'boolean' ? parsed.hasVisitedDungeonExchange : false,
     lastTaxedYear: typeof parsed.lastTaxedYear === 'number' ? parsed.lastTaxedYear : null,
     hasCompletedComingOfAge: typeof parsed.hasCompletedComingOfAge === 'boolean' ? parsed.hasCompletedComingOfAge : false,

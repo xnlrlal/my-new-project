@@ -28,7 +28,7 @@ import {
 import { createEssenceFromMonster, essenceSkillCards, type EquippedEssence } from './engine/essence';
 import { computeTotalStats } from './engine/stats-calc';
 import { autoPlayOneTurn, estimateWinProbability } from './engine/battle-ai';
-import { rollGearDrop, createGearFromMonster, type EquipmentSlot } from './engine/gear';
+import { rollGearDrop, createGearFromMonster, rollPocketWatchDrop, createPocketWatch, type EquipmentSlot } from './engine/gear';
 import {
   generateMaze,
   randomStartPosition,
@@ -864,6 +864,13 @@ function checkForExp() {
   persistProfile();
 }
 
+function hasPocketWatch(p: PlayerProfile): boolean {
+  return (
+    p.inventoryGear.some((gear) => gear.isClockItem === true) ||
+    Object.values(p.equippedGear).some((gear) => gear?.isClockItem === true)
+  );
+}
+
 function checkForDrop() {
   if (!state || !currentMonster || state.status !== 'win' || dropChecked) return;
   dropChecked = true;
@@ -875,6 +882,15 @@ function checkForDrop() {
 
   if (rollGearDrop()) {
     profile = addGearToInventory(profile, createGearFromMonster(currentMonster.id, currentMonster.gearDrop));
+    persistProfile();
+  }
+
+  // 회중시계 — a separate, generic roll (not part of currentMonster.gearDrop,
+  // which is monster-specific loot). Skipped once the player already holds
+  // one (inventory or equipped) since it's a one-off tool item, not a
+  // stackable resource.
+  if (!hasPocketWatch(profile) && rollPocketWatchDrop()) {
+    profile = addGearToInventory(profile, createPocketWatch());
     persistProfile();
   }
 
