@@ -37,6 +37,11 @@ export interface MonsterDef {
   // 없어 1|2로만 좁혀뒀다 — 나중에 층이 늘어나면 그때 확장.
   floor: 1 | 2;
   zone: ArmZone;
+  // 원거리(활 등) 무기를 쓰는 몬스터인지 — engine.ts의 즉사(헤드샷) 판정이
+  // 이 값으로 근접/원거리를 가른다(designnotes.md 3-2번, 12-3번 고블린
+  // 궁수 참고). 근접 몬스터도 즉사가 아예 없는 건 아니지만(등급이 높을수록
+  // 소폭의 확률이 있음), 원거리는 그 위에 "헤드샷" 고정 확률이 더해진다.
+  ranged: boolean;
   essence: EssenceTemplate;
   gearDrop: GearTemplate;
 }
@@ -74,6 +79,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 2,
     floor: 1,
     zone: 'south',
+    ranged: false,
     essence: {
       statBonus: { strength: 1 },
       skill: { name: '기습', cost: 1, effect: 'damage', value: 12, description: '적에게 12의 피해를 준다.' },
@@ -94,6 +100,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 2,
     floor: 1,
     zone: 'west',
+    ranged: false,
     essence: {
       statBonus: { strength: 1 },
       skill: { name: '날카로운 손톱', cost: 1, effect: 'damage', value: 13, description: '적에게 13의 피해를 준다.' },
@@ -114,6 +121,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 3,
     floor: 1,
     zone: 'east',
+    ranged: false,
     essence: {
       statBonus: { strength: 1 },
       skill: { name: '베어물기', cost: 1, effect: 'damage', value: 13, description: '적에게 13의 피해를 준다.' },
@@ -134,6 +142,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 2,
     floor: 1,
     zone: 'north',
+    ranged: false,
     essence: {
       statBonus: { dexterity: 1 },
       skill: { name: '망치질', cost: 1, effect: 'damage', value: 11, description: '적에게 11의 피해를 준다.' },
@@ -156,6 +165,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 3,
     floor: 2,
     zone: 'north',
+    ranged: false,
     essence: {
       statBonus: { strength: 2 },
       skill: { name: '베기 연타', cost: 2, effect: 'damage', value: 20, description: '적에게 20의 피해를 준다.' },
@@ -176,6 +186,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 3,
     floor: 2,
     zone: 'north',
+    ranged: true,
     essence: {
       statBonus: { accuracy: 2 },
       skill: {
@@ -205,6 +216,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 3,
     floor: 2,
     zone: 'west',
+    ranged: false,
     essence: {
       statBonus: { strength: 2, maxHp: 3 },
       skill: { name: '썩은 발톱', cost: 2, effect: 'damage', value: 18, description: '적에게 18의 피해를 준다.' },
@@ -225,6 +237,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 3,
     floor: 2,
     zone: 'west',
+    ranged: false,
     essence: {
       statBonus: { dexterity: 2 },
       skill: { name: '뼈 방패', cost: 1, effect: 'shield', value: 14, description: '방어막 14를 얻는다.' },
@@ -245,6 +258,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 3,
     floor: 2,
     zone: 'west',
+    ranged: true,
     essence: {
       statBonus: { accuracy: 2 },
       skill: { name: '뼈 화살', cost: 1, effect: 'damage', value: 13, description: '적에게 13의 피해를 준다.' },
@@ -265,6 +279,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 4,
     floor: 2,
     zone: 'west',
+    ranged: false,
     essence: {
       statBonus: { maxMana: 1 },
       skill: { name: '냉기 마법', cost: 2, effect: 'damage', value: 19, description: '적에게 냉기 피해 19를 준다.' },
@@ -285,6 +300,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 5,
     floor: 2,
     zone: 'west',
+    ranged: false,
     essence: {
       statBonus: { maxMana: 2 },
       skill: { name: '절규', cost: 2, effect: 'damage', value: 22, description: '적에게 22의 피해를 준다.' },
@@ -305,6 +321,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 4,
     floor: 2,
     zone: 'west',
+    ranged: false,
     essence: {
       statBonus: { strength: 2, dexterity: 1 },
       skill: { name: '죽음의 손아귀', cost: 2, effect: 'damage', value: 22, description: '적에게 22의 피해를 준다.' },
@@ -328,6 +345,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 3,
     floor: 2,
     zone: 'south',
+    ranged: false,
     essence: {
       statBonus: { dexterity: 2 },
       skill: { name: '타락한 망치질', cost: 2, effect: 'damage', value: 16, description: '적에게 16의 피해를 준다.' },
@@ -348,6 +366,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 3,
     floor: 2,
     zone: 'south',
+    ranged: false,
     essence: {
       statBonus: { dexterity: 3 },
       skill: { name: '방패 밀치기', cost: 1, effect: 'shield', value: 16, description: '방어막 16을 얻는다.' },
@@ -368,6 +387,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 2,
     floor: 2,
     zone: 'south',
+    ranged: false,
     essence: {
       statBonus: { maxHp: 6, dexterity: 1 },
       skill: { name: '바위 주먹', cost: 2, effect: 'damage', value: 19, description: '적에게 19의 피해를 준다.' },
@@ -390,6 +410,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 3,
     floor: 2,
     zone: 'east',
+    ranged: false,
     essence: {
       statBonus: { strength: 1 },
       skill: { name: '물어뜯기', cost: 2, effect: 'damage', value: 17, description: '적에게 17의 피해를 준다.' },
@@ -410,6 +431,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 3,
     floor: 2,
     zone: 'east',
+    ranged: false,
     essence: {
       statBonus: { maxHp: 4, strength: 1 },
       skill: { name: '앞발 강타', cost: 2, effect: 'damage', value: 19, description: '적에게 19의 피해를 준다.' },
@@ -430,6 +452,7 @@ export const MONSTERS: MonsterDef[] = [
     maxMana: 4,
     floor: 2,
     zone: 'east',
+    ranged: false,
     essence: {
       statBonus: { strength: 2, dexterity: 1 },
       skill: { name: '맹수의 도약', cost: 2, effect: 'damage', value: 22, description: '적에게 22의 피해를 준다.' },

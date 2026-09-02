@@ -66,6 +66,9 @@ export interface GameState {
   player: Actor;
   enemy: Actor;
   enemyGrade: number;
+  // 원거리(활 등) 몬스터인지 — engine.ts의 즉사(헤드샷) 판정이 이 필드로
+  // 근접/원거리를 구분한다(designnotes.md 3-2번 참고).
+  enemyRanged: boolean;
   log: LogEntry[];
   status: GameStatus;
   // 이 전투 동안 player.hp/maxHp가 도달한 최저 비율(0~1). initGame이 시작
