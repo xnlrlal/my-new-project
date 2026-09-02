@@ -127,17 +127,19 @@ let returnScreen: Screen = 'stats';
 // show "예상 승률 N%" and to decide its safe/risky wording, but auto-battle
 // itself is never gated by it (see battleMode below).
 let winProbability: number | null = null;
-// 'manual' | 'auto' — never persisted (see captureSession's comment below):
-// a reload always resumes into manual, so auto-battle never silently keeps
-// running in the background after a refresh the player didn't expect. Also
-// reset to manual by goTo() whenever the player actually leaves the battle
-// screen (win -> dungeon-map, opening a subscreen, ...) for the same reason.
-// It is deliberately NOT reset by startZoneBattle() itself — see that
-// function's comment: a 무리(pack, dungeon-clock.ts) chains several fights
-// back-to-back without ever leaving the battle screen, and forcing manual
-// on every member there used to silently cancel auto-battle mid-pack
-// (the player would keep watching the same screen, no longer actually
-// defending themselves, and take unmitigated hits every round).
+// 'manual' | 'auto' — a sticky player preference, not a per-battle flag: once
+// switched to 'auto' it stays 'auto' across dungeon-map navigation, subscreens,
+// and separate (non-pack) encounters alike, so the player only has to turn it
+// on once instead of re-enabling it every fight. goTo() stops any in-flight
+// timer whenever the player leaves the battle screen (so auto-battle never
+// keeps progressing off-screen) and restarts it whenever they arrive back at
+// 'battle' with battleMode still 'auto' — that one spot covers a fresh
+// encounter (startZoneBattle -> goTo('battle')), a 무리 continuation (which
+// never even leaves the battle screen), and returning from a subscreen mid-fight.
+// Never persisted (see captureSession's comment below): a reload always
+// resumes into manual, so auto-battle never silently keeps running in the
+// background after a refresh the player didn't expect. It's also force-reset
+// to manual on death/forced-return, since those tear down the whole run.
 let battleMode: 'manual' | 'auto' = 'manual';
 // Pending "advance one more turn" callback for auto-battle mode. Only ever
 // one in flight; startAutoBattleTurnLoop()/stopAutoBattleTurnLoop() are the
@@ -495,19 +497,23 @@ function afterStateChange() {
 function goTo(next: Screen) {
   // Centralized so every way of leaving the battle screen (winning,
   // acknowledging death, opening a subscreen, a forced return interrupting
-  // mid-fight, ...) reliably stops any in-flight auto-battle turn — a
-  // single check here instead of one at each individual exit path. Also
-  // resets battleMode back to manual, so e.g. opening the inventory mid-auto
-  // and returning to the battle screen doesn't show a stale "자동전투 진행
-  // 중..." label with nothing actually progressing (the timer stays stopped
-  // either way; this just keeps what's on screen honest about it).
+  // mid-fight, ...) reliably stops any in-flight auto-battle turn — a single
+  // check here instead of one at each individual exit path. battleMode itself
+  // is left untouched (it's a sticky preference — see its declaration), so
+  // the timer just pauses while off the battle screen instead of the mode
+  // silently flipping back to manual.
   if (screen === 'battle' && next !== 'battle') {
     stopAutoBattleTurnLoop();
-    battleMode = 'manual';
   }
   screen = next;
   persistProfile();
   render();
+  // Arriving at (or back at) the battle screen with auto-battle still the
+  // active preference resumes the loop — covers a fresh encounter, a 무리
+  // continuation, and returning from a subscreen mid-fight, all in one place.
+  if (next === 'battle' && battleMode === 'auto') {
+    startAutoBattleTurnLoop();
+  }
 }
 
 // Schedules the next automatic turn (see AUTO_BATTLE_TURN_DELAY_MS) while
@@ -760,20 +766,15 @@ function startZoneBattle(zone: Zone, options?: { forcedMonsterId?: string; ambus
   state = initGame(totalStats, currentMonster, bonusCards, startingHp, [], ambush);
   dungeonHp = state.player.hp;
   winProbability = estimateWinProbability(totalStats, bonusCards, currentMonster, startingHp, [], ambush);
-  // battleMode is deliberately left as-is here (see its declaration comment)
-  // — a fresh, non-pack encounter already went through 'dungeon-map' first,
-  // which goTo() reset to manual on the way out of the previous battle, so
-  // this still behaves exactly as before for that case. A 무리 continuation
-  // (onContinue below) never leaves the battle screen at all, so this is
-  // the one path where preserving 'auto' actually matters — restart the
-  // loop for the new monster's state if that's still the active mode.
+  // battleMode is deliberately left as-is here — it's a sticky preference
+  // (see its declaration comment), and goTo('battle') below restarts the
+  // auto-battle loop for this new monster's state if 'auto' is still active.
   expResult = null;
   expChecked = false;
   dropChecked = false;
   pendingEssence = null;
   essenceOutcome = null;
   goTo('battle');
-  if (battleMode === 'auto') startAutoBattleTurnLoop();
 }
 
 // Death is permanent regardless of cause (battle loss or unpaid annual
