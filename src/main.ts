@@ -129,7 +129,15 @@ let returnScreen: Screen = 'stats';
 let winProbability: number | null = null;
 // 'manual' | 'auto' — never persisted (see captureSession's comment below):
 // a reload always resumes into manual, so auto-battle never silently keeps
-// running in the background after a refresh the player didn't expect.
+// running in the background after a refresh the player didn't expect. Also
+// reset to manual by goTo() whenever the player actually leaves the battle
+// screen (win -> dungeon-map, opening a subscreen, ...) for the same reason.
+// It is deliberately NOT reset by startZoneBattle() itself — see that
+// function's comment: a 무리(pack, dungeon-clock.ts) chains several fights
+// back-to-back without ever leaving the battle screen, and forcing manual
+// on every member there used to silently cancel auto-battle mid-pack
+// (the player would keep watching the same screen, no longer actually
+// defending themselves, and take unmitigated hits every round).
 let battleMode: 'manual' | 'auto' = 'manual';
 // Pending "advance one more turn" callback for auto-battle mode. Only ever
 // one in flight; startAutoBattleTurnLoop()/stopAutoBattleTurnLoop() are the
@@ -785,14 +793,20 @@ function startZoneBattle(zone: Zone, options?: { forcedMonsterId?: string; ambus
   state = initGame(totalStats, currentMonster, bonusCards, startingHp, initialStatusEffects, ambush);
   dungeonHp = state.player.hp;
   winProbability = estimateWinProbability(totalStats, bonusCards, currentMonster, startingHp, initialStatusEffects, ambush);
-  battleMode = 'manual';
-  stopAutoBattleTurnLoop();
+  // battleMode is deliberately left as-is here (see its declaration comment)
+  // — a fresh, non-pack encounter already went through 'dungeon-map' first,
+  // which goTo() reset to manual on the way out of the previous battle, so
+  // this still behaves exactly as before for that case. A 무리 continuation
+  // (onContinue below) never leaves the battle screen at all, so this is
+  // the one path where preserving 'auto' actually matters — restart the
+  // loop for the new monster's state if that's still the active mode.
   expResult = null;
   expChecked = false;
   dropChecked = false;
   pendingEssence = null;
   essenceOutcome = null;
   goTo('battle');
+  if (battleMode === 'auto') startAutoBattleTurnLoop();
 }
 
 // Death is permanent regardless of cause (battle loss or unpaid annual
