@@ -29,6 +29,10 @@ function ring2Id(i: number): CellId {
 // 저 멀리서도 눈치챌 수 있는 함정이라, 이동할 때마다 새로 굴리는 게 아니라
 // 미궁 생성 시점에 그 칸의 고정 속성으로 확정된다. 2D 탑다운 전환 시에도
 // 이 필드 하나로 타일 위 시각 표시를 대체할 수 있도록 순수 데이터로만 둔다.
+// "덫이 있다" = 그 칸에 고블린이 실제로 숨어있다는 뜻 — 접근하면 반드시
+// 기습당한다(availableMoves 참고). 그 전투를 이기면 main.ts가
+// resolveTrap()으로 이 필드를 지워, 같은 칸을 다시 지나가도 더는 아무
+// 일도 일어나지 않는다(그 고블린은 이미 죽었으므로).
 export type TrapType = 'goblin';
 
 export interface DungeonCell {
@@ -178,6 +182,14 @@ export function cellAt(maze: DungeonMaze, id: CellId): DungeonCell {
   return cell;
 }
 
+// 그 칸의 매복 고블린을 처치한 뒤 호출 — 같은 칸을 다시 지나가도 더는
+// 기습당하지 않는다(handlePortalArrival이 maze.portalsFound를 직접
+// mutate하는 것과 같은 패턴: DungeonMaze는 세이브/복원되는 참조 데이터라
+// 새 객체를 만들어 반환하지 않고 그 자리에서 고친다).
+export function resolveTrap(maze: DungeonMaze, id: CellId): void {
+  cellAt(maze, id).trap = null;
+}
+
 export function randomStartPosition(): CellId {
   const candidates: CellId[] = ['center'];
   for (let i = 0; i < RING_SIZE; i++) candidates.push(ring1Id(i));
@@ -201,9 +213,14 @@ export interface DungeonMove {
   label: string;
   next: CellId;
   battleChance: number;
-  // 함정이 있는 칸으로의 이동만 'trigger'(밟는다)/'avoid'(우회한다) 두 개의
-  // 별도 선택지로 나뉜다 — 그 외 모든 이동은 null(기존과 동일한 단일 선택지).
-  trapChoice: 'trigger' | 'avoid' | null;
+  // 함정이 감지된 칸으로의 이동은 선택의 여지 없이 'ambush' 하나뿐이다 —
+  // 그 외 모든 이동은 null. 예전엔 "덫을 밟는다(bleed만, 전투 없음)"라는
+  // 선택지가 따로 있었으나, 뻔히 보이는 덫을 굳이 밟을 이유가 없다는 지적
+  // (설계 논의 참고 — designnotes.md 4-4번의 "빛이 있으면 함정 무력화"
+  // 원칙과도 모순됐음)에 따라 제거함. 지금은 "덫이 있다 = 그 자리에 고블린이
+  // 숨어있다"는 뜻으로 재정의되어, 그 칸으로 이동하면(다른 칸을 골라
+  // 피해가는 건 여전히 가능) 반드시 고블린이 튀어나와 기습한다.
+  trapChoice: 'ambush' | null;
 }
 
 export function availableMoves(maze: DungeonMaze, pos: CellId): DungeonMove[] {
@@ -215,10 +232,7 @@ export function availableMoves(maze: DungeonMaze, pos: CellId): DungeonMove[] {
 
     if (neighbor.trap) {
       const label = cellLabel(neighbor);
-      return [
-        { label: `${label} (고블린 덫 감지) · 덫을 밟고 이동 · 전투 없음, 출혈`, next: neighborId, battleChance: 0, trapChoice: 'trigger' },
-        { label: `${label} (고블린 덫 감지) · 우회해서 이동 · 기습당할 수 있음`, next: neighborId, battleChance: 1, trapChoice: 'avoid' },
-      ];
+      return [{ label: `${label} (고블린 덫 감지 — 접근하면 기습당함)`, next: neighborId, battleChance: 1, trapChoice: 'ambush' }];
     }
 
     return [{ label: `${cellLabel(neighbor)}로 이동 · ${chanceLabel}`, next: neighborId, battleChance, trapChoice: null }];

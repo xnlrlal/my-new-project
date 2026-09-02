@@ -1,6 +1,5 @@
 import './style.css';
-import type { GameState, StatusEffect } from './engine/types';
-import { applyStatusEffect } from './engine/status-effects';
+import type { GameState } from './engine/types';
 import { getRace, type RaceDef } from './engine/races';
 import type { MonsterDef, MonsterGrade } from './engine/monsters';
 import { getMonsterById, pickMonsterForFloorAndZone, rollEssenceDrop, rollManaStoneDrop } from './engine/monsters';
@@ -36,6 +35,7 @@ import {
   cellAt,
   availableMoves,
   rollBattle,
+  resolveTrap,
   serializeMaze,
   deserializeMaze,
   BASE_BATTLE_CHANCE,
@@ -171,20 +171,13 @@ let dungeonEntryVillageSeconds = 0;
 // untouched. Kept in sync with the live battle state in afterStateChange()
 // so it's current even if a forced return interrupts a fight mid-turn.
 let dungeonHp: number | null = null;
-// 고블린 덫을 밟았지만 아직 전투로 이어지지 않은 상태이상(현재는 출혈만) —
-// 그 다음 정상 전투가 발동하는 순간 startZoneBattle()이 initGame에 접어
-// 넣고 비운다. trackedByGoblin은 그 전투의 몬스터가 랜덤 대신 고블린으로
-// 강제되어야 하는지를 나타낸다. 둘 다 강제 귀환/사망/층 이동 시 초기화됨.
-let pendingStatusEffects: StatusEffect[] = [];
-let trackedByGoblin = false;
 // 몬스터 무리 스폰(dungeon-clock.ts의 packSizeForDay) — 무작위 전투가
 // 발동하는 순간 packSizeForDay로 정해진 마릿수를 packTotal에 담고,
 // packRemaining은 "이번 전투 이후로 몇 마리가 더 남았는지"를 센다.
 // 배틀 화면의 "탐험 계속하기"가 packRemaining>0이면 dungeon-map으로
 // 돌아가는 대신 같은 구역에서 다음 전투를 바로 연다(startZoneBattle).
-// 함정 발동/기습처럼 몬스터가 특정 개체로 강제되는 조우는 무리 취급하지
-// 않는다(packTotal=1). 트랙된 고블린과 같은 이유로 강제 귀환/사망/층
-// 이동 시 둘 다 초기화됨.
+// 함정 기습처럼 몬스터가 특정 개체로 강제되는 조우는 무리 취급하지
+// 않는다(packTotal=1). 강제 귀환/사망/층 이동 시 둘 다 초기화됨.
 let packTotal = 1;
 let packRemaining = 0;
 // Snapshot of floor 1 taken at the moment of entering floor 2, so
@@ -549,8 +542,6 @@ function enterDungeon() {
   floor1Maze = null;
   floor1Pos = null;
   floor2Zones = {};
-  pendingStatusEffects = [];
-  trackedByGoblin = false;
   packTotal = 1;
   packRemaining = 0;
   // Brand-new dungeon entry is the only place HP resets to full — floor
@@ -596,8 +587,6 @@ function forceReturnFromDungeon() {
   pendingEssence = null;
   essenceOutcome = null;
   dungeonEntryVillageSeconds = 0;
-  pendingStatusEffects = [];
-  trackedByGoblin = false;
   packTotal = 1;
   packRemaining = 0;
 
@@ -634,9 +623,6 @@ function enterFloorTwo(themeZone: ArmZone) {
   floor1Pos = pos;
   dungeonFloor = 2;
   dungeonThemeZone = themeZone;
-  // 고블린 추적/덫 상태는 층을 넘어가면 끊긴다는 단순화 규칙(설계 문서 참고).
-  pendingStatusEffects = [];
-  trackedByGoblin = false;
   packTotal = 1;
   packRemaining = 0;
 
@@ -673,27 +659,20 @@ function revertToFloor1() {
   floor1Pos = null;
   dungeonMessage = '1층으로 돌아왔다.';
   portalMessage = null;
-  // 층을 넘어가면 고블린 추적/덫 상태가 끊긴다는 단순화 규칙(설계 문서 참고).
-  pendingStatusEffects = [];
-  trackedByGoblin = false;
   packTotal = 1;
   packRemaining = 0;
   goTo('dungeon-map');
 }
 
-// 고블린 덫이 있는 칸으로의 이동은 "밟는다"/"우회한다" 두 선택지로 갈린다
-// (availableMoves가 만든 두 DungeonMove, 같은 next 목적지). 밟으면 그
-// 자리에서 즉시 전투 없이 출혈만 쌓이고(battleChance=0), 우회하면 고블린이
-// 먼저 뛰쳐나와 기습한다(battleChance=1로 항상 전투, ambush=true로 1턴
-// 기절 선적용). 둘 다 몬스터를 'goblin'으로 강제 지정한다.
+// 고블린 덫이 감지된 칸으로 이동하면 선택의 여지 없이 그 자리에 숨어있던
+// 고블린에게 기습당한다(battleChance=1로 항상 전투, ambush=true로 1턴
+// 기절 선적용, 몬스터는 'goblin'으로 강제). 뻔히 보이는 덫을 일부러 밟는
+// 선택지는 제거됨(설계 논의 참고) — 덫이 있다는 건 곧 거기 고블린이 있다는
+// 뜻이라, 그 방향으로 가지 않는 것 자체가 유일한 회피 수단이다. 이 전투를
+// 이기면 resolveTrap()이 그 칸의 덫을 지워 다음부터는 안전해진다.
 function handleMove(move: DungeonMove) {
-  if (move.trapChoice === 'trigger') {
-    pendingStatusEffects = applyStatusEffect(pendingStatusEffects, 'bleed', 3);
-    trackedByGoblin = true;
-    arriveAt(move.next, 0, '고블린 덫을 밟았다! 출혈을 입었다. 뒤에서 인기척이 느껴진다...');
-    return;
-  }
-  if (move.trapChoice === 'avoid') {
+  if (move.trapChoice === 'ambush') {
+    if (maze) resolveTrap(maze, move.next);
     arriveAt(move.next, 1, '조용히 이동했다.', { forcedMonsterId: 'goblin', ambush: true });
     return;
   }
@@ -726,17 +705,10 @@ function arriveAt(id: CellId, battleChance: number, safeMessage: string, options
 
   portalMessage = null;
   if (rollBattle(battleChance)) {
-    let forcedMonsterId = options?.forcedMonsterId;
+    const forcedMonsterId = options?.forcedMonsterId;
     const ambush = options?.ambush ?? false;
-    // 명시적으로 강제된 몬스터가 없는 정상 전투인데 덫 이후로 추적당하는
-    // 중이라면, 이번이 "고블린이 따라잡는" 그 전투다 — 기습이 아니라
-    // 정상 판정(이미 경계하고 있었으므로)이며, 추적은 여기서 해소된다.
-    if (!forcedMonsterId && trackedByGoblin) {
-      forcedMonsterId = 'goblin';
-      trackedByGoblin = false;
-    }
-    // 몬스터가 특정 개체로 강제된 조우(함정 우회 기습, 추적하던 고블린)는
-    // 무리로 취급하지 않는다 — 무리는 무작위 조우에만 적용된다.
+    // 몬스터가 특정 개체로 강제된 조우(함정 기습)는 무리로 취급하지 않는다
+    // — 무리는 무작위 조우에만 적용된다.
     packTotal = forcedMonsterId ? 1 : packSizeForDay(dungeonFloor, dungeonElapsedSeconds);
     packRemaining = packTotal - 1;
     startZoneBattle(cell.zone, { forcedMonsterId, ambush });
@@ -785,14 +757,9 @@ function startZoneBattle(zone: Zone, options?: { forcedMonsterId?: string; ambus
   // full via undefined.
   const startingHp = dungeonHp ?? undefined;
   const ambush = options?.ambush ?? false;
-  // Any bleed banked from stepping on a goblin trap folds into this fight
-  // (whichever monster it turns out to be) right now, then is cleared —
-  // it's spent the moment a real battle actually starts.
-  const initialStatusEffects = pendingStatusEffects;
-  pendingStatusEffects = [];
-  state = initGame(totalStats, currentMonster, bonusCards, startingHp, initialStatusEffects, ambush);
+  state = initGame(totalStats, currentMonster, bonusCards, startingHp, [], ambush);
   dungeonHp = state.player.hp;
-  winProbability = estimateWinProbability(totalStats, bonusCards, currentMonster, startingHp, initialStatusEffects, ambush);
+  winProbability = estimateWinProbability(totalStats, bonusCards, currentMonster, startingHp, [], ambush);
   // battleMode is deliberately left as-is here (see its declaration comment)
   // — a fresh, non-pack encounter already went through 'dungeon-map' first,
   // which goTo() reset to manual on the way out of the previous battle, so
@@ -843,8 +810,6 @@ function handleDeath(reason: 'battle' | 'tax') {
   dropChecked = false;
   pendingEssence = null;
   essenceOutcome = null;
-  pendingStatusEffects = [];
-  trackedByGoblin = false;
   packTotal = 1;
   packRemaining = 0;
   goTo('menu');
@@ -990,8 +955,6 @@ function captureSession(): ResumeSession | undefined {
     dropChecked,
     pendingEssence,
     essenceOutcome,
-    pendingStatusEffects,
-    trackedByGoblin,
     packTotal,
     packRemaining,
   };
@@ -1080,8 +1043,6 @@ function resumeCharacter() {
     dropChecked = session.dropChecked;
     pendingEssence = session.pendingEssence;
     essenceOutcome = session.essenceOutcome;
-    pendingStatusEffects = session.pendingStatusEffects;
-    trackedByGoblin = session.trackedByGoblin;
     packTotal = session.packTotal;
     packRemaining = session.packRemaining;
     goTo(session.screen);
