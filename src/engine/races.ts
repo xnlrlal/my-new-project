@@ -1,6 +1,6 @@
 import type { CoreStats, SubStats } from './stat-bonus';
 
-export type RaceId = 'human' | 'elf' | 'beastkin' | 'dwarf' | 'barbarian';
+export type RaceId = 'human' | 'fairy' | 'beastkin' | 'dwarf' | 'barbarian';
 
 // Race ids selectable in character-select, in display order. Ids present
 // here but not 'barbarian' render as locked cards rather than being hidden.
@@ -13,7 +13,7 @@ export type RaceId = 'human' | 'elf' | 'beastkin' | 'dwarf' | 'barbarian';
 // Old saves carrying raceId: 'orc' are covered by profile.ts's
 // CURRENT_SCHEMA_VERSION bump, which forces a full reset rather than
 // needing getRace('orc') to keep resolving.
-export const SELECTABLE_RACE_IDS: RaceId[] = ['barbarian', 'human', 'elf', 'dwarf', 'beastkin'];
+export const SELECTABLE_RACE_IDS: RaceId[] = ['barbarian', 'human', 'fairy', 'dwarf', 'beastkin'];
 
 export interface RaceStats extends CoreStats, SubStats {
   maxHp: number;
@@ -42,13 +42,14 @@ export interface RaceDef {
 // maxHp는 전 종족 100으로 통일했다(설계 논의 참고 — 체력을 "수치"가 아니라
 // "%"로 다루기 위해, 종족 간 튼튼함 차이를 풀 크기가 아니라 손재주(방어력%)/
 // 인내심(자연재생력%)으로 표현하도록 재설계). 예전 체력 32~45 사이의 차이는
-// 아래처럼 재배치했다 — 근거는 원래 체력 순위(바바리안>드워프≈수인>인간>엘프):
+// 아래처럼 재배치했다 — 근거는 원래 체력 순위(바바리안>드워프≈수인>인간>요정):
 //   - 드워프: 손재주(=방어력)를 2 → 4로 상향 — "방어력이 뛰어난 종족"이라는
 //     서사와 가장 직접적으로 맞아떨어져 단일 축으로 정리.
 //   - 바바리안/인간/수인: 손재주 대신 인내심(자연재생력) +2로 원래의 중상위
 //     체력을 표현.
-//   - 엘프: 원래 최저 체력이었던 만큼 방어력/재생력 둘 다 0 — 생존기 없이
-//     마나·이능에 완전히 기댄다는 컨셉을 그대로 살림.
+//   - 요정(엘프에서 개명, designnotes.md 9번): 원래 최저 체력이었던 만큼
+//     방어력/재생력 둘 다 0 — 생존기 없이 마나·이능에 완전히 기댄다는
+//     컨셉을 그대로 살림.
 // (체력 풀 크기 대신 방어력/재생력 하나만으로 종족 생존력을 표현하다 보니,
 // 시뮬레이션 결과 레벨 1 캐릭터가 초기장비만으로 버틸 수 있는 전투 수가
 // 너무 적어(방어/재생 수치가 아직 작아서) 종족 기본값·초기장비(ritual.ts)
@@ -78,8 +79,8 @@ export const RACES: RaceDef[] = [
     stats: { maxHp: 100, maxMana: 3, body: 20, mind: 20, arcane: 20, strength: 0, dexterity: 0, willpower: 2, smell: 0, ...ZERO_SUBSTATS },
   },
   {
-    id: 'elf',
-    name: '엘프',
+    id: 'fairy',
+    name: '요정',
     description: '마나가 풍부하지만 방어와 회복 수단이 없다.',
     stats: { maxHp: 100, maxMana: 4, body: 8, mind: 28, arcane: 24, strength: 1, dexterity: 0, willpower: 0, smell: 0, ...ZERO_SUBSTATS },
   },
