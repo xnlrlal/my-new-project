@@ -48,6 +48,39 @@ function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number): st
   `;
 }
 
+// 버그 신고 등으로 전투 로그를 그대로 옮겨 붙일 수 있게 해주는 순수 텍스트
+// 변환 — 화면에 보이는 "[N턴] 메시지" 줄 그대로에 층/상대 정보만 맨 앞에
+// 덧붙인다. 클립보드 기록 자체는 이 함수를 호출하는 쪽(버튼 핸들러)의 몫.
+function buildLogText(state: GameState, floorLabel: string): string {
+  const header = `${floorLabel} — ${state.enemy.name} 상대 전투 로그`;
+  const lines = state.log.map((entry) => `[${entry.turn}턴] ${entry.message}`);
+  return [header, ...lines].join('\n');
+}
+
+// navigator.clipboard.writeText는 보안 컨텍스트(HTTPS)가 아니거나 권한이
+// 없으면 실패할 수 있어, 화면 밖 textarea + execCommand('copy')로 한 번 더
+// 시도한다 — 오래된 브라우저/권한 거부 상황에서도 최대한 동작하도록.
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
 // battleMode/winProbability replace the old boolean skipEligible + one-shot
 // "스킵" button: auto-battle is now a proper mode the player can switch into
 // and back out of at any time mid-fight (not just once, not gated behind a
@@ -146,6 +179,10 @@ export function renderBattle(
       ${renderActor(enemy, 'enemy', state.enemyGrade)}
       ${renderActor(player, 'player')}
     </div>
+    <div class="log-header">
+      <span class="stat-line" style="font-weight:600">전투 로그</span>
+      <button class="nav-link" id="copy-log-btn">로그 복사</button>
+    </div>
     <div class="log" id="log">
       ${log.map((entry) => `<div class="log-entry ${entry.actor}">[${entry.turn}턴] ${entry.message}</div>`).join('')}
     </div>
@@ -185,4 +222,17 @@ export function renderBattle(
   document.getElementById('open-inventory')?.addEventListener('click', handlers.onOpenInventory);
   document.getElementById('open-equipment')?.addEventListener('click', handlers.onOpenEquipment);
   document.getElementById('open-codex')?.addEventListener('click', handlers.onOpenEssence);
+
+  const copyLogBtn = document.getElementById('copy-log-btn') as HTMLButtonElement | null;
+  copyLogBtn?.addEventListener('click', async () => {
+    const originalLabel = copyLogBtn.textContent;
+    const ok = await copyToClipboard(buildLogText(state, floorLabel));
+    // 리렌더 없이 버튼 자체의 텍스트만 잠깐 바꿔 피드백 — render()를 다시
+    // 태우면 이 버튼을 포함한 화면 전체가 새로 그려지며 이 타이머가 가리키던
+    // 엘리먼트가 통째로 교체되므로, 굳이 상태를 안 거치는 가장 단순한 방법.
+    copyLogBtn.textContent = ok ? '복사됨!' : '복사 실패';
+    setTimeout(() => {
+      copyLogBtn.textContent = originalLabel;
+    }, 1500);
+  });
 }

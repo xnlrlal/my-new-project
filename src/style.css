@@ -94,6 +94,16 @@ body {
   margin-top: 4px;
 }
 
+.log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.log-header .stat-line {
+  margin-top: 0;
+}
+
 .log {
   background: #101218;
   border-radius: 10px;
