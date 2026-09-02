@@ -1,9 +1,15 @@
 import type { Actor, StatusEffect, StatusEffectType } from './types';
 
-// 카드 값과 같은 이유로(engine.ts/cards.ts 참고, 체력 풀 100 통일) 3배
-// 스케일업했다 — 그대로 뒀으면 100 체력 기준으로 스택당 2~3은 무의미한 수치.
-const POISON_DAMAGE_PER_STACK = 6;
-const BLEED_DAMAGE_PER_STACK = 9;
+// 카드 값처럼 3배 스케일업했었으나(2/3→6/9), 실전에서 스택 3개(예: 고블린
+// 덫을 연달아 밟은 뒤 우회 기습까지 당하는 경우)만 쌓여도 "9×3스택×3턴=81"
+// 로 100 체력의 대부분을 혼자 태워버리는 게 확인되어 되돌림. 카드는
+// "한 번의 선택"이라 3배가 적절했지만, 상태이상은 스택(최대 5)×지속시간
+// (보통 3턴)으로 곱연산이 붙어 같은 배율을 적용하면 안 됐음 — 원래 값
+// (2/3)이 여전히 100 체력 기준으로도 스택 1개당 2~3%로 유의미하고, 최대
+// 5스택이 쌓여도 "심각하지만 그것만으로 즉사는 아닌" 수준(45=최대체력의
+// 45%)이 되도록 이 값으로 되돌렸다.
+const POISON_DAMAGE_PER_STACK = 2;
+const BLEED_DAMAGE_PER_STACK = 3;
 const MAX_STACKS = 5;
 const POISON_RESIST_COEF = 5; // 독내성 1당 독 피해 -5%p
 const POISON_RESIST_MAX = 80; // 최대 80% 경감 — 완전 면역은 없음(명중/치명타 캡과 같은 원칙)
