@@ -123,6 +123,7 @@ export function initGame(
       poisonResist: 0,
     }),
     enemyGrade: monster.grade,
+    enemyRanged: monster.ranged,
     log: [{ turn: 1, actor: 'player', message: `${monster.name}(을)를 만났다! 전투 시작!` }],
     status: 'playing',
   };
@@ -188,6 +189,23 @@ function clampPercent(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+// 즉사(designnotes.md 3-2번 "헤드샷 즉사") — HP/치명타 배율과 완전히 별개인
+// 위험 축. 몬스터가 플레이어를 명중시켰을 때만 확인한다(그 반대는 대상 밖).
+// 근접 몬스터도 등급이 높을수록(그레이드 숫자가 작을수록, tier가 클수록)
+// 압도적 전투력 차이로 아주 낮은 확률의 즉사가 있을 수 있다 — 요청으로
+// 근접을 완전히 배제하지 않음. 원거리(활 등) 몬스터는 그 위에 "머리에
+// 맞음" 고정 확률이 추가로 더해진다(투구 같은 대응 수단은 아직 없음 —
+// 1차 구현 범위 밖, 장비 슬롯 확장 시 별도로 다룰 예정).
+const WEAKEST_MONSTER_GRADE = 9; // monsters.ts의 WEAKEST_GRADE와 같은 값 — engine.ts는
+// monsters.ts에 의존하지 않는 기존 구조를 유지하기 위해 별도로 상수화.
+const INSTANT_DEATH_TIER_COEF = 0.1; // 등급 tier 1당 즉사 확률 +0.1%p
+const INSTANT_DEATH_RANGED_BONUS = 0.3; // 원거리 몬스터는 헤드샷으로 +0.3%p 추가
+
+function instantDeathChance(enemyGrade: number, enemyRanged: boolean): number {
+  const tier = WEAKEST_MONSTER_GRADE - enemyGrade;
+  return tier * INSTANT_DEATH_TIER_COEF + (enemyRanged ? INSTANT_DEATH_RANGED_BONUS : 0);
+}
+
 // attacker가 defender를 공격할 때의 명중 확률(%). defender의 유연성(회피)과
 // 인식방해(상대 명중률 교란) 둘 다 이 확률을 깎는다.
 function hitChance(attacker: Actor, defender: Actor): number {
@@ -218,6 +236,10 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
     case 'damage': {
       const isHit = Math.random() * 100 < hitChance(sourceActor, targetActor);
       const isCrit = isHit && Math.random() * 100 < critChance(sourceActor);
+      // 즉사는 명중/치명타와 완전히 별개의 판정이고, 몬스터가 플레이어를
+      // 맞췄을 때만 확인한다(그 반대는 대상 밖 — instantDeathChance 문서
+      // 참고).
+      const instantDeath = isHit && source === 'enemy' && Math.random() * 100 < instantDeathChance(state.enemyGrade, state.enemyRanged);
       const rawDamage = isHit
         ? Math.round(card.value * (1 + sourceActor.strength * STRENGTH_ATTACK_COEF) * (isCrit ? critMultiplier(sourceActor) : 1))
         : 0;
@@ -229,7 +251,7 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
       updatedTarget = {
         ...targetActor,
         shield: targetActor.shield - absorbed,
-        hp: Math.max(0, targetActor.hp - remaining),
+        hp: instantDeath ? 0 : Math.max(0, targetActor.hp - remaining),
         statusEffects: inflicted
           ? applyStatusEffect(targetActor.statusEffects, card.appliesStatusEffect!.type, card.appliesStatusEffect!.duration)
           : targetActor.statusEffects,
@@ -240,11 +262,15 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
       // 방어력으로 실제로 뭔가 깎였을 때만 그 사실을 로그에 덧붙인다(0%면
       // rawDamage===totalDamage라 문구가 안 붙음).
       const defenseSuffix = rawDamage > totalDamage ? ` (방어로 ${rawDamage - totalDamage} 경감)` : '';
-      message = !isHit
-        ? `${sourceActor.name}이(가) [${card.name}]로 공격했지만 ${targetActor.name}이(가) 회피했다!`
-        : isCrit
-          ? `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 치명타! ${totalDamage}의 피해!${defenseSuffix}${statusSuffix}`
-          : `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 ${totalDamage}의 피해!${defenseSuffix}${statusSuffix}`;
+      message = instantDeath
+        ? state.enemyRanged
+          ? `${sourceActor.name}의 화살이 급소에 꽂혔다! ${targetActor.name}이(가) 즉사했다...`
+          : `${sourceActor.name}의 일격이 급소를 강타했다! ${targetActor.name}이(가) 즉사했다...`
+        : !isHit
+          ? `${sourceActor.name}이(가) [${card.name}]로 공격했지만 ${targetActor.name}이(가) 회피했다!`
+          : isCrit
+            ? `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 치명타! ${totalDamage}의 피해!${defenseSuffix}${statusSuffix}`
+            : `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 ${totalDamage}의 피해!${defenseSuffix}${statusSuffix}`;
       break;
     }
     case 'heal': {
