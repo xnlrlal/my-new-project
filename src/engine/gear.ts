@@ -20,6 +20,11 @@ export interface GearDef {
   // called from forceReturnFromDungeon() (main.ts) whenever a dungeon visit
   // truly ends (not on floor transitions/backtracking, which keep drops).
   isPermanent?: boolean;
+  // Marks the 회중시계(pocket watch) — designnotes.md 6-3번/우선순위 1번.
+  // profile.ts's isClockVisible() checks equipped gear for this flag instead
+  // of the old always-on clockItemEquipped placeholder, so equipping this
+  // item (any slot) is what actually turns the in-dungeon clock display on.
+  isClockItem?: boolean;
 }
 
 export interface GearInstance extends GearDef {
@@ -32,6 +37,7 @@ export interface GearTemplate {
   statBonus: StatBonus;
   description: string;
   isPermanent?: boolean;
+  isClockItem?: boolean;
 }
 
 export const EQUIPMENT_SLOTS: EquipmentSlot[] = ['weapon', 'armor', 'legwear', 'footwear', 'accessory'];
@@ -84,6 +90,7 @@ export function createGrantedGear(id: string, template: GearTemplate): GearInsta
     statBonus: template.statBonus,
     description: template.description,
     isPermanent: template.isPermanent,
+    isClockItem: template.isClockItem,
   };
 }
 
@@ -91,4 +98,27 @@ const GEAR_DROP_CHANCE = 0.03;
 
 export function rollGearDrop(): boolean {
   return Math.random() < GEAR_DROP_CHANCE;
+}
+
+// 회중시계 — designnotes.md 6-3번: 마을 상점(ui/shop.ts)에서 스톤으로 구매하는
+// 품목이라 몬스터별 gearDrop(monsters.ts)과 달리 여기서 직접 정의한다. No
+// combat statBonus: its only effect is isClockItem gating the in-dungeon
+// clock display (see isClockItem's doc comment above). isPermanent: true so
+// buying it isn't wasted by the next forced dungeon return — see
+// stripDungeonOnlyGear (profile.ts).
+export const POCKET_WATCH_TEMPLATE: GearTemplate = {
+  name: '회중시계',
+  slot: 'accessory',
+  statBonus: {},
+  description: '문자판에 0시부터 23시까지 새겨진 낡은 회중시계. 장착하면 미궁 안에서도 지금이 며칠째 몇 시인지 확인할 수 있다.',
+  isPermanent: true,
+  isClockItem: true,
+};
+
+// 상점 판매가 — 마스터 설정에 구체적인 가격이 없어 잡은 1차 초안, 요청하면
+// 언제든 조정 가능.
+export const POCKET_WATCH_PRICE = 300;
+
+export function createPocketWatch(): GearInstance {
+  return createGrantedGear('pocket-watch', POCKET_WATCH_TEMPLATE);
 }

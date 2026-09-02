@@ -19,6 +19,7 @@ import {
   unequipGear,
   addExp,
   isClockVisible,
+  buyPocketWatch,
   exchangeManaStonesForGrade,
   completeComingOfAge,
   stripDungeonOnlyGear,
@@ -356,7 +357,14 @@ function render() {
   }
 
   if (screen === 'shop') {
-    renderShop(app, { onBack: () => goTo('village') });
+    renderShop(app, profile, {
+      onBack: () => goTo('village'),
+      onBuyPocketWatch: () => {
+        profile = buyPocketWatch(profile);
+        persistProfile();
+        render();
+      },
+    });
     return;
   }
 

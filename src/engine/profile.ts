@@ -1,7 +1,7 @@
 import type { MonsterDef, MonsterGrade } from './monsters';
 import { expForGrade, stoneValueForGrade } from './monsters';
 import type { EquippedEssence } from './essence';
-import { createGrantedGear, EQUIPMENT_SLOTS, type EquipmentSlot, type GearInstance } from './gear';
+import { createGrantedGear, createPocketWatch, POCKET_WATCH_PRICE, EQUIPMENT_SLOTS, type EquipmentSlot, type GearInstance } from './gear';
 import type { EquippedGear } from './stats-calc';
 import type { RaceId } from './races';
 import { sanitizeResumeSession, type ResumeSession } from './session';
@@ -41,12 +41,6 @@ export interface PlayerProfile {
   inventoryGear: GearInstance[];
   equippedGear: EquippedGear;
   gold: number;
-  // Temporary stand-in for a future "시계" equipment item gating the
-  // in-dungeon clock display (see isClockVisible below). Defaults to true
-  // (clock on) since there's no equippable item to actually equip/unequip
-  // yet — once that item exists, this field goes away and isClockVisible()
-  // reads the item's equipped state instead; no other call site changes.
-  clockItemEquipped: boolean;
   // Gates the 환전소(exchange) village facility. Set true the first time
   // forceReturnFromDungeon() fires in main.ts — "다녀옴" for this facility
   // is defined as that first forced return, since that's currently the only
@@ -108,7 +102,6 @@ function defaultProfile(): PlayerProfile {
     inventoryGear: [],
     equippedGear: {},
     gold: 0,
-    clockItemEquipped: true,
     hasVisitedDungeonExchange: false,
     lastTaxedYear: null,
     hasCompletedComingOfAge: false,
@@ -122,13 +115,14 @@ export function resetProfile(): PlayerProfile {
   return defaultProfile();
 }
 
-// Single decision point for whether the in-dungeon clock is shown. See the
-// clockItemEquipped field's comment — once a real "시계" equipment item
-// exists, replace this function's body to check its equipped state instead;
-// every call site (dungeon-map/battle/inventory/equipment/essence UI in
-// main.ts) stays the same.
+// Single decision point for whether the in-dungeon clock is shown — true iff
+// the player has a 회중시계(pocket watch, gear.ts) equipped in any slot. Was
+// a standalone always-true placeholder field (clockItemEquipped) before that
+// item existed; every call site (dungeon-map/battle/inventory/equipment/
+// essence UI in main.ts) reads through this function, so none needed to
+// change when the placeholder was replaced.
 export function isClockVisible(profile: PlayerProfile): boolean {
-  return profile.clockItemEquipped;
+  return Object.values(profile.equippedGear).some((gear) => gear?.isClockItem === true);
 }
 
 export function maxEssenceSlots(profile: PlayerProfile): number {
@@ -177,6 +171,24 @@ export function exchangeManaStonesForGrade(profile: PlayerProfile, grade: Monste
 
 export function addGearToInventory(profile: PlayerProfile, gear: GearInstance): PlayerProfile {
   return { ...profile, inventoryGear: [...profile.inventoryGear, gear] };
+}
+
+// True once the player owns a 회중시계, equipped or not — used to grey out
+// the shop's "구매" button (ui/shop.ts) so a second copy can't be bought as
+// pointless clutter (it's a one-off tool item, not a stackable resource).
+export function hasPocketWatch(profile: PlayerProfile): boolean {
+  return (
+    profile.inventoryGear.some((gear) => gear.isClockItem === true) ||
+    Object.values(profile.equippedGear).some((gear) => gear?.isClockItem === true)
+  );
+}
+
+// 마을 상점(ui/shop.ts)의 회중시계 구매 — 스톤이 부족하거나 이미 보유 중이면
+// (hasPocketWatch) 아무 것도 하지 않고 profile을 그대로 반환한다. 구매만 할 뿐
+// 자동으로 장착하지는 않음 — 다른 gear와 동일하게 장비창에서 직접 장착한다.
+export function buyPocketWatch(profile: PlayerProfile): PlayerProfile {
+  if (profile.gold < POCKET_WATCH_PRICE || hasPocketWatch(profile)) return profile;
+  return addGearToInventory({ ...profile, gold: profile.gold - POCKET_WATCH_PRICE }, createPocketWatch());
 }
 
 export function equipGear(profile: PlayerProfile, instanceId: string): PlayerProfile {
@@ -344,7 +356,6 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
     inventoryGear: Array.isArray(parsed.inventoryGear) ? (parsed.inventoryGear as GearInstance[]) : [],
     equippedGear: parsed.equippedGear && typeof parsed.equippedGear === 'object' ? (parsed.equippedGear as EquippedGear) : {},
     gold: typeof parsed.gold === 'number' ? parsed.gold : 0,
-    clockItemEquipped: typeof parsed.clockItemEquipped === 'boolean' ? parsed.clockItemEquipped : true,
     hasVisitedDungeonExchange: typeof parsed.hasVisitedDungeonExchange === 'boolean' ? parsed.hasVisitedDungeonExchange : false,
     lastTaxedYear: typeof parsed.lastTaxedYear === 'number' ? parsed.lastTaxedYear : null,
     hasCompletedComingOfAge: typeof parsed.hasCompletedComingOfAge === 'boolean' ? parsed.hasCompletedComingOfAge : false,
