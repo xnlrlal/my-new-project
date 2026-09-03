@@ -30,6 +30,7 @@ export function renderVillage(
   root: HTMLElement,
   hasCharacter: boolean,
   hasVisitedDungeonExchange: boolean,
+  dungeonClosedMessage: string | null,
   taxMessage: string | null,
   gearLossMessage: string | null,
   clock: VillageClockView,
@@ -37,6 +38,9 @@ export function renderVillage(
 ) {
   const judging = clock.pendingJudgmentRemainingSeconds !== null;
   const backButton = hasCharacter ? '' : '<button class="menu-return" id="back-btn">뒤로</button>';
+  const dungeonClosedBanner = dungeonClosedMessage
+    ? `<div class="stat-line" style="text-align:center">${dungeonClosedMessage}</div>`
+    : '';
   const taxBanner = taxMessage ? `<div class="stat-line" style="text-align:center">${taxMessage}</div>` : '';
   const gearLossBanner = gearLossMessage ? `<div class="stat-line" style="text-align:center">${gearLossMessage}</div>` : '';
 
@@ -71,6 +75,7 @@ export function renderVillage(
         <button class="menu-return small" id="skip-btn" ${judging ? 'disabled' : ''}>다음 판단 시점까지 스킵</button>
       </div>
       ${judgmentPanel}
+      ${dungeonClosedBanner}
       ${taxBanner}
       ${gearLossBanner}
       <p class="menu-subtitle">모험을 떠나기 전, 잠시 마을에 들렀다.</p>

@@ -159,6 +159,11 @@ let lastTaxMessage: string | null = null;
 // forceReturnFromDungeon() actually removed something, independent of
 // lastTaxMessage so both can show together on the same forced return.
 let lastDungeonGearLossMessage: string | null = null;
+// Same one-shot pattern for "미궁이 폐쇄되었다" — set on every call to
+// forceReturnFromDungeon() (its only caller is the dungeon-clock timeout
+// check, so every forced return is in fact a closure), independent of the
+// tax/gear-loss messages so all three can show together on the same return.
+let lastDungeonClosedMessage: string | null = null;
 
 let dungeonFloor: 1 | 2 = 1;
 let dungeonThemeZone: ArmZone | null = null;
@@ -308,10 +313,13 @@ function render() {
     lastTaxMessage = null;
     const gearLossMessage = lastDungeonGearLossMessage;
     lastDungeonGearLossMessage = null;
+    const dungeonClosedMessage = lastDungeonClosedMessage;
+    lastDungeonClosedMessage = null;
     renderVillage(
       app,
       profile.raceId != null,
       profile.hasVisitedDungeonExchange,
+      dungeonClosedMessage,
       taxMessage,
       gearLossMessage,
       {
@@ -579,6 +587,8 @@ function enterDungeon() {
 function forceReturnFromDungeon() {
   const prevElapsed = profile.villageElapsedSeconds;
   const newElapsed = villageNoonAfterForcedReturn(dungeonEntryVillageSeconds);
+
+  lastDungeonClosedMessage = '미궁이 폐쇄되어 마을로 강제 귀환했다.';
 
   dungeonFloor = 1;
   dungeonThemeZone = null;
