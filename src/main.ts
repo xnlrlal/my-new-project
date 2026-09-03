@@ -4,6 +4,7 @@ import { getRace, type RaceDef } from './engine/races';
 import type { MonsterDef, MonsterGrade } from './engine/monsters';
 import { getMonsterById, pickMonsterForFloorAndZone, rollEssenceDrop, rollManaStoneDrop } from './engine/monsters';
 import { initGame, playCard, endTurn } from './engine/engine';
+import { hasBleed, removeStatusEffect } from './engine/status-effects';
 import type { ResumableScreen, ResumeSession } from './engine/session';
 import {
   loadProfile,
@@ -24,6 +25,9 @@ import {
   completeComingOfAge,
   stripDungeonOnlyGear,
   damageEquippedGearForBodyPart,
+  buyConsumable,
+  consumeItem,
+  consumableCount,
   type PlayerProfile,
   type ExpGrantResult,
 } from './engine/profile';
@@ -381,6 +385,11 @@ function render() {
         persistProfile();
         render();
       },
+      onBuyBandage: () => {
+        profile = buyConsumable(profile, 'bandage');
+        persistProfile();
+        render();
+      },
     });
     return;
   }
@@ -440,6 +449,7 @@ function render() {
       winProbability,
       expResult,
       { pending: pendingEssence, outcome: essenceOutcome },
+      consumableCount(profile, 'bandage'),
       {
         onPlayCard: (cardId) => {
           if (battleMode !== 'manual') return;
@@ -497,6 +507,17 @@ function render() {
         onOpenInventory: () => openSubScreen('inventory'),
         onOpenEquipment: () => openSubScreen('equipment'),
         onOpenEssence: () => openSubScreen('essence'),
+        onUseBandage: () => {
+          if (!state || consumableCount(profile, 'bandage') <= 0 || !hasBleed(state.player)) return;
+          profile = consumeItem(profile, 'bandage');
+          state = {
+            ...state,
+            player: { ...state.player, statusEffects: removeStatusEffect(state.player.statusEffects, 'bleed') },
+            log: [...state.log, { turn: state.turn, actor: 'player', message: '붕대를 사용해 출혈을 멎게 했다.' }],
+          };
+          persistProfile();
+          render();
+        },
       }
     );
   }

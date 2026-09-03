@@ -2,6 +2,7 @@ import type { PlayerProfile } from '../engine/profile';
 import { totalManaStones } from '../engine/profile';
 import { slotLabel } from '../engine/gear';
 import { statBonusText, statBonusMagnitude } from '../engine/stat-bonus';
+import { CONSUMABLES } from '../engine/consumables';
 
 export interface InventoryHandlers {
   onBack: () => void;
@@ -25,6 +26,13 @@ export function renderInventory(
     manaStoneEntries.length > 0
       ? manaStoneEntries.map((entry) => `<div class="item-row"><span>${entry.grade}등급 마석</span><span>x${entry.count}</span></div>`).join('')
       : '<div class="stat-line">보유한 마석이 없습니다.</div>';
+
+  const consumableEntries = CONSUMABLES.map((def) => ({ def, count: profile.consumables[def.id] ?? 0 })).filter((entry) => entry.count > 0);
+
+  const consumableHtml =
+    consumableEntries.length > 0
+      ? consumableEntries.map((entry) => `<div class="item-row"><span>${entry.def.name}</span><span>x${entry.count}</span></div>`).join('')
+      : '<div class="stat-line">보유한 소모품이 없습니다.</div>';
 
   const gearHtml =
     profile.inventoryGear.length > 0
@@ -57,6 +65,10 @@ export function renderInventory(
       <div class="stats-card">
         <div class="stat-line" style="font-weight:600">마석 (총 ${totalManaStones(profile)}개)</div>
         ${manaStoneHtml}
+      </div>
+      <div class="stats-card">
+        <div class="stat-line" style="font-weight:600">소모품</div>
+        ${consumableHtml}
       </div>
       <div class="stats-card">
         <div class="stat-line" style="font-weight:600">미착용 장비 (장비창에서 장착 가능)</div>

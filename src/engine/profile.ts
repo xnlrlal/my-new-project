@@ -5,6 +5,7 @@ import { createGrantedGear, createPocketWatch, POCKET_WATCH_PRICE, EQUIPMENT_SLO
 import type { EquippedGear } from './stats-calc';
 import type { RaceId } from './races';
 import type { BodyPart } from './types';
+import { getConsumable, type ConsumableId } from './consumables';
 import { sanitizeResumeSession, type ResumeSession } from './session';
 import { SECONDS_PER_HOUR, type ClockSpeed } from './village-clock';
 import { STARTER_ARMOR, findWeaponChoice } from './ritual';
@@ -39,6 +40,10 @@ export interface PlayerProfile {
   essences: EquippedEssence[];
   discoveredEssenceIds: string[];
   manaStones: ManaStoneCounts;
+  // 소모품(designnotes.md 6-1번, consumables.ts) — 마석과 같은 카운터
+  // 저장 방식. 개별 인스턴스가 없어 GearInstance/EquippedEssence와 달리
+  // instanceId 개념이 필요 없다.
+  consumables: Partial<Record<ConsumableId, number>>;
   inventoryGear: GearInstance[];
   equippedGear: EquippedGear;
   gold: number;
@@ -100,6 +105,7 @@ function defaultProfile(): PlayerProfile {
     essences: [],
     discoveredEssenceIds: [],
     manaStones: {},
+    consumables: {},
     inventoryGear: [],
     equippedGear: {},
     gold: 0,
@@ -168,6 +174,35 @@ export function exchangeManaStonesForGrade(profile: PlayerProfile, grade: Monste
     manaStones: nextManaStones,
     gold: profile.gold + count * stoneValueForGrade(grade),
   };
+}
+
+export function consumableCount(profile: PlayerProfile, id: ConsumableId): number {
+  return profile.consumables[id] ?? 0;
+}
+
+function addConsumable(profile: PlayerProfile, id: ConsumableId, amount = 1): PlayerProfile {
+  return { ...profile, consumables: { ...profile.consumables, [id]: consumableCount(profile, id) + amount } };
+}
+
+// 마을 상점(ui/shop.ts)의 소모품 구매 — 회중시계(buyPocketWatch)와 달리
+// 보유 여부로 막지 않는다: 소모품은 반복 구매가 전제인 자원이라, 스톤이
+// 부족할 때만 아무 일도 일어나지 않는다.
+export function buyConsumable(profile: PlayerProfile, id: ConsumableId): PlayerProfile {
+  const def = getConsumable(id);
+  if (profile.gold < def.price) return profile;
+  return addConsumable({ ...profile, gold: profile.gold - def.price }, id);
+}
+
+// 전투 중 붕대 사용(main.ts) 등, 실제로 아이템을 소비할 때 호출한다. 재고가
+// 없으면 no-op — 호출부가 미리 consumableCount()로 확인해야 하는 책임은
+// 그대로 호출부에 있다(UI가 버튼 자체를 비활성화하는 식으로).
+export function consumeItem(profile: PlayerProfile, id: ConsumableId): PlayerProfile {
+  const count = consumableCount(profile, id);
+  if (count <= 0) return profile;
+  const nextConsumables = { ...profile.consumables };
+  if (count <= 1) delete nextConsumables[id];
+  else nextConsumables[id] = count - 1;
+  return { ...profile, consumables: nextConsumables };
 }
 
 export function addGearToInventory(profile: PlayerProfile, gear: GearInstance): PlayerProfile {
@@ -412,6 +447,8 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
     essences: Array.isArray(parsed.essences) ? (parsed.essences as EquippedEssence[]) : [],
     discoveredEssenceIds: Array.isArray(parsed.discoveredEssenceIds) ? (parsed.discoveredEssenceIds as string[]) : [],
     manaStones: parsed.manaStones && typeof parsed.manaStones === 'object' ? (parsed.manaStones as ManaStoneCounts) : {},
+    consumables:
+      parsed.consumables && typeof parsed.consumables === 'object' ? (parsed.consumables as Partial<Record<ConsumableId, number>>) : {},
     inventoryGear: Array.isArray(parsed.inventoryGear) ? (parsed.inventoryGear as GearInstance[]) : [],
     equippedGear: parsed.equippedGear && typeof parsed.equippedGear === 'object' ? (parsed.equippedGear as EquippedGear) : {},
     gold: typeof parsed.gold === 'number' ? parsed.gold : 0,

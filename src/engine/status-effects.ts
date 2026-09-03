@@ -30,6 +30,17 @@ export function isStunned(actor: Actor): boolean {
   return actor.statusEffects.some((e) => e.type === 'stun' && e.remainingTurns > 0);
 }
 
+export function hasBleed(actor: Actor): boolean {
+  return actor.statusEffects.some((e) => e.type === 'bleed' && e.remainingTurns > 0);
+}
+
+// 붕대(consumables.ts) 등, 상태이상을 카드 판정 밖에서 직접 걷어내는 효과가
+// 쓴다 — applyStatusEffect처럼 지속시간을 다루지 않고 그 타입을 통째로
+// 제거한다(스택 수와 무관하게 완전히 치료).
+export function removeStatusEffect(effects: StatusEffect[], type: StatusEffectType): StatusEffect[] {
+  return effects.filter((e) => e.type !== type);
+}
+
 // 출혈이 활성 상태면 이 배율을 회복 카드 값에 곱한다(즉시 0.5배, 반내림).
 export function bleedHealMultiplier(actor: Actor): number {
   return actor.statusEffects.some((e) => e.type === 'bleed' && e.remainingTurns > 0) ? BLEED_HEAL_MULTIPLIER : 1;
