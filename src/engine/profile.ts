@@ -37,6 +37,12 @@ export interface PlayerProfile {
   level: number;
   exp: number;
   defeatedMonsterNames: string[];
+  // 사냥 숙련도(designnotes.md 3-1번, hunting-proficiency.ts)의 데이터 기반 —
+  // defeatedMonsterNames("처치한 적 있는가", exp 최초 지급 판정 전용)와 달리
+  // 몬스터 id별 누적 처치 "횟수"를 센다. 같은 몬스터를 exp 없이 반복 처치해도
+  // (alreadyDefeated===true) 계속 늘어난다 — grantExpForKill과 별개로
+  // recordMonsterKill()이 관리한다.
+  monsterKillCounts: Partial<Record<string, number>>;
   essences: EquippedEssence[];
   discoveredEssenceIds: string[];
   manaStones: ManaStoneCounts;
@@ -102,6 +108,7 @@ function defaultProfile(): PlayerProfile {
     level: 1,
     exp: 0,
     defeatedMonsterNames: [],
+    monsterKillCounts: {},
     essences: [],
     discoveredEssenceIds: [],
     manaStones: {},
@@ -444,6 +451,10 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
     level: typeof parsed.level === 'number' ? parsed.level : 1,
     exp: typeof parsed.exp === 'number' ? parsed.exp : 0,
     defeatedMonsterNames: Array.isArray(parsed.defeatedMonsterNames) ? (parsed.defeatedMonsterNames as string[]) : [],
+    monsterKillCounts:
+      parsed.monsterKillCounts && typeof parsed.monsterKillCounts === 'object'
+        ? (parsed.monsterKillCounts as Partial<Record<string, number>>)
+        : {},
     essences: Array.isArray(parsed.essences) ? (parsed.essences as EquippedEssence[]) : [],
     discoveredEssenceIds: Array.isArray(parsed.discoveredEssenceIds) ? (parsed.discoveredEssenceIds as string[]) : [],
     manaStones: parsed.manaStones && typeof parsed.manaStones === 'object' ? (parsed.manaStones as ManaStoneCounts) : {},
@@ -485,6 +496,17 @@ export interface ExpGrantResult {
   gained: number;
   leveledUp: boolean;
   alreadyDefeated: boolean;
+}
+
+export function monsterKillCount(profile: PlayerProfile, monsterId: string): number {
+  return profile.monsterKillCounts[monsterId] ?? 0;
+}
+
+// exp 지급(grantExpForKill, "최초 처치만")과 달리 이 몬스터를 몇 번째 잡든
+// 매번 호출한다 — 사냥 숙련도(hunting-proficiency.ts)는 반복 처치 자체가
+// 목적이므로 alreadyDefeated 여부와 무관하게 계속 누적돼야 한다.
+export function recordMonsterKill(profile: PlayerProfile, monsterId: string): PlayerProfile {
+  return { ...profile, monsterKillCounts: { ...profile.monsterKillCounts, [monsterId]: monsterKillCount(profile, monsterId) + 1 } };
 }
 
 export function grantExpForKill(profile: PlayerProfile, monster: MonsterDef): ExpGrantResult {

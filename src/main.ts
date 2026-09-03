@@ -28,11 +28,15 @@ import {
   buyConsumable,
   consumeItem,
   consumableCount,
+  monsterKillCount,
+  recordMonsterKill,
   type PlayerProfile,
   type ExpGrantResult,
 } from './engine/profile';
 import { createEssenceFromMonster, essenceSkillCards, type EquippedEssence } from './engine/essence';
 import { computeTotalStats } from './engine/stats-calc';
+import { applyStatBonuses } from './engine/stat-bonus';
+import { huntingProficiencyBonus, huntingProficiencyLabel, huntingProficiencyTier } from './engine/hunting-proficiency';
 import { autoPlayOneTurn, estimateWinProbability } from './engine/battle-ai';
 import { rollGearDrop, createGearFromMonster, type EquipmentSlot } from './engine/gear';
 import {
@@ -450,6 +454,7 @@ function render() {
       expResult,
       { pending: pendingEssence, outcome: essenceOutcome },
       consumableCount(profile, 'bandage'),
+      currentMonster ? huntingProficiencyLabel(monsterKillCount(profile, currentMonster.id)) : null,
       {
         onPlayCard: (cardId) => {
           if (battleMode !== 'manual') return;
@@ -828,7 +833,11 @@ function startZoneBattle(zone: Zone, options?: { forcedMonsterId?: string; ambus
   if (!selectedRace) return;
   currentMonster = options?.forcedMonsterId ? getMonsterById(options.forcedMonsterId) : pickMonsterForFloorAndZone(dungeonFloor, zone);
   const bonusCards = essenceSkillCards(profile.essences);
-  const totalStats = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus);
+  const baseStats = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus);
+  // 사냥 숙련도(designnotes.md 3-1번, hunting-proficiency.ts) — 이 몬스터
+  // 상대로만 적용되는 보너스라 computeTotalStats(범용 스탯)에는 넣지 않고,
+  // 전투 시작 시점에 이 몬스터 한정으로 한 겹 더 얹는다.
+  const totalStats = applyStatBonuses(baseStats, [{ statBonus: huntingProficiencyBonus(monsterKillCount(profile, currentMonster.id)) }]);
   // Carry HP left over from the previous battle in this run (clamped inside
   // initGame against the just-recomputed maxHp, in case gear/essences
   // changed mid-run); a brand-new run has no carried HP yet, so fall back to
@@ -934,6 +943,21 @@ function checkForExp() {
     };
     state = { ...state, log: [...state.log, { turn: state.turn, actor: 'player', message: '업적 달성: 첫 사냥 — 정신 영구 +1!' }] };
   }
+
+  // 사냥 숙련도(hunting-proficiency.ts) — exp와 달리 alreadyDefeated 여부와
+  // 무관하게 이 몬스터를 잡을 때마다 누적된다. checkForExp가 이미 "이번
+  // 승리를 정확히 한 번만 반영"하는 시점(expChecked 가드)이라, 별도의
+  // session-persisted 플래그 없이 여기서 함께 처리한다.
+  const beforeTier = huntingProficiencyTier(monsterKillCount(profile, currentMonster.id));
+  profile = recordMonsterKill(profile, currentMonster.id);
+  const afterTier = huntingProficiencyTier(monsterKillCount(profile, currentMonster.id));
+  if (afterTier > beforeTier) {
+    state = {
+      ...state,
+      log: [...state.log, { turn: state.turn, actor: 'player', message: `${currentMonster.name} 사냥 숙련도가 올랐다! (Lv.${afterTier})` }],
+    };
+  }
+
   persistProfile();
 }
 

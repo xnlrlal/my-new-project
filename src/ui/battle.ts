@@ -32,7 +32,7 @@ export interface EssenceDropState {
 // available regardless of the estimated odds (see renderBattle's doc comment).
 const SAFE_WIN_PROBABILITY = 0.99;
 
-function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number): string {
+function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number, proficiencyLabel?: string | null): string {
   const hpPct = Math.round((actor.hp / actor.maxHp) * 100);
   const manaPct = Math.round((actor.mana / actor.maxMana) * 100);
   // statusEffects는 순수 데이터(status-effects.ts)이고, 이 한 줄 텍스트는
@@ -42,7 +42,7 @@ function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number): st
   const partsText = damagedPartsText(actor);
   return `
     <div class="actor ${role}">
-      <div class="actor-name">${actor.name}${grade ? ` <span class="grade-tag">${grade}등급</span>` : ''}</div>
+      <div class="actor-name">${actor.name}${grade ? ` <span class="grade-tag">${grade}등급</span>` : ''}${proficiencyLabel ? ` <span class="grade-tag proficiency-tag">${proficiencyLabel}</span>` : ''}</div>
       <div class="bar"><div class="bar-fill" style="width:${hpPct}%"></div></div>
       <div class="stat-line">HP ${hpPct}% ${actor.shield > 0 ? `· 방어막 ${actor.shield}` : ''}</div>
       <div class="bar"><div class="bar-fill mana" style="width:${manaPct}%"></div></div>
@@ -102,6 +102,7 @@ export function renderBattle(
   expResult: ExpGrantResult | null,
   essenceDrop: EssenceDropState,
   bandageCount: number,
+  proficiencyLabel: string | null,
   handlers: BattleHandlers
 ) {
   const { player, enemy, log, status } = state;
@@ -182,7 +183,7 @@ export function renderBattle(
     ${clockHtml}
     ${banner}
     <div class="board">
-      ${renderActor(enemy, 'enemy', state.enemyGrade)}
+      ${renderActor(enemy, 'enemy', state.enemyGrade, proficiencyLabel)}
       ${renderActor(player, 'player')}
     </div>
     <div class="log-header">
