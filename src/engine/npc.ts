@@ -30,6 +30,10 @@ export interface NpcDef {
   // 9(최약)로 고정해 즉사 확률을 정확히 0%로 둔다. UI에는 절대 노출하지
   // 않는다(ui/battle.ts) — "등급" 용어가 몬스터 등급과 겹치는 문제
   // (designnotes.md 1번 원칙)를 인간형에서까지 반복하지 않기 위함.
+  // ⚠️ 이 9는 monsters.ts의 WEAKEST_GRADE, engine.ts의 WEAKEST_MONSTER_GRADE와
+  // 반드시 같은 값이어야 한다(그래야 tier=0, 즉사 확률=0%) — 세 곳 모두
+  // 타입/임포트로 강제되지 않은 수동 동기화라, 등급 체계가 바뀌면
+  // (designnotes.md 2번 "무등급 몬스터" 확장 등) 여기도 같이 확인해야 한다.
   grade: 9;
   introMessage: string;
   incapacitatedMessage: string;
