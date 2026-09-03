@@ -232,8 +232,8 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'banshee',
     name: '벤시',
-    grade: 6,
-    ...combatStatsForGrade(6),
+    grade: 8,
+    ...combatStatsForGrade(8),
     maxHp: 100,
     maxMana: 5,
     floor: 2,
