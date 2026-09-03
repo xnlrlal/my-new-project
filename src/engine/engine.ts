@@ -260,14 +260,27 @@ function clampPercent(value: number, min: number, max: number): number {
 // 근접을 완전히 배제하지 않음. 원거리(활 등) 몬스터는 그 위에 "머리에
 // 맞음" 고정 확률이 추가로 더해진다(투구 같은 대응 수단은 아직 없음 —
 // 1차 구현 범위 밖, 장비 슬롯 확장 시 별도로 다룰 예정).
-const WEAKEST_MONSTER_GRADE = 9; // monsters.ts의 WEAKEST_GRADE와 같은 값 — engine.ts는
-// monsters.ts에 의존하지 않는 기존 구조를 유지하기 위해 별도로 상수화.
+// WEAKEST_MONSTER_GRADE는 monsters.ts의 WEAKEST_GRADE, npc.ts의 NpcDef.grade
+// 하드코딩과 같은 값(9)으로 맞춰져 있어야 한다 — engine.ts는 monsters.ts에
+// 의존하지 않는 기존 구조를 유지하기 위해 임포트 대신 별도로 상수화했다.
+// 셋 중 하나라도 바뀌면(예: designnotes.md 2번의 "무등급 몬스터" 확장으로
+// 9등급보다 약한 등급이 생기는 경우) 나머지도 함께 맞춰야 한다 — 컴파일
+// 에러 없이 조용히 어긋날 수 있는 지점이니 등급 체계를 건드릴 땐 이 세 곳을
+// 모두 검색해서 확인할 것.
+const WEAKEST_MONSTER_GRADE = 9;
 const INSTANT_DEATH_TIER_COEF = 0.1; // 등급 tier 1당 즉사 확률 +0.1%p
 const INSTANT_DEATH_RANGED_BONUS = 0.3; // 원거리 몬스터는 헤드샷으로 +0.3%p 추가
+// 다른 확률 판정(명중/치명타/방어력 경감/독내성)은 전부 명시적 상한이 있는데
+// 즉사만 없었다 — 지금의 등급 범위(1~9)에서는 tier가 최대 8이라 이론상
+// 최댓값이 약 1.1%로 자연히 낮지만, 등급 체계가 확장되거나(위 참고)
+// enemyGrade가 잘못된 값으로 들어오면 상한 없이 커질 수 있어 위 상수들과
+// 같은 원칙(완전 무적/즉사 방지)으로 명시적 캡을 둔다.
+const INSTANT_DEATH_MAX_CHANCE = 10;
 
 function instantDeathChance(enemyGrade: number, enemyRanged: boolean): number {
   const tier = WEAKEST_MONSTER_GRADE - enemyGrade;
-  return tier * INSTANT_DEATH_TIER_COEF + (enemyRanged ? INSTANT_DEATH_RANGED_BONUS : 0);
+  const raw = tier * INSTANT_DEATH_TIER_COEF + (enemyRanged ? INSTANT_DEATH_RANGED_BONUS : 0);
+  return clampPercent(raw, 0, INSTANT_DEATH_MAX_CHANCE);
 }
 
 // attacker가 defender를 공격할 때의 명중 확률(%). defender의 유연성(회피)과
