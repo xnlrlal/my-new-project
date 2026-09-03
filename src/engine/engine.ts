@@ -113,9 +113,36 @@ function createActor(
 // represent being caught off guard (see status-effects.ts's isStunned/
 // endTurn ordering — this works correctly because the stun is present in
 // the very first GameState, before any playCard/endTurn call ever runs).
+function createEnemyLikeActor(id: ActorId, combatant: EnemyCombatant, bonusCards: Card[] = []): Actor {
+  return createActor(
+    id,
+    combatant.name,
+    {
+      maxHp: combatant.maxHp,
+      maxMana: combatant.maxMana,
+      strength: combatant.strength,
+      dexterity: combatant.dexterity,
+      willpower: combatant.willpower,
+      // 몬스터는 이 다섯 필드가 없어(MonsterDef에 필드 자체가 없음) 0
+      // 고정, 인간형 NPC(npc.ts)는 실수치를 제공한다(EnemyCombatant 문서
+      // 참고).
+      accuracy: combatant.accuracy ?? 0,
+      flexibility: combatant.flexibility ?? 0,
+      perceptionJam: combatant.perceptionJam ?? 0,
+      obsession: combatant.obsession ?? 0,
+      poisonResist: combatant.poisonResist ?? 0,
+    },
+    bonusCards
+  );
+}
+
 // isHuman marks the enemy as an incapacitatable NPC rather than a monster
 // (designnotes.md 3-6번) — see EnemyCombatant's doc comment and
 // checkGameOver below for what this changes.
+// companion is the optional 동료 NPC(designnotes.md 10번, 최소 구현) fighting
+// alongside the player — reuses the same EnemyCombatant shape as the enemy
+// (grade/ranged on it go unused, see GameState.companion's doc comment).
+// undefined/omitted means "no companion in this fight" (the common case).
 export function initGame(
   playerStats: RaceStats,
   enemy: EnemyCombatant,
@@ -123,7 +150,8 @@ export function initGame(
   startingHp?: number,
   initialStatusEffects: StatusEffect[] = [],
   ambush = false,
-  isHuman = false
+  isHuman = false,
+  companion?: EnemyCombatant
 ): GameState {
   const player = createActor('player', '플레이어', playerStats, bonusCards);
   const hp = startingHp === undefined ? player.maxHp : Math.min(Math.max(0, startingHp), player.maxHp);
@@ -135,21 +163,11 @@ export function initGame(
     // level during this battle" — the player is genuinely at risk from the
     // first card played, not just from damage dealt after this point.
     lowestPlayerHpRatio: hp / player.maxHp,
-    enemy: createActor('enemy', enemy.name, {
-      maxHp: enemy.maxHp,
-      maxMana: enemy.maxMana,
-      strength: enemy.strength,
-      dexterity: enemy.dexterity,
-      willpower: enemy.willpower,
-      // 몬스터는 이 다섯 필드가 없어(MonsterDef에 필드 자체가 없음) 0
-      // 고정, 인간형 NPC(npc.ts)는 실수치를 제공한다(EnemyCombatant 문서
-      // 참고).
-      accuracy: enemy.accuracy ?? 0,
-      flexibility: enemy.flexibility ?? 0,
-      perceptionJam: enemy.perceptionJam ?? 0,
-      obsession: enemy.obsession ?? 0,
-      poisonResist: enemy.poisonResist ?? 0,
-    }),
+    // 동료도 적도 플레이어의 정수 스킬 카드(bonusCards)를 받지 않는다 —
+    // 원래도 적은 그랬고(과거엔 아예 인자를 안 넘겼음), 동료 역시 자기
+    // 카드만으로 싸운다(1차 구현, 동료 전용 스킬 카드는 미착수).
+    companion: companion ? createEnemyLikeActor('companion', companion) : null,
+    enemy: createEnemyLikeActor('enemy', enemy),
     enemyGrade: enemy.grade,
     enemyRanged: enemy.ranged,
     enemyIsHuman: isHuman,
@@ -160,6 +178,23 @@ export function initGame(
 
 function appendLog(state: GameState, entry: Omit<LogEntry, 'turn'>): LogEntry[] {
   return [...state.log, { ...entry, turn: state.turn }];
+}
+
+// player/enemy는 GameState에 항상 있지만 companion은 없을 수 있어(Actor|null)
+// 이 둘로 안전하게 읽고 쓴다 — applyCard가 셋 중 어느 하나를 소스/타깃으로
+// 다루든 이 두 함수만 거치면 나머지 로직은 늘 Actor(널 아님) 타입으로
+// 다룰 수 있다. companion이 없는데 이 id로 호출되는 일은 없다(호출부가
+// 항상 존재를 먼저 확인 — companionAct/pickEnemyTarget 등).
+function getActor(state: GameState, id: ActorId): Actor {
+  const actor = id === 'player' ? state.player : id === 'enemy' ? state.enemy : state.companion;
+  if (!actor) throw new Error(`No '${id}' actor in this battle`);
+  return actor;
+}
+
+function withActor(state: GameState, id: ActorId, actor: Actor): GameState {
+  if (id === 'player') return { ...state, player: actor };
+  if (id === 'enemy') return { ...state, enemy: actor };
+  return { ...state, companion: actor };
 }
 
 // 2단계: 데미지 카드에 명중→치명타 판정 레이어를 얹는다. 카드 코스트/마나
@@ -253,10 +288,16 @@ function critMultiplier(attacker: Actor): number {
   return Math.min(MAX_CRIT_MULTIPLIER, BASE_CRIT_MULTIPLIER + attacker.obsession * OBSESSION_CRIT_COEF);
 }
 
-function applyCard(state: GameState, source: ActorId, card: Card): GameState {
-  const targetId: ActorId = card.effect === 'heal' || card.effect === 'shield' ? source : source === 'player' ? 'enemy' : 'player';
-  const sourceActor = state[source];
-  const targetActor = state[targetId];
+// explicitTarget only matters for damage cards from the enemy — it's how
+// pickEnemyTarget(below) tells applyCard whether this attack goes at the
+// player or the companion. Every other source has a fixed, unambiguous
+// target (player/companion always attack 'enemy'; heal/shield always
+// target self), so explicitTarget is ignored for those.
+function applyCard(state: GameState, source: ActorId, card: Card, explicitTarget?: ActorId): GameState {
+  const targetId: ActorId =
+    card.effect === 'heal' || card.effect === 'shield' ? source : (explicitTarget ?? (source === 'enemy' ? 'player' : 'enemy'));
+  const sourceActor = getActor(state, source);
+  const targetActor = getActor(state, targetId);
 
   let updatedTarget: Actor = targetActor;
   let message = '';
@@ -330,14 +371,14 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
       ? { ...updatedTarget, mana: sourceActor.mana - card.cost, hand: sourceActor.hand.filter((c) => c.id !== card.id), discard: [...sourceActor.discard, card] }
       : { ...sourceActor, mana: sourceActor.mana - card.cost, hand: sourceActor.hand.filter((c) => c.id !== card.id), discard: [...sourceActor.discard, card] };
 
-  const next: GameState = {
+  let next: GameState = {
     ...state,
-    [source]: updatedSource,
-    [targetId]: source === targetId ? updatedSource : updatedTarget,
     log: appendLog(state, { actor: source, message }),
   };
+  next = withActor(next, source, updatedSource);
+  if (source !== targetId) next = withActor(next, targetId, updatedTarget);
 
-  return trackLowestPlayerHp(checkGameOver(next));
+  return trackLowestPlayerHp(checkCompanionFallen(checkGameOver(next)));
 }
 
 // Keeps lowestPlayerHpRatio current after every single card resolution (not
@@ -364,12 +405,47 @@ function checkGameOver(state: GameState): GameState {
   return state;
 }
 
+// 동료가 쓰러져도(HP 0) 게임 오버가 아니다 — 페르마데스는 플레이어 HP 0에만
+// 걸린다(checkGameOver). 이 함수는 그 대신 companion을 null로 비워 전투에서
+// 조용히 이탈시킨다 — applyCard/endTurn이 상태이상 틱·회복 등 companion의
+// HP를 바꿀 수 있는 모든 지점 직후에 호출한다.
+function checkCompanionFallen(state: GameState): GameState {
+  if (!state.companion || state.companion.hp > 0) return state;
+  return {
+    ...state,
+    companion: null,
+    log: appendLog(state, { actor: 'companion', message: `${state.companion.name}이(가) 쓰러져 전투에서 이탈했다!` }),
+  };
+}
+
+// 적이 데미지 카드를 낼 때 플레이어와 동료 중 누굴 노릴지 — 동료가 없거나
+// 이미 쓰러졌으면 항상 플레이어. 1차 구현은 단순 50/50 무작위(더 약한
+// 쪽을 우선 노리는 등의 AI는 미착수, designnotes.md 10번 최소 구현 범위).
+function pickEnemyTarget(state: GameState): ActorId {
+  if (!state.companion || state.companion.hp <= 0) return 'player';
+  return Math.random() < 0.5 ? 'player' : 'companion';
+}
+
 function enemyAct(state: GameState): GameState {
   if (state.status !== 'playing') return state;
   const playable = state.enemy.hand.filter((c) => c.cost <= state.enemy.mana);
   if (playable.length === 0) return state;
   const card = playable[Math.floor(Math.random() * playable.length)];
-  return applyCard(state, 'enemy', card);
+  const target = card.effect === 'damage' ? pickEnemyTarget(state) : undefined;
+  return applyCard(state, 'enemy', card, target);
+}
+
+// 동료의 턴 — battle-ai.ts의 pickBestCard와 같은 정책(코스트 감당 가능한
+// 카드 중 값이 가장 높은 걸 우선)을 engine.ts 안에 그대로 복제했다(동료는
+// UI가 아니라 항상 자동으로 움직이므로 여기서 직접 결정해야 함). 데미지
+// 카드는 explicitTarget 없이 호출 — applyCard의 기본 분기(source!=='enemy'
+// → 'enemy')가 정확히 "동료는 항상 적을 공격한다"와 일치해 그대로 맞는다.
+function companionAct(state: GameState): GameState {
+  if (state.status !== 'playing' || !state.companion) return state;
+  const playable = state.companion.hand.filter((c) => c.cost <= state.companion!.mana);
+  if (playable.length === 0) return state;
+  const card = playable.reduce((best, c) => (c.value > best.value ? c : best));
+  return applyCard(state, 'companion', card);
 }
 
 // 상태이상 틱은 턴이 "끝날 때"가 아니라 이 함수 맨 앞, 적의 행동 페이즈보다
@@ -382,19 +458,34 @@ export function endTurn(state: GameState): GameState {
   if (state.status !== 'playing') return state;
 
   const playerTick = tickStatusEffects(state.player, '플레이어');
+  const companionTick = state.companion ? tickStatusEffects(state.companion, state.companion.name) : null;
   const enemyTick = tickStatusEffects(state.enemy, state.enemy.name);
   let next: GameState = {
     ...state,
     player: playerTick.actor,
+    companion: companionTick ? companionTick.actor : state.companion,
     enemy: enemyTick.actor,
     log: [
       ...state.log,
       ...playerTick.messages.map((message) => ({ turn: state.turn, actor: 'player' as const, message })),
+      ...(companionTick?.messages.map((message) => ({ turn: state.turn, actor: 'companion' as const, message })) ?? []),
       ...enemyTick.messages.map((message) => ({ turn: state.turn, actor: 'enemy' as const, message })),
     ],
   };
-  next = trackLowestPlayerHp(checkGameOver(next));
+  next = trackLowestPlayerHp(checkCompanionFallen(checkGameOver(next)));
   if (next.status !== 'playing') return next;
+
+  // 동료 턴 — 플레이어 턴 다음, 적 턴 이전. 상태이상 틱을 이미 반영한
+  // companionTick.wasStunned 기준으로 건너뛸지 정한다(적의 wasStunned와
+  // 같은 원칙).
+  if (next.companion && !(companionTick?.wasStunned ?? false)) {
+    while (next.status === 'playing' && next.companion && next.companion.hand.some((c) => c.cost <= next.companion!.mana)) {
+      const before = next;
+      next = companionAct(next);
+      if (next === before) break;
+    }
+    if (next.status !== 'playing') return next;
+  }
 
   if (!enemyTick.wasStunned) {
     while (next.status === 'playing' && next.enemy.hand.some((c) => c.cost <= next.enemy.mana)) {
@@ -405,19 +496,24 @@ export function endTurn(state: GameState): GameState {
     if (next.status !== 'playing') return next;
   }
 
-  // 라운드(플레이어 턴 + 적 턴)가 완전히 끝난 시점에 자연재생력을 적용한다 —
-  // 다음 라운드 마나 리필과 같은 지점이라, "라운드마다 한 번" 원칙이 자연히
-  // 지켜진다. 인내심이 없는 쪽(현재 모든 몬스터)은 healed===0이라 로그도 안
-  // 붙는다.
+  // 라운드(플레이어 턴 + 동료 턴 + 적 턴)가 완전히 끝난 시점에 자연재생력을
+  // 적용한다 — 다음 라운드 마나 리필과 같은 지점이라, "라운드마다 한 번"
+  // 원칙이 자연히 지켜진다. 인내심이 없는 쪽(현재 모든 몬스터)은
+  // healed===0이라 로그도 안 붙는다.
   const playerRegen = applyRegenTick(next.player);
+  const companionRegen = next.companion ? applyRegenTick(next.companion) : null;
   const enemyRegen = applyRegenTick(next.enemy);
   next = {
     ...next,
     player: playerRegen.actor,
+    companion: companionRegen ? companionRegen.actor : next.companion,
     enemy: enemyRegen.actor,
     log: [
       ...next.log,
       ...(playerRegen.healed > 0 ? [{ turn: next.turn, actor: 'player' as const, message: `자연재생력으로 체력을 ${playerRegen.healed} 회복했다.` }] : []),
+      ...(companionRegen && companionRegen.healed > 0
+        ? [{ turn: next.turn, actor: 'companion' as const, message: `${next.companion!.name}이(가) 자연재생력으로 체력을 ${companionRegen.healed} 회복했다.` }]
+        : []),
       ...(enemyRegen.healed > 0
         ? [{ turn: next.turn, actor: 'enemy' as const, message: `${next.enemy.name}이(가) 자연재생력으로 체력을 ${enemyRegen.healed} 회복했다.` }]
         : []),
@@ -426,12 +522,16 @@ export function endTurn(state: GameState): GameState {
 
   const nextTurn = next.turn + 1;
   const refreshedPlayer = drawCards({ ...next.player, mana: next.player.maxMana }, HAND_SIZE - next.player.hand.length);
+  const refreshedCompanion = next.companion
+    ? drawCards({ ...next.companion, mana: next.companion.maxMana }, HAND_SIZE - next.companion.hand.length)
+    : null;
   const refreshedEnemy = drawCards({ ...next.enemy, mana: next.enemy.maxMana }, HAND_SIZE - next.enemy.hand.length);
 
   return {
     ...next,
     turn: nextTurn,
     player: refreshedPlayer,
+    companion: refreshedCompanion,
     enemy: refreshedEnemy,
     log: [...next.log, { turn: nextTurn, actor: 'player', message: `--- ${nextTurn}턴 시작 ---` }],
   };

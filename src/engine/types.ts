@@ -28,7 +28,10 @@ export interface Card {
   appliesStatusEffect?: { type: StatusEffectType; duration: number };
 }
 
-export type ActorId = 'player' | 'enemy';
+// 'companion'(동료 NPC, designnotes.md 10번 "파티(결속)"의 최소 구현) — 항상
+// 있는 건 아니라 GameState.companion은 Actor|null(없으면 그냥 2인 전투).
+// 있을 때만 관여하는 모든 로직(engine.ts)이 이 셋째 값으로 분기한다.
+export type ActorId = 'player' | 'companion' | 'enemy';
 
 export interface Actor {
   id: ActorId;
@@ -79,6 +82,11 @@ export type GameStatus = 'playing' | 'win' | 'lose' | 'incapacitated';
 export interface GameState {
   turn: number;
   player: Actor;
+  // 동료 NPC(designnotes.md 10번) — 없는 전투가 기본(null). 있으면 플레이어
+  // 턴 다음·적 턴 이전에 자동으로 카드를 낸다(engine.ts의 companionAct).
+  // 죽어도 게임 오버가 아니라 이 필드가 null로 바뀌며 전투에서 이탈할
+  // 뿐이다(checkCompanionFallen) — 페르마데스는 플레이어 HP 0에만 걸림.
+  companion: Actor | null;
   enemy: Actor;
   enemyGrade: number;
   // 원거리(활 등) 몬스터인지 — engine.ts의 즉사(헤드샷) 판정이 이 필드로

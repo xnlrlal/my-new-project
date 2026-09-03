@@ -93,6 +93,13 @@ export interface PlayerProfile {
   // never defeated anything yet" (see checkForExp in main.ts).
   achievementHp2PctGranted: boolean;
   achievementHp01PctGranted: boolean;
+  // 동료 NPC(designnotes.md 10번 "파티(결속)", 최소 구현) — npc.ts의
+  // NpcDef.id 하나만 저장한다(전투 중 실제 HP/카드 등은 GameState.companion
+  // 쪽에 있고, ResumeSession.state가 그걸 통째로 들고 있어 별도 저장이
+  // 필요 없다 — session.ts 참고). null = 동료 없음. 최대 1명까지만
+  // (1차 구현 범위, 교체/해산 UI 없음 — 전투 중 쓰러지면 자동으로 null이
+  // 됨). 페르마데스 원칙에 따라 사망 시 resetProfile()로 함께 초기화.
+  companionNpcId: string | null;
 }
 
 function defaultProfile(): PlayerProfile {
@@ -119,6 +126,7 @@ function defaultProfile(): PlayerProfile {
     hasVisitedDungeonExchange: false,
     lastTaxedYear: null,
     hasCompletedComingOfAge: false,
+    companionNpcId: null,
     achievementStatBonus: {},
     achievementHp2PctGranted: false,
     achievementHp01PctGranted: false,
@@ -470,6 +478,7 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
       parsed.achievementStatBonus && typeof parsed.achievementStatBonus === 'object' ? (parsed.achievementStatBonus as StatBonus) : {},
     achievementHp2PctGranted: typeof parsed.achievementHp2PctGranted === 'boolean' ? parsed.achievementHp2PctGranted : false,
     achievementHp01PctGranted: typeof parsed.achievementHp01PctGranted === 'boolean' ? parsed.achievementHp01PctGranted : false,
+    companionNpcId: typeof parsed.companionNpcId === 'string' ? parsed.companionNpcId : null,
   };
 }
 
@@ -507,6 +516,22 @@ export function monsterKillCount(profile: PlayerProfile, monsterId: string): num
 // 목적이므로 alreadyDefeated 여부와 무관하게 계속 누적돼야 한다.
 export function recordMonsterKill(profile: PlayerProfile, monsterId: string): PlayerProfile {
   return { ...profile, monsterKillCounts: { ...profile.monsterKillCounts, [monsterId]: monsterKillCount(profile, monsterId) + 1 } };
+}
+
+// 동료 NPC(designnotes.md 10번, npc.ts) — 이미 동료가 있으면 no-op(1차
+// 구현은 동시에 1명까지만, 교체 UI 없음). main.ts가 전투불능 상태의 NPC를
+// "동료로 삼는다" 선택했을 때 호출한다.
+export function recruitCompanion(profile: PlayerProfile, npcId: string): PlayerProfile {
+  if (profile.companionNpcId) return profile;
+  return { ...profile, companionNpcId: npcId };
+}
+
+// 동료가 전투 중 쓰러졌을 때(GameState.companion이 null이 됨, engine.ts의
+// checkCompanionFallen) 세이브 쪽 기록도 맞춰 지운다 — main.ts가 전투 종료
+// 후 이 둘의 불일치를 감지하면 호출한다.
+export function clearCompanion(profile: PlayerProfile): PlayerProfile {
+  if (!profile.companionNpcId) return profile;
+  return { ...profile, companionNpcId: null };
 }
 
 export function grantExpForKill(profile: PlayerProfile, monster: MonsterDef): ExpGrantResult {

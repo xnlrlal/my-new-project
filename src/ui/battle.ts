@@ -22,9 +22,11 @@ export interface BattleHandlers {
   onOpenEssence: () => void;
   onUseBandage: () => void;
   // 인간형 NPC 전투불능(designnotes.md 3-6번) 전용 — status === 'incapacitated'
-  // 일 때만 배너에 뜨는 두 선택지.
+  // 일 때만 배너에 뜨는 선택지들. onRecruitCompanion은 이미 동료가 있으면
+  // 배너 자체에 안 뜬다(renderBattle의 canRecruitCompanion 참고).
   onSpareNpc: () => void;
   onFinishNpc: () => void;
+  onRecruitCompanion: () => void;
 }
 
 export interface EssenceDropState {
@@ -37,7 +39,7 @@ export interface EssenceDropState {
 // available regardless of the estimated odds (see renderBattle's doc comment).
 const SAFE_WIN_PROBABILITY = 0.99;
 
-function renderActor(actor: Actor, role: 'player' | 'enemy', grade?: number, proficiencyLabel?: string | null): string {
+function renderActor(actor: Actor, role: 'player' | 'companion' | 'enemy', grade?: number, proficiencyLabel?: string | null): string {
   const hpPct = Math.round((actor.hp / actor.maxHp) * 100);
   const manaPct = Math.round((actor.mana / actor.maxMana) * 100);
   // statusEffects는 순수 데이터(status-effects.ts)이고, 이 한 줄 텍스트는
@@ -109,6 +111,10 @@ export function renderBattle(
   bandageCount: number,
   proficiencyLabel: string | null,
   npcEncounter: NpcDef | null,
+  // 파티(designnotes.md 10번, 최소 구현) — 이미 동료가 있으면 false로 넘어와
+  // "동료로 삼는다" 버튼 자체가 안 뜬다(main.ts가 profile.companionNpcId
+  // 기준으로 판단).
+  canRecruitCompanion: boolean,
   handlers: BattleHandlers
 ) {
   const { player, enemy, log, status } = state;
@@ -158,6 +164,7 @@ export function renderBattle(
         : status === 'incapacitated' && npcEncounter
           ? `<div class="status-banner">${npcEncounter.incapacitatedMessage}
               <div class="banner-actions">
+                ${canRecruitCompanion ? '<button class="menu-return" id="recruit-companion">동료로 삼는다</button>' : ''}
                 <button class="menu-return" id="spare-npc">살려준다</button>
                 <button class="menu-start" id="finish-npc">끝장낸다</button>
               </div>
@@ -197,6 +204,7 @@ export function renderBattle(
     ${banner}
     <div class="board">
       ${renderActor(enemy, 'enemy', state.enemyIsHuman ? undefined : state.enemyGrade, proficiencyLabel)}
+      ${state.companion ? renderActor(state.companion, 'companion') : ''}
       ${renderActor(player, 'player')}
     </div>
     <div class="log-header">
@@ -250,6 +258,7 @@ export function renderBattle(
   document.getElementById('open-codex')?.addEventListener('click', handlers.onOpenEssence);
   document.getElementById('spare-npc')?.addEventListener('click', handlers.onSpareNpc);
   document.getElementById('finish-npc')?.addEventListener('click', handlers.onFinishNpc);
+  document.getElementById('recruit-companion')?.addEventListener('click', handlers.onRecruitCompanion);
 
   const copyLogBtn = document.getElementById('copy-log-btn') as HTMLButtonElement | null;
   copyLogBtn?.addEventListener('click', async () => {

@@ -35,6 +35,13 @@ export interface NpcDef {
   incapacitatedMessage: string;
   spareMessage: string;
   killMessage: string;
+  // 파티(designnotes.md 10번 "결속", 최소 구현) — 전투불능 상태에서 "동료로
+  // 삼는다"를 골랐을 때만 쓰인다. 은혜를 갚는다는 서사로 스톤 비용 없이
+  // 즉시 합류한다(designnotes 원문의 "마석 2개=1.5만 스톤" 비용은 현재
+  // 구현된 마석 환전 기준 9등급=20스톤과 맞지 않는 예전 수치라 이번
+  // 최소 구현에서는 채택하지 않음 — 유료 결속은 이후 필요해지면 별도로
+  // 설계).
+  recruitMessage: string;
 }
 
 export const WANDERING_EXPLORER: NpcDef = {
@@ -56,6 +63,7 @@ export const WANDERING_EXPLORER: NpcDef = {
   incapacitatedMessage: '탐험가가 무기를 놓치고 쓰러졌다. 아직 숨은 붙어있다 — 죽일지 살려줄지 선택할 수 있다.',
   spareMessage: '탐험가를 살려주고 그대로 보내주었다.',
   killMessage: '탐험가의 숨통을 끊고 소지품을 뒤져 스톤 몇 개를 챙겼다.',
+  recruitMessage: '탐험가가 목숨을 살려준 은혜에 감사하며 동료가 되기로 했다.',
 };
 
 export const NPCS: NpcDef[] = [WANDERING_EXPLORER];
