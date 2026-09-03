@@ -1421,7 +1421,14 @@ function tickGameClock() {
     if (advanceProfileVillageTime(newElapsed)) return;
   }
 
-  saveProfile(profile);
+  // persistProfileLocalOnly() (not a bare saveProfile) so this tick's
+  // mutations (tax charged, judgment cycle opened/answered, elapsed time
+  // advanced) also stamp updatedAt — otherwise a real change made purely by
+  // clock-tick (no explicit persistProfile() call site touching it) would
+  // look stale on the next restoreLoggedInSession() recency merge and could
+  // lose to an older cloud snapshot on reload (see updatedAt's doc comment
+  // in profile.ts).
+  persistProfileLocalOnly();
   if (screen === 'village') render();
 }
 
