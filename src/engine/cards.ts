@@ -11,7 +11,6 @@ export const CARD_POOL: Card[] = [
   { id: 'strike', name: '베기', cost: 1, effect: 'damage', value: 12, description: '적에게 12의 피해를 준다.' },
   { id: 'heavy-strike', name: '강타', cost: 2, effect: 'damage', value: 22, description: '적에게 22의 피해를 준다.' },
   { id: 'guard', name: '방어', cost: 1, effect: 'shield', value: 10, description: '방어막 10을 얻는다.' },
-  { id: 'bandage', name: '응급처치', cost: 1, effect: 'heal', value: 8, description: '체력을 8 회복한다.' },
   {
     id: 'pierce',
     name: '관통',
@@ -29,7 +28,6 @@ export function buildDeck(bonusCards: Card[] = []): Card[] {
   for (let i = 0; i < 2; i++) deck.push({ ...CARD_POOL[1] });
   for (let i = 0; i < 3; i++) deck.push({ ...CARD_POOL[2] });
   for (let i = 0; i < 2; i++) deck.push({ ...CARD_POOL[3] });
-  for (let i = 0; i < 2; i++) deck.push({ ...CARD_POOL[4] });
   for (const bonus of bonusCards) {
     deck.push({ ...bonus });
     deck.push({ ...bonus });
