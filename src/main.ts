@@ -16,7 +16,6 @@ import {
   hasOpenEssenceSlot,
   recordEssenceDiscovery,
   addManaStone,
-  addGearToInventory,
   equipGear,
   unequipGear,
   addExp,
@@ -41,7 +40,7 @@ import { computeTotalStats } from './engine/stats-calc';
 import { applyStatBonuses } from './engine/stat-bonus';
 import { huntingProficiencyBonus, huntingProficiencyLabel, huntingProficiencyTier } from './engine/hunting-proficiency';
 import { autoPlayOneTurn, estimateWinProbability } from './engine/battle-ai';
-import { rollGearDrop, createGearFromMonster, type EquipmentSlot } from './engine/gear';
+import { type EquipmentSlot } from './engine/gear';
 import {
   generateMaze,
   randomStartPosition,
@@ -1065,11 +1064,6 @@ function checkForDrop() {
 
   if (rollManaStoneDrop()) {
     profile = addManaStone(profile, currentMonster.grade);
-    persistProfile();
-  }
-
-  if (rollGearDrop()) {
-    profile = addGearToInventory(profile, createGearFromMonster(currentMonster.id, currentMonster.gearDrop));
     persistProfile();
   }
 
