@@ -13,14 +13,22 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
+-- drop-then-create (rather than `create policy if not exists`, which
+-- Postgres doesn't support) so this whole script stays safe to paste and
+-- re-run on a project that already has these policies — re-running it to
+-- pick up a fix further down (e.g. protect_is_admin below) used to fail
+-- with "policy ... already exists" before it ever reached that fix.
+drop policy if exists "Users can read their own profile" on public.profiles;
 create policy "Users can read their own profile"
   on public.profiles for select
   using (auth.uid() = user_id);
 
+drop policy if exists "Users can insert their own profile" on public.profiles;
 create policy "Users can insert their own profile"
   on public.profiles for insert
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can update their own profile" on public.profiles;
 create policy "Users can update their own profile"
   on public.profiles for update
   using (auth.uid() = user_id);

@@ -38,7 +38,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
 
 ## ⚠️ 기존 프로젝트라면: `is_admin` 보안 패치 재적용 필요
 
-과거 버전의 `schema.sql`은 `protect_is_admin` 트리거를 `UPDATE`에만 걸어뒀습니다. 앱의 저장 로직(`saveCloudProfile`)은 `upsert`를 쓰기 때문에, 로그인 후 첫 저장은 `INSERT` 경로를 타서 이 트리거를 아예 거치지 않았습니다 — 즉 인증된 사용자가 앱을 거치지 않고 API를 직접 호출해 자기 계정의 `is_admin`을 `true`로 넣는 게 가능했던 결함입니다. 이미 이 저장소로 Supabase 프로젝트를 만들어 운영 중이라면, **`schema.sql` 전체를 SQL Editor에서 다시 실행**해 트리거를 `INSERT`까지 포함하도록 갱신해야 합니다(테이블은 `if not exists`라 재실행해도 안전, 트리거는 `drop ... if exists` 후 재생성).
+과거 버전의 `schema.sql`은 `protect_is_admin` 트리거를 `UPDATE`에만 걸어뒀습니다. 앱의 저장 로직(`saveCloudProfile`)은 `upsert`를 쓰기 때문에, 로그인 후 첫 저장은 `INSERT` 경로를 타서 이 트리거를 아예 거치지 않았습니다 — 즉 인증된 사용자가 앱을 거치지 않고 API를 직접 호출해 자기 계정의 `is_admin`을 `true`로 넣는 게 가능했던 결함입니다. 이미 이 저장소로 Supabase 프로젝트를 만들어 운영 중이라면, **`schema.sql` 전체를 SQL Editor에서 다시 실행**해 트리거를 `INSERT`까지 포함하도록 갱신해야 합니다(테이블은 `if not exists`, 정책은 `drop policy if exists`, 트리거는 `drop trigger if exists` 후 재생성이라 전체 재실행이 안전합니다 — 이전 버전의 `schema.sql`엔 정책 쪽 `drop ... if exists`가 없어 "policy ... already exists" 오류로 재실행 자체가 막혔을 수 있는데, 지금 버전은 그 문제가 고쳐져 있습니다).
 
 ## admin 계정 만들기
 
