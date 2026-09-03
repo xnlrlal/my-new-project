@@ -125,6 +125,15 @@ let authUser: AuthUser | null = null;
 let authMode: AuthMode = 'login';
 let authError: string | null = null;
 let authLoading = false;
+// Bumped by any action that should invalidate an in-flight login/signup/
+// session-restore (going guest, logging out, or starting a newer request of
+// either kind) — see syncLoggedInProfile/adoptLoggedInProfile/
+// restoreLoggedInSession below. Without this, a login submitted just before
+// clicking "게스트로 계속하기" could still resolve afterward and silently log
+// the player back in — overwriting whatever guest profile they'd since
+// loaded/played with the account's cloud save and yanking them back to the
+// menu screen, regardless of what they were doing by then.
+let authRequestId = 0;
 let selectedRace: RaceDef | null = null;
 let currentMonster: MonsterDef | null = null;
 // 인간형 NPC 조우(designnotes.md 3-6번, npc.ts) — currentMonster와 배타적:
@@ -258,7 +267,15 @@ function render() {
           else handleSignup(username, password);
         },
         onGuest: () => {
+          // Invalidate any login/signup/session-restore still in flight —
+          // see authRequestId's declaration comment. Also clears loading/
+          // error so the auth screen doesn't come back stuck on "처리
+          // 중..." from the now-abandoned request if the player logs out
+          // and returns here later.
+          authRequestId += 1;
           authUser = null;
+          authLoading = false;
+          authError = null;
           goTo('menu');
         },
       }
@@ -1187,11 +1204,6 @@ function persistProfile() {
 function resumeCharacter() {
   if (!profile.raceId) return;
   const session = profile.session;
-  if (!session) {
-    selectedRace = getRace(profile.raceId);
-    goTo('village');
-    return;
-  }
   // profile.session is already sanitized to a valid ResumeSession by
   // sanitizeProfile() (see profile.ts/session.ts) before it ever reaches
   // here, so this shouldn't throw in practice. The try/catch is a last-resort
@@ -1199,8 +1211,16 @@ function resumeCharacter() {
   // raceId/monster id, say) — falling back to village loses only the
   // in-progress dungeon navigation state, never profile.raceId or any of the
   // character's actual progress (level/gear/essences/gold), which live
-  // entirely outside `session` and are untouched here.
+  // entirely outside `session` and are untouched here. getRace(profile.raceId)
+  // below is inside this try (even on the no-session path) for the same
+  // reason — a stray invalid raceId shouldn't throw uncaught out of a menu
+  // button click.
   try {
+    if (!session) {
+      selectedRace = getRace(profile.raceId);
+      goTo('village');
+      return;
+    }
     // render() has no fallback branch for 'dungeon-map'/'battle' without
     // their required companion data (maze+pos / state) — it would just
     // leave the previous screen frozen on screen instead of painting
@@ -1253,8 +1273,16 @@ function resumeCharacter() {
 // for which merge behavior applies and why. Never overwrites either side on
 // a cloud read error; the next real action's persistProfile() will sync
 // things up on its own once the cloud is reachable again.
-async function syncLoggedInProfile(user: AuthUser, opts: { preferLocalIfNewer: boolean }): Promise<void> {
+//
+// `requestId` must be the value authRequestId held right before this call's
+// only await (loadCloudProfile) started. Checked immediately after that
+// await resolves, before touching `profile` or writing to the cloud — if
+// it's gone stale (the player went guest, logged out, or started a newer
+// login/signup while this was in flight), this bails out untouched rather
+// than applying a decision made for a request that's no longer current.
+async function syncLoggedInProfile(user: AuthUser, requestId: number, opts: { preferLocalIfNewer: boolean }): Promise<void> {
   const result = await loadCloudProfile(user.id);
+  if (requestId !== authRequestId) return;
   if (result.status === 'error') {
     console.warn('Failed to load cloud profile; continuing with the local save.');
     return;
@@ -1276,9 +1304,15 @@ async function syncLoggedInProfile(user: AuthUser, opts: { preferLocalIfNewer: b
 // Called after the player explicitly authenticates (login/signup) — a
 // deliberate identity switch, so an existing cloud save is authoritative
 // over whatever local/guest profile happened to be loaded before it.
-async function adoptLoggedInProfile(user: AuthUser) {
+// `requestId` is handleLogin/handleSignup's authRequestId snapshot, threaded
+// through so the final authUser/goTo('menu') step is skipped too if the
+// player moved on (see syncLoggedInProfile's doc comment) while the cloud
+// round-trip was still in flight — authUser is only ever set here, once the
+// request is confirmed still current, never speculatively before the await.
+async function adoptLoggedInProfile(user: AuthUser, requestId: number) {
+  await syncLoggedInProfile(user, requestId, { preferLocalIfNewer: false });
+  if (requestId !== authRequestId) return;
   authUser = user;
-  await syncLoggedInProfile(user, { preferLocalIfNewer: false });
   authError = null;
   authLoading = false;
   goTo('menu');
@@ -1289,42 +1323,53 @@ async function adoptLoggedInProfile(user: AuthUser) {
 // instead of blindly trusting the cloud, so a same-tab reload before an
 // earlier background cloud sync (persistProfile's fire-and-forget
 // saveCloudProfile) lands can't silently roll the player back to the last
-// state the cloud actually received.
-async function restoreLoggedInSession(user: AuthUser) {
+// state the cloud actually received. See adoptLoggedInProfile's comment for
+// why `requestId` is threaded through and checked again afterward — the
+// player can click "게스트로 계속하기" during this restore's own network
+// round-trip too, since it runs on the very screen that button lives on.
+async function restoreLoggedInSession(user: AuthUser, requestId: number) {
+  await syncLoggedInProfile(user, requestId, { preferLocalIfNewer: true });
+  if (requestId !== authRequestId) return;
   authUser = user;
-  await syncLoggedInProfile(user, { preferLocalIfNewer: true });
   goTo('menu');
 }
 
 async function handleLogin(username: string, password: string) {
+  const requestId = ++authRequestId;
   authLoading = true;
   authError = null;
   render();
   const result = await signIn(username, password);
+  // Stale if the player went guest, logged out, or fired off a newer
+  // login/signup while this was in flight — don't resurrect it now.
+  if (requestId !== authRequestId) return;
   if (!result.ok || !result.user) {
     authLoading = false;
     authError = result.error ?? '로그인에 실패했습니다.';
     render();
     return;
   }
-  await adoptLoggedInProfile(result.user);
+  await adoptLoggedInProfile(result.user, requestId);
 }
 
 async function handleSignup(username: string, password: string) {
+  const requestId = ++authRequestId;
   authLoading = true;
   authError = null;
   render();
   const result = await signUp(username, password);
+  if (requestId !== authRequestId) return;
   if (!result.ok || !result.user) {
     authLoading = false;
     authError = result.error ?? '회원가입에 실패했습니다.';
     render();
     return;
   }
-  await adoptLoggedInProfile(result.user);
+  await adoptLoggedInProfile(result.user, requestId);
 }
 
 async function handleLogout() {
+  authRequestId += 1;
   await signOut();
   authUser = null;
   goTo('auth');
@@ -1421,7 +1466,14 @@ function tickGameClock() {
     if (advanceProfileVillageTime(newElapsed)) return;
   }
 
-  saveProfile(profile);
+  // persistProfileLocalOnly() (not a bare saveProfile) so this tick's
+  // mutations (tax charged, judgment cycle opened/answered, elapsed time
+  // advanced) also stamp updatedAt — otherwise a real change made purely by
+  // clock-tick (no explicit persistProfile() call site touching it) would
+  // look stale on the next restoreLoggedInSession() recency merge and could
+  // lose to an older cloud snapshot on reload (see updatedAt's doc comment
+  // in profile.ts).
+  persistProfileLocalOnly();
   if (screen === 'village') render();
 }
 
@@ -1431,7 +1483,8 @@ async function init() {
   if (isCloudConfigured) {
     const existingUser = await getCurrentUser();
     if (existingUser) {
-      await restoreLoggedInSession(existingUser);
+      const requestId = ++authRequestId;
+      await restoreLoggedInSession(existingUser, requestId);
       return;
     }
   }

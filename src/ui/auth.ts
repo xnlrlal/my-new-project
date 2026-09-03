@@ -19,8 +19,8 @@ export function renderAuth(root: HTMLElement, state: AuthScreenState, handlers: 
   const formHtml = cloudConfigured
     ? `
       <div class="auth-tabs">
-        <button class="auth-tab ${mode === 'login' ? 'active' : ''}" id="tab-login" type="button">로그인</button>
-        <button class="auth-tab ${mode === 'signup' ? 'active' : ''}" id="tab-signup" type="button">회원가입</button>
+        <button class="auth-tab ${mode === 'login' ? 'active' : ''}" id="tab-login" type="button" ${loading ? 'disabled' : ''}>로그인</button>
+        <button class="auth-tab ${mode === 'signup' ? 'active' : ''}" id="tab-signup" type="button" ${loading ? 'disabled' : ''}>회원가입</button>
       </div>
       <form id="auth-form" class="auth-form">
         <input class="auth-input" type="text" id="username" placeholder="아이디" autocomplete="username" />
