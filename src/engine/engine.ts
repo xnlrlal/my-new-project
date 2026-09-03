@@ -1,9 +1,31 @@
 import type { Actor, ActorId, Card, GameState, LogEntry, StatusEffect } from './types';
 import { buildDeck } from './cards';
 import type { RaceStats } from './races';
-import type { MonsterDef } from './monsters';
 import { applyStatusEffect, bleedHealMultiplier, isStunned, tickStatusEffects } from './status-effects';
 import { maybeDamageBodyPart } from './body-parts';
+
+// initGame이 몬스터(monsters.ts의 MonsterDef)와 인간형 NPC(npc.ts의 NpcDef)
+// 양쪽을 모두 상대로 전투를 시작할 수 있도록 뽑아낸 최소 공통 형태 — 두
+// 타입이 구조적으로 이 인터페이스를 만족하기만 하면 되고, engine.ts는
+// monsters.ts/npc.ts 어느 쪽에도 의존하지 않는다(기존 관례, monsters.ts
+// 자신도 races.ts에 의존하지 않는 것과 같은 이유). accuracy 이하 다섯
+// 필드는 MonsterDef에 아직 없어(세부스탯 미부여, designnotes.md 5번)
+// 선택적으로 두고 createActor에서 0으로 기본 처리한다.
+export interface EnemyCombatant {
+  name: string;
+  maxHp: number;
+  maxMana: number;
+  strength: number;
+  dexterity: number;
+  willpower: number;
+  accuracy?: number;
+  flexibility?: number;
+  perceptionJam?: number;
+  obsession?: number;
+  poisonResist?: number;
+  grade: number;
+  ranged: boolean;
+}
 
 const HAND_SIZE = 4;
 
@@ -91,13 +113,17 @@ function createActor(
 // represent being caught off guard (see status-effects.ts's isStunned/
 // endTurn ordering — this works correctly because the stun is present in
 // the very first GameState, before any playCard/endTurn call ever runs).
+// isHuman marks the enemy as an incapacitatable NPC rather than a monster
+// (designnotes.md 3-6번) — see EnemyCombatant's doc comment and
+// checkGameOver below for what this changes.
 export function initGame(
   playerStats: RaceStats,
-  monster: MonsterDef,
+  enemy: EnemyCombatant,
   bonusCards: Card[] = [],
   startingHp?: number,
   initialStatusEffects: StatusEffect[] = [],
-  ambush = false
+  ambush = false,
+  isHuman = false
 ): GameState {
   const player = createActor('player', '플레이어', playerStats, bonusCards);
   const hp = startingHp === undefined ? player.maxHp : Math.min(Math.max(0, startingHp), player.maxHp);
@@ -109,24 +135,25 @@ export function initGame(
     // level during this battle" — the player is genuinely at risk from the
     // first card played, not just from damage dealt after this point.
     lowestPlayerHpRatio: hp / player.maxHp,
-    enemy: createActor('enemy', monster.name, {
-      maxHp: monster.maxHp,
-      maxMana: monster.maxMana,
-      strength: monster.strength,
-      dexterity: monster.dexterity,
-      willpower: monster.willpower,
-      // 명중/치명타 관련 세부스탯은 여전히 몬스터에 부여되지 않은 축(MonsterDef에
-      // 필드 자체가 없음) — 0 고정. 향후 밸런스 패스에서 몬스터별 데이터를
-      // 부여할 때 여기 하드코딩을 대체하면 됨.
-      accuracy: 0,
-      flexibility: 0,
-      perceptionJam: 0,
-      obsession: 0,
-      poisonResist: 0,
+    enemy: createActor('enemy', enemy.name, {
+      maxHp: enemy.maxHp,
+      maxMana: enemy.maxMana,
+      strength: enemy.strength,
+      dexterity: enemy.dexterity,
+      willpower: enemy.willpower,
+      // 몬스터는 이 다섯 필드가 없어(MonsterDef에 필드 자체가 없음) 0
+      // 고정, 인간형 NPC(npc.ts)는 실수치를 제공한다(EnemyCombatant 문서
+      // 참고).
+      accuracy: enemy.accuracy ?? 0,
+      flexibility: enemy.flexibility ?? 0,
+      perceptionJam: enemy.perceptionJam ?? 0,
+      obsession: enemy.obsession ?? 0,
+      poisonResist: enemy.poisonResist ?? 0,
     }),
-    enemyGrade: monster.grade,
-    enemyRanged: monster.ranged,
-    log: [{ turn: 1, actor: 'player', message: `${monster.name}(을)를 만났다! 전투 시작!` }],
+    enemyGrade: enemy.grade,
+    enemyRanged: enemy.ranged,
+    enemyIsHuman: isHuman,
+    log: [{ turn: 1, actor: 'player', message: `${enemy.name}(을)를 만났다! 전투 시작!` }],
     status: 'playing',
   };
 }
@@ -330,7 +357,9 @@ export function playCard(state: GameState, cardId: string): GameState {
 }
 
 function checkGameOver(state: GameState): GameState {
-  if (state.enemy.hp <= 0) return { ...state, status: 'win' };
+  // 인간형 NPC(designnotes.md 3-6번)는 HP 0에 닿아도 죽지 않고 '전투불능'
+  // 으로 멈춘다 — 죽이거나 살려줄지는 전투 밖(main.ts)에서 따로 고른다.
+  if (state.enemy.hp <= 0) return { ...state, status: state.enemyIsHuman ? 'incapacitated' : 'win' };
   if (state.player.hp <= 0) return { ...state, status: 'lose' };
   return state;
 }

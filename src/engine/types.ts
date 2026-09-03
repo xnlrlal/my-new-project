@@ -69,7 +69,12 @@ export interface LogEntry {
   message: string;
 }
 
-export type GameStatus = 'playing' | 'win' | 'lose';
+// 'incapacitated'(전투 불능, designnotes.md 3-6번) — 인간형 NPC 전용 결과.
+// "HP 0 = 사망"인 몬스터(status: 'win')와 달리, 인간형 상대는 HP 0에
+// 도달해도 죽지 않고 전투가 이 상태로 끝난다 — 이후 죽이거나 살려줄지는
+// 전투 밖(main.ts)의 별도 선택으로 넘어간다. checkGameOver(engine.ts)가
+// GameState.enemyIsHuman로 'win'과 이 상태를 가른다.
+export type GameStatus = 'playing' | 'win' | 'lose' | 'incapacitated';
 
 export interface GameState {
   turn: number;
@@ -79,6 +84,10 @@ export interface GameState {
   // 원거리(활 등) 몬스터인지 — engine.ts의 즉사(헤드샷) 판정이 이 필드로
   // 근접/원거리를 구분한다(designnotes.md 3-2번 참고).
   enemyRanged: boolean;
+  // 상대가 인간형 NPC인지(designnotes.md 3-6번) — true면 HP 0 도달 시
+  // status가 'win'이 아니라 'incapacitated'가 된다(engine.ts의
+  // checkGameOver). 몬스터 전투는 항상 false.
+  enemyIsHuman: boolean;
   log: LogEntry[];
   status: GameStatus;
   // 이 전투 동안 player.hp/maxHp가 도달한 최저 비율(0~1). initGame이 시작

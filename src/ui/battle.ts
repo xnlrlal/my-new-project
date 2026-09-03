@@ -1,6 +1,7 @@
 import type { Actor, GameState } from '../engine/types';
 import type { ExpGrantResult } from '../engine/profile';
 import type { EquippedEssence } from '../engine/essence';
+import type { NpcDef } from '../engine/npc';
 import { statusEffectsText, hasBleed } from '../engine/status-effects';
 import { damagedPartsText } from '../engine/body-parts';
 import { BANDAGE } from '../engine/consumables';
@@ -20,6 +21,10 @@ export interface BattleHandlers {
   onOpenEquipment: () => void;
   onOpenEssence: () => void;
   onUseBandage: () => void;
+  // 인간형 NPC 전투불능(designnotes.md 3-6번) 전용 — status === 'incapacitated'
+  // 일 때만 배너에 뜨는 두 선택지.
+  onSpareNpc: () => void;
+  onFinishNpc: () => void;
 }
 
 export interface EssenceDropState {
@@ -103,6 +108,7 @@ export function renderBattle(
   essenceDrop: EssenceDropState,
   bandageCount: number,
   proficiencyLabel: string | null,
+  npcEncounter: NpcDef | null,
   handlers: BattleHandlers
 ) {
   const { player, enemy, log, status } = state;
@@ -149,7 +155,14 @@ export function renderBattle(
               <button class="menu-start" id="acknowledge-death">확인</button>
             </div>
           </div>`
-        : '';
+        : status === 'incapacitated' && npcEncounter
+          ? `<div class="status-banner">${npcEncounter.incapacitatedMessage}
+              <div class="banner-actions">
+                <button class="menu-return" id="spare-npc">살려준다</button>
+                <button class="menu-start" id="finish-npc">끝장낸다</button>
+              </div>
+            </div>`
+          : '';
 
   const isManual = battleMode === 'manual';
   const cardsDisabled = !isManual || status !== 'playing';
@@ -183,7 +196,7 @@ export function renderBattle(
     ${clockHtml}
     ${banner}
     <div class="board">
-      ${renderActor(enemy, 'enemy', state.enemyGrade, proficiencyLabel)}
+      ${renderActor(enemy, 'enemy', state.enemyIsHuman ? undefined : state.enemyGrade, proficiencyLabel)}
       ${renderActor(player, 'player')}
     </div>
     <div class="log-header">
@@ -235,6 +248,8 @@ export function renderBattle(
   document.getElementById('open-inventory')?.addEventListener('click', handlers.onOpenInventory);
   document.getElementById('open-equipment')?.addEventListener('click', handlers.onOpenEquipment);
   document.getElementById('open-codex')?.addEventListener('click', handlers.onOpenEssence);
+  document.getElementById('spare-npc')?.addEventListener('click', handlers.onSpareNpc);
+  document.getElementById('finish-npc')?.addEventListener('click', handlers.onFinishNpc);
 
   const copyLogBtn = document.getElementById('copy-log-btn') as HTMLButtonElement | null;
   copyLogBtn?.addEventListener('click', async () => {

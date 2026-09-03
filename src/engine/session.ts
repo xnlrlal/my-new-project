@@ -47,6 +47,10 @@ export interface ResumeSession {
   dungeonMessage: string | null;
   portalMessage: string | null;
   currentMonsterId: string | null;
+  // 인간형 NPC 조우(designnotes.md 3-6번, npc.ts) 중일 때만 채워진다 —
+  // currentMonsterId와 배타적(둘이 동시에 채워질 일 없음, main.ts의
+  // startZoneBattle/startNpcEncounter가 각각 반대쪽을 null로 정리한다).
+  currentNpcId: string | null;
   state: GameState | null;
   // Player HP carried across battles within this dungeon run (survives
   // dungeon-map navigation and subscreens, not just mid-battle reloads —
@@ -139,6 +143,7 @@ export function sanitizeResumeSession(raw: unknown): ResumeSession | null {
     dungeonMessage: typeof r.dungeonMessage === 'string' ? r.dungeonMessage : null,
     portalMessage: typeof r.portalMessage === 'string' ? r.portalMessage : null,
     currentMonsterId: typeof r.currentMonsterId === 'string' ? r.currentMonsterId : null,
+    currentNpcId: typeof r.currentNpcId === 'string' ? r.currentNpcId : null,
     state: r.state && typeof r.state === 'object' ? (r.state as GameState) : null,
     dungeonHp: typeof r.dungeonHp === 'number' ? r.dungeonHp : null,
     winProbability: typeof r.winProbability === 'number' ? r.winProbability : null,
