@@ -4,6 +4,7 @@ import type { EquippedEssence } from './essence';
 import { createGrantedGear, createPocketWatch, POCKET_WATCH_PRICE, EQUIPMENT_SLOTS, type EquipmentSlot, type GearInstance } from './gear';
 import type { EquippedGear } from './stats-calc';
 import type { RaceId } from './races';
+import type { BodyPart } from './types';
 import { sanitizeResumeSession, type ResumeSession } from './session';
 import { SECONDS_PER_HOUR, type ClockSpeed } from './village-clock';
 import { STARTER_ARMOR, findWeaponChoice } from './ritual';
@@ -202,6 +203,64 @@ export function equipGear(profile: PlayerProfile, instanceId: string): PlayerPro
     ...profile,
     inventoryGear: previouslyEquipped ? [...remainingInventory, previouslyEquipped] : remainingInventory,
     equippedGear: { ...profile.equippedGear, [gear.slot]: gear },
+  };
+}
+
+// 장비 내구도(designnotes.md 3-5번)와 부위 손상(3-3번, body-parts.ts)을
+// 잇는 다리 — 몸통 손상은 방어구(armor, 상의) 슬롯을, 다리 손상은 신발
+// (footwear) 슬롯을 깎는다. 마스터 설정이 확정한 유일한 사례(성인식
+// 샌들이 고블린 덫에 망가짐)를 그대로 반영한 매핑 — 팔 손상은 대응하는
+// 방어구 슬롯이 아직 없어(6-2번 "어깨 보호대" 후보 참고) 대상 밖이고,
+// legwear(하의)도 아직 근거가 없어 제외했다(ritual.ts 주석 참고).
+function slotForBodyPart(part: BodyPart): EquipmentSlot | null {
+  switch (part) {
+    case 'torso':
+      return 'armor';
+    case 'leftLeg':
+    case 'rightLeg':
+      return 'footwear';
+    default:
+      return null;
+  }
+}
+
+const DURABILITY_LOSS_PER_HIT = 1; // 1차 추정치 — 손상 1회당 내구도 -1
+
+export interface BodyPartDurabilityResult {
+  profile: PlayerProfile;
+  // 장비가 이번 호출로 완전히 파괴됐을 때만 채워진다 — 매 손상마다 "내구도
+  // -1" 같은 문구를 띄우면 로그가 지나치게 시끄러워지므로, 실제로 뭔가
+  // 사라졌을 때만 알린다.
+  message: string | null;
+}
+
+// main.ts가 전투 중 새로 손상된 부위(GameState.player.damagedParts의 새
+// 항목)마다 호출한다. 대응 슬롯이 비어있거나, 장비에 애초에 내구도 개념이
+// 없으면(maxDurability undefined) 아무 일도 일어나지 않는다. 내구도가
+// 0에 닿으면 그 장비는 인벤토리로 돌아가지 않고 완전히 사라진다 — "신발
+// 이라고 부르기도 애매한 수준"이라는 서술처럼 수리 불가능한 파손으로 다룬
+// 1차 판단(수리 시스템은 미확정이라 다루지 않음).
+export function damageEquippedGearForBodyPart(profile: PlayerProfile, part: BodyPart): BodyPartDurabilityResult {
+  const slot = slotForBodyPart(part);
+  if (!slot) return { profile, message: null };
+  const gear = profile.equippedGear[slot];
+  if (!gear || gear.maxDurability === undefined) return { profile, message: null };
+
+  const currentDurability = gear.durability ?? gear.maxDurability;
+  const nextDurability = Math.max(0, currentDurability - DURABILITY_LOSS_PER_HIT);
+
+  if (nextDurability <= 0) {
+    const nextEquipped = { ...profile.equippedGear };
+    delete nextEquipped[slot];
+    return {
+      profile: { ...profile, equippedGear: nextEquipped },
+      message: `${gear.name}이(가) 완전히 망가져 사라졌다.`,
+    };
+  }
+
+  return {
+    profile: { ...profile, equippedGear: { ...profile.equippedGear, [slot]: { ...gear, durability: nextDurability } } },
+    message: null,
   };
 }
 

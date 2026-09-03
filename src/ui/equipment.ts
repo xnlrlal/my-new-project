@@ -1,5 +1,5 @@
 import type { PlayerProfile } from '../engine/profile';
-import { EQUIPMENT_SLOTS, slotLabel, type EquipmentSlot } from '../engine/gear';
+import { EQUIPMENT_SLOTS, slotLabel, durabilityText, type EquipmentSlot } from '../engine/gear';
 import { statBonusText, statBonusMagnitude } from '../engine/stat-bonus';
 
 export interface EquipmentHandlers {
@@ -20,6 +20,7 @@ export function renderEquipment(
   const slotsHtml = EQUIPMENT_SLOTS.map((slot) => {
     const gear = profile.equippedGear[slot];
     if (gear) {
+      const durability = durabilityText(gear);
       return `
         <div class="essence-slot filled">
           <div class="essence-slot-header">
@@ -28,7 +29,7 @@ export function renderEquipment(
             }</span>
             <button class="menu-return small" data-unequip-slot="${slot}">해제</button>
           </div>
-          <div class="essence-stat">${statBonusText(gear.statBonus)}</div>
+          <div class="essence-stat">${statBonusText(gear.statBonus)}${durability ? ` · ${durability}` : ''}</div>
           <div class="essence-skill">${gear.description}</div>
         </div>
       `;

@@ -23,6 +23,7 @@ import {
   exchangeManaStonesForGrade,
   completeComingOfAge,
   stripDungeonOnlyGear,
+  damageEquippedGearForBodyPart,
   type PlayerProfile,
   type ExpGrantResult,
 } from './engine/profile';
@@ -179,6 +180,14 @@ let dungeonEntryVillageSeconds = 0;
 // untouched. Kept in sync with the live battle state in afterStateChange()
 // so it's current even if a forced return interrupts a fight mid-turn.
 let dungeonHp: number | null = null;
+// 부위 손상(body-parts.ts)과 장비 내구도(profile.ts의
+// damageEquippedGearForBodyPart)를 잇는 커서 — state.player.damagedParts는
+// 전투 동안 항목만 계속 늘어나는 배열이라, 이 카운트 이후로 새로 추가된
+// 항목만 골라 afterStateChange()에서 한 번씩 내구도에 반영한다. 새 전투가
+// 시작될 때(startZoneBattle)는 0으로, 저장된 전투를 이어할 때
+// (resumeCharacter)는 복원된 state의 현재 길이로 맞춰 — 재시작 시 이미
+// 반영된 손상을 또 깎지 않는다.
+let processedDamagedPartsCount = 0;
 // 몬스터 무리 스폰(dungeon-clock.ts의 packSizeForDay) — 무작위 전투가
 // 발동하는 순간 packSizeForDay로 정해진 마릿수를 packTotal에 담고,
 // packRemaining은 "이번 전투 이후로 몇 마리가 더 남았는지"를 센다.
@@ -503,11 +512,35 @@ function afterStateChange() {
   // its end, so an interrupting forced return (which can fire mid-turn)
   // captures the right value.
   if (state) dungeonHp = state.player.hp;
+  applyNewBodyPartDurabilityLoss();
   checkForAchievements();
   checkForExp();
   checkForDrop();
   persistProfile();
   render();
+}
+
+// state.player.damagedParts(body-parts.ts)는 전투 동안 항목만 늘어나는
+// 배열이라, processedDamagedPartsCount 이후로 새로 추가된 부위만 골라
+// 장비 내구도(profile.ts의 damageEquippedGearForBodyPart)에 반영한다.
+// 장비가 이번 호출로 완전히 파괴됐을 때만 전투 로그에 한 줄 덧붙인다 —
+// afterStateChange()가 매 턴 호출되므로 여기서 커서를 갱신해두지 않으면
+// 같은 손상을 다음 호출에서 또 반영해버린다.
+function applyNewBodyPartDurabilityLoss() {
+  if (!state) return;
+  const damagedParts = state.player.damagedParts;
+  if (damagedParts.length <= processedDamagedPartsCount) return;
+
+  const newParts = damagedParts.slice(processedDamagedPartsCount);
+  processedDamagedPartsCount = damagedParts.length;
+
+  for (const part of newParts) {
+    const result = damageEquippedGearForBodyPart(profile, part);
+    profile = result.profile;
+    if (result.message && state) {
+      state = { ...state, log: [...state.log, { turn: state.turn, actor: 'player', message: result.message }] };
+    }
+  }
 }
 
 function goTo(next: Screen) {
@@ -783,6 +816,7 @@ function startZoneBattle(zone: Zone, options?: { forcedMonsterId?: string; ambus
   const ambush = options?.ambush ?? false;
   state = initGame(totalStats, currentMonster, bonusCards, startingHp, [], ambush);
   dungeonHp = state.player.hp;
+  processedDamagedPartsCount = 0;
   winProbability = estimateWinProbability(totalStats, bonusCards, currentMonster, startingHp, [], ambush);
   // battleMode is deliberately left as-is here — it's a sticky preference
   // (see its declaration comment), and goTo('battle') below restarts the
@@ -1052,6 +1086,7 @@ function resumeCharacter() {
     dungeonEntryVillageSeconds = session.dungeonEntryVillageSeconds;
     currentMonster = session.currentMonsterId ? getMonsterById(session.currentMonsterId) : null;
     state = session.state;
+    processedDamagedPartsCount = state?.player.damagedParts.length ?? 0;
     dungeonHp = session.dungeonHp;
     winProbability = session.winProbability;
     // battleMode is intentionally not restored from the session — resuming
