@@ -9,6 +9,8 @@
 - `src/engine/` — 순수 TypeScript 함수로 작성된 게임 엔진 (`engine.ts`, `cards.ts`, `races.ts`, `monsters.ts`, `dungeon.ts`, `essence.ts`, `gear.ts`, `stats-calc.ts`, `stat-bonus.ts`, `profile.ts`, `auth.ts`, `cloud-profile.ts`, `supabase-client.ts`, `tax.ts`, `body-parts.ts`, `battle-ai.ts`, `consumables.ts`, `npc.ts`, `dungeon-clock.ts`, `village-clock.ts`, `hunting-proficiency.ts`, `session.ts`, `status-effects.ts`, `ritual.ts`, `types.ts`). 카드 사용, 턴 진행 등 모든 액션이 `GameState`를 새로 계산하고 `log` 배열에 이벤트를 기록합니다. DOM이나 렌더링에 전혀 의존하지 않아 UI를 바꿔도 그대로 재사용 가능합니다.
 - `src/ui/` — 화면별 렌더링 (`auth`, `menu`, `character-select`, `stats`, `village`, `dungeon-map`, `inventory`, `equipment`, `essence`, `battle`, `shop`, `exchange`, `library`, `ritual`). `src/main.ts`는 화면 전환만 담당하는 라우터입니다. 나중에 Phaser 기반 2D 렌더러로 교체해도 엔진은 그대로 둘 수 있습니다.
 - **세이브 데이터 필드 추가 원칙**: `PlayerProfile`/`ResumeSession`에 새 필드를 추가할 때는 반드시 (1) `defaultProfile()`에 기본값을 넣고 (2) `sanitizeProfile()`(`profile.ts`)/`sanitizeResumeSession()`(`session.ts`)에도 그 필드의 방어적 기본값 처리를 같이 추가하세요. 이 두 함수가 로컬(`loadProfile`)과 클라우드(`loadCloudProfile`) 저장분을 모두 통과하는 유일한 관문이라, 여기 안 거치면 그 필드가 없는 구버전 세이브에서 `undefined`가 그대로 흘러들어와 조용히 깨질 수 있습니다 (실제로 `floor2Zones` 필드 추가 후 이 처리를 빠뜨려서 구버전 계정의 "이어하기"가 무반응이 되는 버그가 있었습니다).
+- **로컬↔클라우드 저장 병합 원칙**: `PlayerProfile.updatedAt`(`profile.ts`)은 로컬 저장이 실제로 일어날 때마다(`main.ts`의 `persistProfileLocalOnly()`) 갱신되는, "이 기기가 마지막으로 이 세이브를 저장한 시각"입니다. 앱 시작 시 이미 로그인된 세션을 조용히 복원할 때(`restoreLoggedInSession`)는 로컬·클라우드 중 이 값이 더 최신인 쪽을 채택하고, 명시적으로 로그인/회원가입할 때(`adoptLoggedInProfile`)는 계정 전환이 목적이므로 클라우드를 우선합니다(둘 다 `syncLoggedInProfile`이 처리). `loadCloudProfile`(`cloud-profile.ts`)은 "저장된 게 없음"과 "네트워크 오류로 확인 못함"을 별도 상태(`CloudProfileResult`)로 구분해서, 일시적 오류를 "빈 세이브"로 오인해 실제 클라우드 데이터를 덮어쓰는 일이 없도록 합니다. 새로 `profile`을 저장하는 경로를 추가할 땐 반드시 `persistProfileLocalOnly()`를 거치게 하세요 — 그렇지 않으면 그 변경이 `updatedAt`에 반영되지 않아 다음 재접속 때 "오래된 변경"으로 오판되어 클라우드의 더 이전 상태로 되돌아갈 수 있습니다(실제로 마을 시계 틱의 세금/판단창 처리가 이 경로를 빠뜨렸던 회귀가 있었습니다).
+- **로그인 요청 경쟁 상태 원칙**: 로그인/회원가입/자동 세션 복원은 모두 비동기(Supabase 네트워크 왕복)라, 요청이 끝나기 전에 "게스트로 계속하기"를 누르거나 다시 로그인/로그아웃을 시도할 수 있습니다. `main.ts`는 매 시도마다 증가하는 `authRequestId`를 발급해, 응답이 왔을 때 그 사이 더 최근 시도(게스트 전환 포함)가 있었다면 자신의 결과(클라우드 프로필 채택, 화면 이동 등)를 조용히 버립니다 — 늦게 도착한 로그인 응답이 이미 게스트로 진행 중인 세션을 덮어쓰는 일을 막기 위함입니다.
 
 ## 시작하기
 
@@ -21,6 +23,7 @@ npm run build      # 프로덕션 빌드 (dist/)
 ## 현재 구현된 것
 
 - **로그인 / 클라우드 저장**: 앱 진입 시 아이디·비밀번호로 로그인하거나 "게스트로 계속하기"를 선택. 로그인하면 진행 상황(레벨, 인벤토리, 장비, 정수 등)이 [Supabase](https://supabase.com) 계정에 저장되어 다른 기기에서도 이어할 수 있고, 게스트는 이 브라우저의 `localStorage`에만 저장됨. 로그인 없이도 게임은 항상 완전히 동작함 (설정 방법은 `supabase/README.md` 참고)
+  - 같은 탭에서 새로고침해 이미 로그인된 세션이 자동 복원될 때는 로컬·클라우드 중 더 최근에 저장된 쪽을 채택하고(위 "로컬↔클라우드 저장 병합 원칙" 참고), 클라우드 조회가 네트워크 오류로 실패하면 절대 어느 쪽도 덮어쓰지 않고 로컬 상태 그대로 계속 진행함 — 일시적 오류로 실제 진행 상황이 사라지는 일을 막기 위함
   - 내부적으로 "아이디"를 가짜 이메일로 변환해 Supabase Auth의 이메일/비밀번호 로그인을 그대로 사용하므로, 나중에 실제 이메일 인증이나 구글 등 소셜 로그인으로 확장할 때 설정만 추가하면 됨 (게임 로직 변경 불필요)
   - 계정에는 `is_admin` 플래그가 있어 향후 관리자 전용 기능의 기반이 됨. 일반 로그인 경로로는 스스로 켤 수 없고 Supabase SQL Editor에서만 설정 가능 (`supabase/README.md`의 "admin 계정 만들기" 참고). 로그인 시 관리자 계정이면 메인 메뉴에 "관리자" 표시가 뜸
 - **캐릭터는 계정당 1개만 존재**: 메인 메뉴 버튼이 캐릭터 유무에 따라 자동으로 바뀜 — 캐릭터가 없으면 "캐릭터 생성"(종족 선택으로 이동), 있으면 "이어하기"(종족 선택을 건너뛰고 바로 진행). 사망 시 세이브 전체 초기화와 자연스럽게 맞물려, 죽고 나면 다시 "캐릭터 생성"이 뜸
