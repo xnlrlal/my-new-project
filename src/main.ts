@@ -3,7 +3,8 @@ import type { GameState } from './engine/types';
 import { getRace, type RaceDef } from './engine/races';
 import type { MonsterDef, MonsterGrade } from './engine/monsters';
 import { getMonsterById, pickMonsterForFloorAndZone, rollEssenceDrop, rollManaStoneDrop } from './engine/monsters';
-import { initGame, playCard, endTurn } from './engine/engine';
+import { initGame, playCard, endTurn, type EnemyCombatant } from './engine/engine';
+import { getNpcById, WANDERING_EXPLORER, NPC_ENCOUNTER_CHANCE, NPC_KILL_LOOT_GOLD, type NpcDef } from './engine/npc';
 import { hasBleed, removeStatusEffect } from './engine/status-effects';
 import type { ResumableScreen, ResumeSession } from './engine/session';
 import {
@@ -30,6 +31,8 @@ import {
   consumableCount,
   monsterKillCount,
   recordMonsterKill,
+  recruitCompanion,
+  clearCompanion,
   type PlayerProfile,
   type ExpGrantResult,
 } from './engine/profile';
@@ -125,6 +128,10 @@ let authError: string | null = null;
 let authLoading = false;
 let selectedRace: RaceDef | null = null;
 let currentMonster: MonsterDef | null = null;
+// 인간형 NPC 조우(designnotes.md 3-6번, npc.ts) — currentMonster와 배타적:
+// 몬스터 전투를 시작하는 startZoneBattle()과 NPC 조우를 시작하는
+// startNpcEncounter() 각각이 반대쪽을 null로 정리한다.
+let currentNpc: NpcDef | null = null;
 let state: GameState | null = null;
 let expResult: ExpGrantResult | null = null;
 let expChecked = false;
@@ -455,6 +462,8 @@ function render() {
       { pending: pendingEssence, outcome: essenceOutcome },
       consumableCount(profile, 'bandage'),
       currentMonster ? huntingProficiencyLabel(monsterKillCount(profile, currentMonster.id)) : null,
+      currentNpc,
+      !profile.companionNpcId,
       {
         onPlayCard: (cardId) => {
           if (battleMode !== 'manual') return;
@@ -491,6 +500,32 @@ function render() {
           goTo('dungeon-map');
         },
         onAcknowledgeDeath: () => handleDeath('battle'),
+        onSpareNpc: () => {
+          if (!state || state.status !== 'incapacitated' || !currentNpc) return;
+          dungeonMessage = currentNpc.spareMessage;
+          currentNpc = null;
+          persistProfile();
+          goTo('dungeon-map');
+        },
+        onFinishNpc: () => {
+          if (!state || state.status !== 'incapacitated' || !currentNpc) return;
+          // designnotes.md 11번(탐험가 약탈)의 실제 전리품 목록이 아직
+          // 없어, 그 자리를 대신하는 임시 보상(npc.ts의 NPC_KILL_LOOT_GOLD
+          // 참고) — 실제 전리품 시스템이 들어오면 대체될 자리.
+          profile = { ...profile, gold: profile.gold + NPC_KILL_LOOT_GOLD };
+          dungeonMessage = currentNpc.killMessage;
+          currentNpc = null;
+          persistProfile();
+          goTo('dungeon-map');
+        },
+        onRecruitCompanion: () => {
+          if (!state || state.status !== 'incapacitated' || !currentNpc || profile.companionNpcId) return;
+          profile = recruitCompanion(profile, currentNpc.id);
+          dungeonMessage = currentNpc.recruitMessage;
+          currentNpc = null;
+          persistProfile();
+          goTo('dungeon-map');
+        },
         onAbsorbEssence: () => {
           if (!pendingEssence) return;
           if (hasOpenEssenceSlot(profile)) {
@@ -542,8 +577,18 @@ function afterStateChange() {
   checkForAchievements();
   checkForExp();
   checkForDrop();
+  checkForCompanionLoss();
   persistProfile();
   render();
+}
+
+// 동료가 전투 중 쓰러지면(engine.ts의 checkCompanionFallen이 GameState.
+// companion을 null로 비움) profile.companionNpcId도 같이 지워 동기화한다 —
+// 매 상태 변화마다 불려도 이미 지워져 있으면(clearCompanion의 no-op) 비용이
+// 없어 별도의 "한 번만" 가드가 필요 없다.
+function checkForCompanionLoss() {
+  if (!state || !profile.companionNpcId || state.companion) return;
+  profile = clearCompanion(profile);
 }
 
 // state.player.damagedParts(body-parts.ts)는 전투 동안 항목만 늘어나는
@@ -662,6 +707,7 @@ function forceReturnFromDungeon() {
   state = null;
   dungeonHp = null;
   currentMonster = null;
+  currentNpc = null;
   winProbability = null;
   battleMode = 'manual';
   expResult = null;
@@ -790,6 +836,14 @@ function arriveAt(id: CellId, battleChance: number, safeMessage: string, options
   if (rollBattle(battleChance)) {
     const forcedMonsterId = options?.forcedMonsterId;
     const ambush = options?.ambush ?? false;
+    // 인간형 NPC 조우(designnotes.md 3-6번, 9-1번 "탐험가들 사이의 불문율") —
+    // 함정 기습처럼 몬스터가 특정 개체로 강제된 조우에는 끼어들지 않는다
+    // (forcedMonsterId 있으면 이 분기 자체를 건너뜀, 몬스터 무리(3-1번)와
+    // 같은 이유).
+    if (!forcedMonsterId && Math.random() < NPC_ENCOUNTER_CHANCE) {
+      startNpcEncounter();
+      return;
+    }
     // 몬스터가 특정 개체로 강제된 조우(함정 기습)는 무리로 취급하지 않는다
     // — 무리는 무작위 조우에만 적용된다.
     packTotal = forcedMonsterId ? 1 : packSizeForDay(dungeonFloor, dungeonElapsedSeconds);
@@ -829,8 +883,22 @@ function handlePortalArrival(cell: DungeonCell) {
   }
 }
 
+// 동료 NPC(designnotes.md 10번, 최소 구현) — profile.companionNpcId가
+// 가리키는 NpcDef를 전투용 EnemyCombatant 형태로 반환한다(없으면
+// undefined, initGame/estimateWinProbability의 "동료 없음" 기본값과 그대로
+// 맞물림). 이름에 "(동료)"를 붙이는 이유는 적으로 같은 종류의 NPC를 다시
+// 만났을 때(예: 이미 동료가 있는데 또 다른 떠돌이 탐험가와 싸움) 전투
+// 화면에서 둘을 구분하기 위함.
+function companionCombatant(): EnemyCombatant | undefined {
+  if (!profile.companionNpcId) return undefined;
+  const npc = getNpcById(profile.companionNpcId);
+  if (!npc) return undefined;
+  return { ...npc, name: `${npc.name} (동료)` };
+}
+
 function startZoneBattle(zone: Zone, options?: { forcedMonsterId?: string; ambush?: boolean }) {
   if (!selectedRace) return;
+  currentNpc = null;
   currentMonster = options?.forcedMonsterId ? getMonsterById(options.forcedMonsterId) : pickMonsterForFloorAndZone(dungeonFloor, zone);
   const bonusCards = essenceSkillCards(profile.essences);
   const baseStats = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus);
@@ -844,10 +912,11 @@ function startZoneBattle(zone: Zone, options?: { forcedMonsterId?: string; ambus
   // full via undefined.
   const startingHp = dungeonHp ?? undefined;
   const ambush = options?.ambush ?? false;
-  state = initGame(totalStats, currentMonster, bonusCards, startingHp, [], ambush);
+  const companion = companionCombatant();
+  state = initGame(totalStats, currentMonster, bonusCards, startingHp, [], ambush, false, companion);
   dungeonHp = state.player.hp;
   processedDamagedPartsCount = 0;
-  winProbability = estimateWinProbability(totalStats, bonusCards, currentMonster, startingHp, [], ambush);
+  winProbability = estimateWinProbability(totalStats, bonusCards, currentMonster, startingHp, [], ambush, false, companion);
   // battleMode is deliberately left as-is here — it's a sticky preference
   // (see its declaration comment), and goTo('battle') below restarts the
   // auto-battle loop for this new monster's state if 'auto' is still active.
@@ -856,6 +925,34 @@ function startZoneBattle(zone: Zone, options?: { forcedMonsterId?: string; ambus
   dropChecked = false;
   pendingEssence = null;
   essenceOutcome = null;
+  goTo('battle');
+}
+
+// 인간형 NPC 조우(designnotes.md 3-6번) — arriveAt()이 몬스터 대신 이 NPC와
+// 마주칠 확률(NPC_ENCOUNTER_CHANCE)을 굴렸을 때 호출된다. startZoneBattle()
+// 과 거의 같은 구조지만 몬스터 전용 요소(사냥 숙련도, 무리 스폰, exp/드랍
+// 파이프라인)를 전부 건너뛴다 — 이 NPC는 currentMonster가 아니라
+// currentNpc로 추적되고, 승리 결과도 'win'이 아니라 'incapacitated'라
+// checkForExp/checkForDrop이 자동으로 관여하지 않는다.
+function startNpcEncounter() {
+  if (!selectedRace) return;
+  currentMonster = null;
+  currentNpc = WANDERING_EXPLORER;
+  const bonusCards = essenceSkillCards(profile.essences);
+  const totalStats = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus);
+  const startingHp = dungeonHp ?? undefined;
+  const companion = companionCombatant();
+  state = initGame(totalStats, currentNpc, bonusCards, startingHp, [], false, true, companion);
+  dungeonHp = state.player.hp;
+  processedDamagedPartsCount = 0;
+  winProbability = estimateWinProbability(totalStats, bonusCards, currentNpc, startingHp, [], false, true, companion);
+  expResult = null;
+  expChecked = false;
+  dropChecked = false;
+  pendingEssence = null;
+  essenceOutcome = null;
+  packTotal = 1;
+  packRemaining = 0;
   goTo('battle');
 }
 
@@ -873,6 +970,7 @@ function handleDeath(reason: 'battle' | 'tax') {
   profile = resetProfile();
   selectedRace = null;
   currentMonster = null;
+  currentNpc = null;
   state = null;
   dungeonHp = null;
   dungeonFloor = 1;
@@ -1045,6 +1143,7 @@ function captureSession(): ResumeSession | undefined {
     dungeonElapsedSeconds,
     dungeonEntryVillageSeconds,
     currentMonsterId: currentMonster?.id ?? null,
+    currentNpcId: currentNpc?.id ?? null,
     state,
     dungeonHp,
     winProbability,
@@ -1130,6 +1229,7 @@ function resumeCharacter() {
     dungeonElapsedSeconds = session.dungeonElapsedSeconds;
     dungeonEntryVillageSeconds = session.dungeonEntryVillageSeconds;
     currentMonster = session.currentMonsterId ? getMonsterById(session.currentMonsterId) : null;
+    currentNpc = session.currentNpcId ? getNpcById(session.currentNpcId) : null;
     state = session.state;
     processedDamagedPartsCount = state?.player.damagedParts.length ?? 0;
     dungeonHp = session.dungeonHp;

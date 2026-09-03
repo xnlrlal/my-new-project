@@ -65,6 +65,10 @@ body {
   border: 1px solid #3b5f7a;
 }
 
+.actor.companion {
+  border: 1px solid #3b7a4f;
+}
+
 .actor-name {
   font-weight: 600;
   margin-bottom: 6px;
