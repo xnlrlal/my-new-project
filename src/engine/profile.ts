@@ -100,6 +100,17 @@ export interface PlayerProfile {
   // (1차 구현 범위, 교체/해산 UI 없음 — 전투 중 쓰러지면 자동으로 null이
   // 됨). 페르마데스 원칙에 따라 사망 시 resetProfile()로 함께 초기화.
   companionNpcId: string | null;
+  // Wall-clock timestamp (Date.now()) of the last time this profile was
+  // actually persisted (main.ts's persistProfileLocalOnly stamps it on
+  // every local save). Lets adoptLoggedInProfile/restoreLoggedInSession
+  // (main.ts) tell a genuinely newer save from a stale one when local and
+  // cloud disagree, instead of always trusting one side blindly — that
+  // blind trust used to let an unlucky network error on cloud read wipe a
+  // real cloud save with a blank local one, and let a same-tab reload
+  // silently roll back a local change whose background cloud sync hadn't
+  // landed yet. Defaults to 0 ("never saved") so a genuinely untouched
+  // profile always loses to any real saved data on either side.
+  updatedAt: number;
 }
 
 function defaultProfile(): PlayerProfile {
@@ -130,6 +141,7 @@ function defaultProfile(): PlayerProfile {
     achievementStatBonus: {},
     achievementHp2PctGranted: false,
     achievementHp01PctGranted: false,
+    updatedAt: 0,
   };
 }
 
@@ -479,6 +491,7 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
     achievementHp2PctGranted: typeof parsed.achievementHp2PctGranted === 'boolean' ? parsed.achievementHp2PctGranted : false,
     achievementHp01PctGranted: typeof parsed.achievementHp01PctGranted === 'boolean' ? parsed.achievementHp01PctGranted : false,
     companionNpcId: typeof parsed.companionNpcId === 'string' ? parsed.companionNpcId : null,
+    updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : 0,
   };
 }
 

@@ -36,6 +36,10 @@ VITE_SUPABASE_URL=https://xxxxxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
 ```
 
+## ⚠️ 기존 프로젝트라면: `is_admin` 보안 패치 재적용 필요
+
+과거 버전의 `schema.sql`은 `protect_is_admin` 트리거를 `UPDATE`에만 걸어뒀습니다. 앱의 저장 로직(`saveCloudProfile`)은 `upsert`를 쓰기 때문에, 로그인 후 첫 저장은 `INSERT` 경로를 타서 이 트리거를 아예 거치지 않았습니다 — 즉 인증된 사용자가 앱을 거치지 않고 API를 직접 호출해 자기 계정의 `is_admin`을 `true`로 넣는 게 가능했던 결함입니다. 이미 이 저장소로 Supabase 프로젝트를 만들어 운영 중이라면, **`schema.sql` 전체를 SQL Editor에서 다시 실행**해 트리거를 `INSERT`까지 포함하도록 갱신해야 합니다(테이블은 `if not exists`라 재실행해도 안전, 트리거는 `drop ... if exists` 후 재생성).
+
 ## admin 계정 만들기
 
 `profiles` 테이블에는 `is_admin` 컬럼이 있고, 일반 로그인 경로(앱/anon key)로는 스스로 켤 수 없도록 트리거로 막아뒀습니다 (SQL Editor에서만 변경 가능). 계정 자체(비밀번호 포함)는 앱의 회원가입 화면에서 직접 만들어야 합니다.
