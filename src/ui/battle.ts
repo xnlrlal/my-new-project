@@ -1,8 +1,9 @@
 import type { Actor, GameState } from '../engine/types';
 import type { ExpGrantResult } from '../engine/profile';
 import type { EquippedEssence } from '../engine/essence';
-import { statusEffectsText } from '../engine/status-effects';
+import { statusEffectsText, hasBleed } from '../engine/status-effects';
 import { damagedPartsText } from '../engine/body-parts';
+import { BANDAGE } from '../engine/consumables';
 
 export type BattleMode = 'manual' | 'auto';
 
@@ -18,6 +19,7 @@ export interface BattleHandlers {
   onOpenInventory: () => void;
   onOpenEquipment: () => void;
   onOpenEssence: () => void;
+  onUseBandage: () => void;
 }
 
 export interface EssenceDropState {
@@ -99,6 +101,7 @@ export function renderBattle(
   winProbability: number | null,
   expResult: ExpGrantResult | null,
   essenceDrop: EssenceDropState,
+  bandageCount: number,
   handlers: BattleHandlers
 ) {
   const { player, enemy, log, status } = state;
@@ -201,6 +204,11 @@ export function renderBattle(
         )
         .join('')}
     </div>
+    ${
+      bandageCount > 0
+        ? `<button class="menu-return small" id="use-bandage" ${status === 'playing' && hasBleed(player) && isManual ? '' : 'disabled'}>${BANDAGE.name} 사용 (보유 ${bandageCount}개)</button>`
+        : ''
+    }
     <div class="actions">
       <div class="stat-line">${status === 'playing' ? `${state.turn}턴 진행 중` : '전투 종료'}</div>
       <button class="end-turn" id="end-turn" ${cardsDisabled ? 'disabled' : ''}>턴 종료</button>
@@ -216,6 +224,7 @@ export function renderBattle(
   });
 
   document.getElementById('end-turn')?.addEventListener('click', handlers.onEndTurn);
+  document.getElementById('use-bandage')?.addEventListener('click', handlers.onUseBandage);
   document.getElementById('switch-to-auto')?.addEventListener('click', handlers.onSwitchToAuto);
   document.getElementById('switch-to-manual')?.addEventListener('click', handlers.onSwitchToManual);
   document.getElementById('continue-btn')?.addEventListener('click', handlers.onContinue);
