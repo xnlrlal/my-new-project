@@ -25,10 +25,20 @@ export interface GearDef {
   // of the old always-on clockItemEquipped placeholder, so equipping this
   // item (any slot) is what actually turns the in-dungeon clock display on.
   isClockItem?: boolean;
+  // 장비 내구도(designnotes.md 3-5번) — undefined면 "내구도 개념 없음"(무한,
+  // 절대 파손되지 않음)이라는 뜻이다. 지금은 성인식 방어구(armor/footwear
+  // 슬롯, ritual.ts)에만 부여되어 있고, 몬스터 드랍 장비(전부 weapon/
+  // accessory)는 아직 대상이 아니다 — profile.ts의
+  // damageEquippedGearForBodyPart()가 이 필드가 있는 장비만 대상으로
+  // 삼는다.
+  maxDurability?: number;
 }
 
 export interface GearInstance extends GearDef {
   instanceId: string;
+  // 현재 내구도 — undefined면 maxDurability(정의돼 있다면) 그대로 풀피
+  // 취급한다. maxDurability 자체가 없는 장비에서는 의미 없는 필드.
+  durability?: number;
 }
 
 export interface GearTemplate {
@@ -38,6 +48,7 @@ export interface GearTemplate {
   description: string;
   isPermanent?: boolean;
   isClockItem?: boolean;
+  maxDurability?: number;
 }
 
 export const EQUIPMENT_SLOTS: EquipmentSlot[] = ['weapon', 'armor', 'legwear', 'footwear', 'accessory'];
@@ -73,6 +84,8 @@ export function createGearFromMonster(monsterId: string, template: GearTemplate)
     // isPermanent to true; stripDungeonOnlyGear() (profile.ts) always reads
     // this live, so that flip is all it takes to spare an item later.
     isPermanent: false,
+    maxDurability: template.maxDurability,
+    durability: template.maxDurability,
   };
 }
 
@@ -91,7 +104,17 @@ export function createGrantedGear(id: string, template: GearTemplate): GearInsta
     description: template.description,
     isPermanent: template.isPermanent,
     isClockItem: template.isClockItem,
+    maxDurability: template.maxDurability,
+    durability: template.maxDurability,
   };
+}
+
+// 순수 표시용 포맷터 — maxDurability가 없는(내구도 개념 없는) 장비는 빈
+// 문자열을 반환해 equipment.ts가 아예 줄을 안 그리게 한다.
+export function durabilityText(gear: GearInstance): string {
+  if (gear.maxDurability === undefined) return '';
+  const current = gear.durability ?? gear.maxDurability;
+  return `내구도 ${current}/${gear.maxDurability}`;
 }
 
 const GEAR_DROP_CHANCE = 0.03;

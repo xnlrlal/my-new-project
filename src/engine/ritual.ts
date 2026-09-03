@@ -92,6 +92,10 @@ export const STARTER_ARMOR: GrantedGearChoice[] = [
       statBonus: { dexterity: 1 },
       description: '성인식에서 받는 기본 천 상의.',
       isPermanent: true,
+      // 장비 내구도(designnotes.md 3-5번) — 몸통 부위 손상(body-parts.ts)이
+      // 이 슬롯의 내구도를 깎는다(profile.ts의 damageEquippedGearForBodyPart
+      // 참고). 수치는 마스터 설정에 없어 1차 추정치.
+      maxDurability: 15,
     },
   },
   {
@@ -105,6 +109,10 @@ export const STARTER_ARMOR: GrantedGearChoice[] = [
       statBonus: { dexterity: 2 },
       description: '성인식에서 받는 기본 천 하의.',
       isPermanent: true,
+      // maxDurability 없음(내구도 개념 미적용) — 마스터 설정이 확정한 유일한
+      // 내구도 사례는 샌들(footwear)이 망가진 것뿐이라, 다리 부위 손상은
+      // footwear만 깎는다(profile.ts). legwear를 깎을 근거가 아직 없어
+      // 의도적으로 제외 — 근거가 생기면 그때 추가.
     },
   },
   {
@@ -117,6 +125,12 @@ export const STARTER_ARMOR: GrantedGearChoice[] = [
       statBonus: { willpower: 2 },
       description: '성인식에서 받는 기본 샌들.',
       isPermanent: true,
+      // 장비 내구도(designnotes.md 3-5번, 마스터 설정 확정 사례: "고블린
+      // 덫에 의해 기존 샌들이 망가진 것") — 다리 부위 손상(body-parts.ts)이
+      // 이 슬롯의 내구도를 깎는다. 천 상의보다 훨씬 낮게 잡아, 샌들이 쉽게
+      // 망가지는 재질이라는 서사(가죽 장화였다면 덜 망가졌을 것)를 반영한
+      // 1차 추정치.
+      maxDurability: 6,
     },
   },
 ];
