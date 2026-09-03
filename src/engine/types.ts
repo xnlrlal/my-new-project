@@ -8,6 +8,13 @@ export interface StatusEffect {
   remainingTurns: number;
 }
 
+// 부위 손상(designnotes.md 3-3번) — HP(생명력 총량)·상태이상(시간에 따른
+// 지속 효과)과 독립된 세 번째 축. 머리는 이 목록에 없다 — 머리 손상은
+// engine.ts의 기존 즉사(헤드샷) 판정으로 이미 다뤄지고 있어(3-2번 참고),
+// 같은 부위를 두 판정이 중복으로 다루지 않도록 body-parts.ts의 스폰 후보에서
+// 처음부터 제외한다.
+export type BodyPart = 'torso' | 'leftArm' | 'rightArm' | 'leftLeg' | 'rightLeg';
+
 export interface Card {
   id: string;
   name: string;
@@ -48,6 +55,9 @@ export interface Actor {
   // (engine.ts의 WILLPOWER_REGEN_COEF).
   willpower: number;
   statusEffects: StatusEffect[];
+  // 이번 전투에서 이미 손상된 부위 목록(body-parts.ts) — 같은 부위는 이번
+  // 전투 동안 두 번 손상되지 않는다(1차 구현, 아래 body-parts.ts 문서 참고).
+  damagedParts: BodyPart[];
   hand: Card[];
   deck: Card[];
   discard: Card[];

@@ -3,6 +3,7 @@ import { buildDeck } from './cards';
 import type { RaceStats } from './races';
 import type { MonsterDef } from './monsters';
 import { applyStatusEffect, bleedHealMultiplier, isStunned, tickStatusEffects } from './status-effects';
+import { maybeDamageBodyPart } from './body-parts';
 
 const HAND_SIZE = 4;
 
@@ -68,6 +69,7 @@ function createActor(
     poisonResist: stats.poisonResist,
     willpower: stats.willpower,
     statusEffects: [],
+    damagedParts: [],
     hand: [],
     deck: shuffle(buildDeck(bonusCards)),
     discard: [],
@@ -271,6 +273,15 @@ function applyCard(state: GameState, source: ActorId, card: Card): GameState {
           : isCrit
             ? `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 치명타! ${totalDamage}의 피해!${defenseSuffix}${statusSuffix}`
             : `${sourceActor.name}이(가) [${card.name}]로 ${targetActor.name}에게 ${totalDamage}의 피해!${defenseSuffix}${statusSuffix}`;
+      // 부위 손상(designnotes.md 3-3번, body-parts.ts)은 즉사·크리티컬과
+      // 완전히 독립된 판정이라 명중 여부만 확인한다. 이 공격으로 이미
+      // 죽었다면(즉사 판정이거나 남은 HP가 0) 부위 손상을 굳이 얹지 않는다 —
+      // 죽는 순간에 "팔이 손상되었다" 같은 문구가 붙는 걸 막기 위함.
+      if (isHit && !instantDeath && updatedTarget.hp > 0) {
+        const partResult = maybeDamageBodyPart(updatedTarget, targetActor.name);
+        updatedTarget = partResult.actor;
+        if (partResult.message) message += ` ${partResult.message}`;
+      }
       break;
     }
     case 'heal': {
