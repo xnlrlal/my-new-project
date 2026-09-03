@@ -1,8 +1,5 @@
 import type { StatBonus } from './stat-bonus';
 
-// 'legwear'/'footwear' exist only for the barbarian coming-of-age starter
-// gear (천 하의/샌들) — every monster drop still only ever uses
-// 'weapon'/'armor'/'accessory', so this is a purely additive extension.
 export type EquipmentSlot = 'weapon' | 'armor' | 'accessory' | 'legwear' | 'footwear';
 
 export interface GearDef {
@@ -11,14 +8,13 @@ export interface GearDef {
   slot: EquipmentSlot;
   statBonus: StatBonus;
   description: string;
-  // Whether this instance survives leaving the dungeon. A live state, not a
-  // fixed record of origin: granted gear (character-creation rituals, ...)
-  // starts true and monster drops start false, but a future skill/scroll is
-  // expected to flip a drop's isPermanent to true in place — so always read
-  // this field fresh (=== true) rather than inferring it from where the
-  // item came from. stripDungeonOnlyGear() (profile.ts) is the reader;
-  // called from forceReturnFromDungeon() (main.ts) whenever a dungeon visit
-  // truly ends (not on floor transitions/backtracking, which keep drops).
+  // Whether this instance survives leaving the dungeon. Granted gear
+  // (character-creation rituals, shop purchases) is permanent; any future
+  // dungeon-only loot (넘버링 아이템/부속물 등, designnotes.md 3-7번) is
+  // expected to start false and read this field live rather than inferring
+  // it from where the item came from. stripDungeonOnlyGear() (profile.ts)
+  // is the reader; called from forceReturnFromDungeon() (main.ts) whenever
+  // a dungeon visit truly ends (not on floor transitions/backtracking).
   isPermanent?: boolean;
   // Marks the 회중시계(pocket watch) — designnotes.md 6-3번/우선순위 1번.
   // profile.ts's isClockVisible() checks equipped gear for this flag instead
@@ -27,8 +23,7 @@ export interface GearDef {
   isClockItem?: boolean;
   // 장비 내구도(designnotes.md 3-5번) — undefined면 "내구도 개념 없음"(무한,
   // 절대 파손되지 않음)이라는 뜻이다. 지금은 성인식 방어구(armor/footwear
-  // 슬롯, ritual.ts)에만 부여되어 있고, 몬스터 드랍 장비(전부 weapon/
-  // accessory)는 아직 대상이 아니다 — profile.ts의
+  // 슬롯, ritual.ts)에만 부여되어 있다 — profile.ts의
   // damageEquippedGearForBodyPart()가 이 필드가 있는 장비만 대상으로
   // 삼는다.
   maxDurability?: number;
@@ -70,29 +65,10 @@ export function slotLabel(slot: EquipmentSlot): string {
 
 let gearCounter = 0;
 
-export function createGearFromMonster(monsterId: string, template: GearTemplate): GearInstance {
-  gearCounter += 1;
-  return {
-    id: `${monsterId}-gear`,
-    instanceId: `gear-${monsterId}-${Date.now()}-${gearCounter}`,
-    name: template.name,
-    slot: template.slot,
-    statBonus: template.statBonus,
-    description: template.description,
-    // Explicit false (not left undefined) — every monster drop starts
-    // dungeon-only. A future skill/scroll can flip a specific instance's
-    // isPermanent to true; stripDungeonOnlyGear() (profile.ts) always reads
-    // this live, so that flip is all it takes to spare an item later.
-    isPermanent: false,
-    maxDurability: template.maxDurability,
-    durability: template.maxDurability,
-  };
-}
-
-// Same shape as createGearFromMonster but for gear granted outright (not
-// dropped) — e.g. the barbarian coming-of-age ritual's weapon/armor. `id`
-// identifies the template (not tied to a monster), and template.isPermanent
-// carries through so the instance is flagged too.
+// Gear granted outright (not dropped by a kill) — e.g. the barbarian
+// coming-of-age ritual's weapon/armor, or the pocket watch bought in the
+// shop. `id` identifies the template, and template.isPermanent carries
+// through so the instance is flagged too.
 export function createGrantedGear(id: string, template: GearTemplate): GearInstance {
   gearCounter += 1;
   return {
@@ -117,15 +93,8 @@ export function durabilityText(gear: GearInstance): string {
   return `내구도 ${current}/${gear.maxDurability}`;
 }
 
-const GEAR_DROP_CHANCE = 0.03;
-
-export function rollGearDrop(): boolean {
-  return Math.random() < GEAR_DROP_CHANCE;
-}
-
 // 회중시계 — designnotes.md 6-3번: 마을 상점(ui/shop.ts)에서 스톤으로 구매하는
-// 품목이라 몬스터별 gearDrop(monsters.ts)과 달리 여기서 직접 정의한다. No
-// combat statBonus: its only effect is isClockItem gating the in-dungeon
+// 품목이다. No combat statBonus: its only effect is isClockItem gating the in-dungeon
 // clock display (see isClockItem's doc comment above). isPermanent: true so
 // buying it isn't wasted by the next forced dungeon return — see
 // stripDungeonOnlyGear (profile.ts).

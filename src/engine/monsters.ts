@@ -1,7 +1,6 @@
 import type { Card } from './types';
 import type { StatBonus } from './stat-bonus';
 import type { ArmZone, Zone } from './dungeon';
-import type { GearTemplate } from './gear';
 
 export type EssenceStatBonus = StatBonus;
 
@@ -43,7 +42,6 @@ export interface MonsterDef {
   // 소폭의 확률이 있음), 원거리는 그 위에 "헤드샷" 고정 확률이 더해진다.
   ranged: boolean;
   essence: EssenceTemplate;
-  gearDrop: GearTemplate;
 }
 
 // 체력을 전부 100으로 통일하면서, "몬스터가 세다"는 감각을 체력 풀 크기
@@ -84,12 +82,6 @@ export const MONSTERS: MonsterDef[] = [
       statBonus: { strength: 1 },
       skill: { name: '기습', cost: 1, effect: 'damage', value: 12, description: '적에게 12의 피해를 준다.' },
     },
-    gearDrop: {
-      name: '고블린의 녹슨 검',
-      slot: 'weapon',
-      statBonus: { strength: 1 },
-      description: '고블린이 사용하던 녹슨 검. 공격력이 오른다.',
-    },
   },
   {
     id: 'ghoul',
@@ -104,12 +96,6 @@ export const MONSTERS: MonsterDef[] = [
     essence: {
       statBonus: { strength: 1 },
       skill: { name: '날카로운 손톱', cost: 1, effect: 'damage', value: 13, description: '적에게 13의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '구울의 손톱',
-      slot: 'weapon',
-      statBonus: { strength: 1 },
-      description: '구울의 날카로운 손톱을 다듬어 만든 무기. 공격력이 오른다.',
     },
   },
   {
@@ -126,12 +112,6 @@ export const MONSTERS: MonsterDef[] = [
       statBonus: { strength: 1 },
       skill: { name: '베어물기', cost: 1, effect: 'damage', value: 13, description: '적에게 13의 피해를 준다.' },
     },
-    gearDrop: {
-      name: '칼날늑대의 이빨',
-      slot: 'accessory',
-      statBonus: { strength: 1 },
-      description: '칼날처럼 예리한 늑대의 이빨. 공격력이 오른다.',
-    },
   },
   {
     id: 'gnome',
@@ -146,12 +126,6 @@ export const MONSTERS: MonsterDef[] = [
     essence: {
       statBonus: { dexterity: 1 },
       skill: { name: '망치질', cost: 1, effect: 'damage', value: 11, description: '적에게 11의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '노움의 작은 망치',
-      slot: 'weapon',
-      statBonus: { dexterity: 1 },
-      description: '노움이 쓰던 작업용 망치. 방어력이 오른다.',
     },
   },
 
@@ -169,12 +143,6 @@ export const MONSTERS: MonsterDef[] = [
     essence: {
       statBonus: { strength: 2 },
       skill: { name: '베기 연타', cost: 2, effect: 'damage', value: 20, description: '적에게 20의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '고블린 검사의 장검',
-      slot: 'weapon',
-      statBonus: { strength: 2 },
-      description: '고블린 검사가 쓰던 장검. 일반 고블린의 것보다 훨씬 무겁고 단단하다.',
     },
   },
   {
@@ -198,12 +166,6 @@ export const MONSTERS: MonsterDef[] = [
         appliesStatusEffect: { type: 'poison', duration: 3 },
       },
     },
-    gearDrop: {
-      name: '고블린 궁수의 단궁',
-      slot: 'weapon',
-      statBonus: { accuracy: 2 },
-      description: '고블린 궁수가 쓰던 하프 모양의 작은 단궁. 명중률이 오른다.',
-    },
   },
 
   // ── 2층: 망자의 땅(서) — 구울 계열 ──
@@ -221,12 +183,6 @@ export const MONSTERS: MonsterDef[] = [
       statBonus: { strength: 2, maxHp: 3 },
       skill: { name: '썩은 발톱', cost: 2, effect: 'damage', value: 18, description: '적에게 18의 피해를 준다.' },
     },
-    gearDrop: {
-      name: '엘더구울의 발톱',
-      slot: 'weapon',
-      statBonus: { strength: 2 },
-      description: '엘더구울의 억센 발톱. 공격력이 크게 오른다.',
-    },
   },
   {
     id: 'skeleton-warrior',
@@ -241,12 +197,6 @@ export const MONSTERS: MonsterDef[] = [
     essence: {
       statBonus: { dexterity: 2 },
       skill: { name: '뼈 방패', cost: 1, effect: 'shield', value: 14, description: '방어막 14를 얻는다.' },
-    },
-    gearDrop: {
-      name: '스켈레톤의 낡은 검',
-      slot: 'weapon',
-      statBonus: { strength: 1 },
-      description: '스켈레톤 전사가 휘두르던 검. 공격력이 오른다.',
     },
   },
   {
@@ -263,12 +213,6 @@ export const MONSTERS: MonsterDef[] = [
       statBonus: { accuracy: 2 },
       skill: { name: '뼈 화살', cost: 1, effect: 'damage', value: 13, description: '적에게 13의 피해를 준다.' },
     },
-    gearDrop: {
-      name: '스켈레톤의 활',
-      slot: 'weapon',
-      statBonus: { accuracy: 1 },
-      description: '스켈레톤 궁수가 쓰던 활. 명중률이 오른다.',
-    },
   },
   {
     id: 'skeleton-mage',
@@ -283,12 +227,6 @@ export const MONSTERS: MonsterDef[] = [
     essence: {
       statBonus: { maxMana: 1 },
       skill: { name: '냉기 마법', cost: 2, effect: 'damage', value: 19, description: '적에게 냉기 피해 19를 준다.' },
-    },
-    gearDrop: {
-      name: '스켈레톤 마법사의 지팡이',
-      slot: 'weapon',
-      statBonus: { maxMana: 1 },
-      description: '스켈레톤 마법사가 쓰던 지팡이. 마나가 오른다.',
     },
   },
   {
@@ -305,12 +243,6 @@ export const MONSTERS: MonsterDef[] = [
       statBonus: { maxMana: 2 },
       skill: { name: '절규', cost: 2, effect: 'damage', value: 22, description: '적에게 22의 피해를 준다.' },
     },
-    gearDrop: {
-      name: '벤시의 찢어진 베일',
-      slot: 'armor',
-      statBonus: { maxMana: 1, dexterity: 1 },
-      description: '벤시가 두르던 베일. 마나와 방어력이 오른다.',
-    },
   },
   {
     id: 'death-fiend',
@@ -325,12 +257,6 @@ export const MONSTERS: MonsterDef[] = [
     essence: {
       statBonus: { strength: 2, dexterity: 1 },
       skill: { name: '죽음의 손아귀', cost: 2, effect: 'damage', value: 22, description: '적에게 22의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '데스핀드의 사슬',
-      slot: 'accessory',
-      statBonus: { strength: 1, dexterity: 1 },
-      description: '데스핀드가 두르던 사슬. 공격력과 방어력이 오른다.',
     },
   },
 
@@ -350,12 +276,6 @@ export const MONSTERS: MonsterDef[] = [
       statBonus: { dexterity: 2 },
       skill: { name: '타락한 망치질', cost: 2, effect: 'damage', value: 16, description: '적에게 16의 피해를 준다.' },
     },
-    gearDrop: {
-      name: '타락한 노움의 망치',
-      slot: 'weapon',
-      statBonus: { strength: 1, dexterity: 1 },
-      description: '타락한 노움이 휘두르던 망치. 공격력과 방어력이 오른다.',
-    },
   },
   {
     id: 'kobold-shieldbearer',
@@ -371,12 +291,6 @@ export const MONSTERS: MonsterDef[] = [
       statBonus: { dexterity: 3 },
       skill: { name: '방패 밀치기', cost: 1, effect: 'shield', value: 16, description: '방어막 16을 얻는다.' },
     },
-    gearDrop: {
-      name: '코볼트의 큰 방패',
-      slot: 'armor',
-      statBonus: { dexterity: 2 },
-      description: '코볼트 방패병이 들던 큰 방패. 방어력이 크게 오른다.',
-    },
   },
   {
     id: 'stone-golem',
@@ -391,12 +305,6 @@ export const MONSTERS: MonsterDef[] = [
     essence: {
       statBonus: { maxHp: 6, dexterity: 1 },
       skill: { name: '바위 주먹', cost: 2, effect: 'damage', value: 19, description: '적에게 19의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '스톤골렘의 파편',
-      slot: 'armor',
-      statBonus: { dexterity: 2, maxHp: 2 },
-      description: '스톤골렘의 몸에서 떨어진 돌 파편으로 만든 갑옷. 방어력과 체력이 오른다.',
     },
   },
 
@@ -415,12 +323,6 @@ export const MONSTERS: MonsterDef[] = [
       statBonus: { strength: 1 },
       skill: { name: '물어뜯기', cost: 2, effect: 'damage', value: 17, description: '적에게 17의 피해를 준다.' },
     },
-    gearDrop: {
-      name: '늑대 이빨 목걸이',
-      slot: 'accessory',
-      statBonus: { strength: 1 },
-      description: '늑대의 이빨로 만든 목걸이. 공격력이 오른다.',
-    },
   },
   {
     id: 'bear',
@@ -436,12 +338,6 @@ export const MONSTERS: MonsterDef[] = [
       statBonus: { maxHp: 4, strength: 1 },
       skill: { name: '앞발 강타', cost: 2, effect: 'damage', value: 19, description: '적에게 19의 피해를 준다.' },
     },
-    gearDrop: {
-      name: '곰가죽 갑옷',
-      slot: 'armor',
-      statBonus: { maxHp: 3 },
-      description: '곰의 두꺼운 가죽으로 만든 갑옷. 체력이 오른다.',
-    },
   },
   {
     id: 'tiger',
@@ -456,12 +352,6 @@ export const MONSTERS: MonsterDef[] = [
     essence: {
       statBonus: { strength: 2, dexterity: 1 },
       skill: { name: '맹수의 도약', cost: 2, effect: 'damage', value: 22, description: '적에게 22의 피해를 준다.' },
-    },
-    gearDrop: {
-      name: '호랑이 가죽',
-      slot: 'armor',
-      statBonus: { strength: 1, dexterity: 1 },
-      description: '호랑이의 무늬 가죽으로 만든 갑옷. 공격력과 방어력이 오른다.',
     },
   },
 ];
