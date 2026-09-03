@@ -1158,9 +1158,12 @@ function captureSession(): ResumeSession | undefined {
 // reload without pushing a network write every single second.
 function persistProfileLocalOnly() {
   const captured = captureSession();
-  if (captured !== undefined) {
-    profile = { ...profile, session: captured };
-  }
+  // Always stamp updatedAt, even when there's no resumable session to
+  // capture (auth/menu/character-select) — it's the "this device's save is
+  // current as of now" signal that adoptLoggedInProfile/restoreLoggedInSession
+  // use to merge against the cloud by recency (see updatedAt's doc comment
+  // in profile.ts).
+  profile = { ...profile, updatedAt: Date.now(), session: captured !== undefined ? captured : profile.session };
   saveProfile(profile);
 }
 
@@ -1245,19 +1248,51 @@ function resumeCharacter() {
   }
 }
 
-async function adoptLoggedInProfile(user: AuthUser) {
-  authUser = user;
-  const cloud = await loadCloudProfile(user.id);
-  if (cloud) {
-    profile = cloud;
-    saveProfile(profile);
-  } else {
+// Shared by adoptLoggedInProfile (explicit login/signup) and
+// restoreLoggedInSession (silent session restore on app start) — see each
+// for which merge behavior applies and why. Never overwrites either side on
+// a cloud read error; the next real action's persistProfile() will sync
+// things up on its own once the cloud is reachable again.
+async function syncLoggedInProfile(user: AuthUser, opts: { preferLocalIfNewer: boolean }): Promise<void> {
+  const result = await loadCloudProfile(user.id);
+  if (result.status === 'error') {
+    console.warn('Failed to load cloud profile; continuing with the local save.');
+    return;
+  }
+  if (result.status === 'not_found') {
     // first time this account has logged in: push whatever local/guest
     // progress exists up to the cloud so it isn't lost
     await saveCloudProfile(user.id, profile);
+    return;
   }
+  if (opts.preferLocalIfNewer && profile.updatedAt > result.profile.updatedAt) {
+    await saveCloudProfile(user.id, profile);
+    return;
+  }
+  profile = result.profile;
+  saveProfile(profile);
+}
+
+// Called after the player explicitly authenticates (login/signup) — a
+// deliberate identity switch, so an existing cloud save is authoritative
+// over whatever local/guest profile happened to be loaded before it.
+async function adoptLoggedInProfile(user: AuthUser) {
+  authUser = user;
+  await syncLoggedInProfile(user, { preferLocalIfNewer: false });
   authError = null;
   authLoading = false;
+  goTo('menu');
+}
+
+// Called when the app starts and a Supabase session already exists (same
+// browser/account continuing, not a fresh login) — merges by recency
+// instead of blindly trusting the cloud, so a same-tab reload before an
+// earlier background cloud sync (persistProfile's fire-and-forget
+// saveCloudProfile) lands can't silently roll the player back to the last
+// state the cloud actually received.
+async function restoreLoggedInSession(user: AuthUser) {
+  authUser = user;
+  await syncLoggedInProfile(user, { preferLocalIfNewer: true });
   goTo('menu');
 }
 
@@ -1396,7 +1431,7 @@ async function init() {
   if (isCloudConfigured) {
     const existingUser = await getCurrentUser();
     if (existingUser) {
-      await adoptLoggedInProfile(existingUser);
+      await restoreLoggedInSession(existingUser);
       return;
     }
   }

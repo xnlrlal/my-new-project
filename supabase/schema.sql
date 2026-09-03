@@ -26,12 +26,17 @@ create policy "Users can update their own profile"
   using (auth.uid() = user_id);
 
 -- is_admin is account-level, not regular game data, so it must not be
--- settable by the player themselves — the UPDATE policy above has no
--- column-level restriction, so without this trigger a signed-in user could
--- flip their own is_admin to true with a raw REST/SQL call. This trigger
--- silently keeps is_admin unchanged for any request made as the
--- "authenticated" role (i.e. through the app / anon key); it only stays
--- open to the SQL editor (superuser) or a future service_role-based backend.
+-- settable by the player themselves — neither the INSERT nor the UPDATE
+-- policy above has a column-level restriction, so without this trigger a
+-- signed-in user could set is_admin=true on their very first save
+-- (saveCloudProfile in the app uses upsert, so a brand-new row goes through
+-- INSERT, not UPDATE) or flip it later with a raw REST/SQL call. This
+-- trigger silently forces is_admin back to a safe value for any request
+-- made as the "authenticated" role (i.e. through the app / anon key) on
+-- both INSERT (forced to false — a legitimate signup never sets it) and
+-- UPDATE (kept at its previous value); it only stays open to the SQL
+-- editor (superuser) or a future service_role-based backend, neither of
+-- which authenticates as "authenticated".
 create or replace function public.protect_is_admin()
 returns trigger
 language plpgsql
@@ -39,8 +44,12 @@ security definer
 set search_path = public
 as $$
 begin
-  if new.is_admin is distinct from old.is_admin and auth.role() = 'authenticated' then
-    new.is_admin := old.is_admin;
+  if auth.role() = 'authenticated' then
+    if TG_OP = 'INSERT' then
+      new.is_admin := false;
+    elsif new.is_admin is distinct from old.is_admin then
+      new.is_admin := old.is_admin;
+    end if;
   end if;
   return new;
 end;
@@ -49,7 +58,7 @@ $$;
 drop trigger if exists protect_is_admin_trigger on public.profiles;
 
 create trigger protect_is_admin_trigger
-  before update on public.profiles
+  before insert or update on public.profiles
   for each row
   execute function public.protect_is_admin();
 
