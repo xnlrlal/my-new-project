@@ -35,6 +35,18 @@ function ring2Id(i: number): CellId {
 // 일도 일어나지 않는다(그 고블린은 이미 죽었으므로).
 export type TrapType = 'goblin';
 
+// 2D 탑다운 전환(designnotes.md 1번 원칙 "데이터와 표시를 분리")을 대비한
+// 좌표 필드 — 지금의 그래프 구조(open으로 연결된 인접 칸) 자체는 이동
+// 가능 여부의 유일한 근거로 계속 남고, pos는 오직 "이 칸을 화면 어디에
+// 그릴지"를 위한 부가 데이터일 뿐이다. 지금 버튼 UI는 이 필드를 전혀
+// 읽지 않으므로 기존 동작에 영향 없음 — 나중에 실제 타일맵/좌표 기반
+// 미궁 생성으로 옮겨갈 때 이 필드를 그대로 대체하면 그래프(open) 쪽 로직은
+// 손댈 필요가 없다는 게 핵심 의도.
+export interface CellPosition {
+  x: number;
+  y: number;
+}
+
 export interface DungeonCell {
   id: CellId;
   ring: 0 | 1 | 2;
@@ -43,6 +55,7 @@ export interface DungeonCell {
   zone: Zone;
   portal: ArmZone | null;
   trap: TrapType | null;
+  pos: CellPosition;
 }
 
 export interface DungeonMaze {
@@ -98,6 +111,7 @@ export interface SerializedDungeonCell {
   zone: Zone;
   portal: ArmZone | null;
   trap: TrapType | null;
+  pos: CellPosition;
 }
 
 export interface SerializedDungeonMaze {
@@ -127,21 +141,35 @@ export function deserializeMaze(serialized: SerializedDungeonMaze): DungeonMaze 
 // 등장하지 않는 목표 등급 분포라(rollTargetGrade 참고) 대상에서 제외한다.
 const GOBLIN_TRAP_CHANCE = 0.25;
 
+// 링별 반지름(단위 없는 추상 스케일) — 실제 미터/타일 값이 아니라, 8방위
+// 각 슬롯을 원형으로 균등 배치하기 위한 상대적 비율일 뿐이다. 2D 미궁이
+// 실제로 설계될 때(designnotes.md 13번) 진짜 좌표계로 교체되는 걸 전제로
+// 지금은 "어느 칸이 어느 칸보다 중심에서 먼가"만 일관되게 표현한다.
+const RING1_RADIUS = 1;
+const RING2_RADIUS = 2;
+
+// index 0=북쪽으로 시작해 시계 방향으로 45°씩(COMPASS_LABEL 순서와 동일)
+// 배치되는 극좌표 → 직교좌표 변환. y는 북쪽(+)이 양수인 수학 좌표계.
+function ringPos(radius: number, index: number): CellPosition {
+  const angleRad = ((90 - index * 45) * Math.PI) / 180;
+  return { x: Math.round(radius * Math.cos(angleRad) * 100) / 100, y: Math.round(radius * Math.sin(angleRad) * 100) / 100 };
+}
+
 export function generateMaze(themeZone: ArmZone | null, allowTraps = false): DungeonMaze {
   const cells = new Map<CellId, DungeonCell>();
 
   const rollTrap = (zone: Zone, portal: ArmZone | null): TrapType | null =>
     allowTraps && zone === 'south' && !portal && Math.random() < GOBLIN_TRAP_CHANCE ? 'goblin' : null;
 
-  cells.set('center', { id: 'center', ring: 0, index: -1, open: new Set(), zone: 'center', portal: null, trap: null });
+  cells.set('center', { id: 'center', ring: 0, index: -1, open: new Set(), zone: 'center', portal: null, trap: null, pos: { x: 0, y: 0 } });
   for (let i = 0; i < RING_SIZE; i++) {
     const zone = themeZone ?? zoneForIndex(i);
-    cells.set(ring1Id(i), { id: ring1Id(i), ring: 1, index: i, open: new Set(), zone, portal: null, trap: rollTrap(zone, null) });
+    cells.set(ring1Id(i), { id: ring1Id(i), ring: 1, index: i, open: new Set(), zone, portal: null, trap: rollTrap(zone, null), pos: ringPos(RING1_RADIUS, i) });
   }
   for (let i = 0; i < RING_SIZE; i++) {
     const zone = themeZone ?? zoneForIndex(i);
     const portal = (Object.keys(PORTAL_INDEX) as ArmZone[]).find((z) => PORTAL_INDEX[z] === i) ?? null;
-    cells.set(ring2Id(i), { id: ring2Id(i), ring: 2, index: i, open: new Set(), zone, portal, trap: rollTrap(zone, portal) });
+    cells.set(ring2Id(i), { id: ring2Id(i), ring: 2, index: i, open: new Set(), zone, portal, trap: rollTrap(zone, portal), pos: ringPos(RING2_RADIUS, i) });
   }
 
   const uf = new UnionFind();
