@@ -197,6 +197,10 @@ let lastDungeonClosedMessage: string | null = null;
 
 let dungeonFloor: 1 | 2 = 1;
 let dungeonThemeZone: ArmZone | null = null;
+// 1층 동굴(그리드) 전용 UI 상태 — 로컬 뷰(기본)인지 전체맵인지. 세이브에
+// 남기지 않는 순수 화면 상태라 profile/session 어디에도 속하지 않고,
+// enterDungeon/revertToFloor1에서 로컬 뷰로 리셋된다(designnotes.md 20번).
+let dungeonShowFullMap = false;
 let maze: DungeonMaze | null = null;
 let pos: CellId | null = null;
 let dungeonMessage: string | null = null;
@@ -492,6 +496,7 @@ function render() {
       dungeonHp,
       maxHp,
       consumableCount(profile, 'potion'),
+      dungeonShowFullMap,
       {
         onMove: handleMove,
         onEnterPortal: enterFloorTwo,
@@ -500,6 +505,8 @@ function render() {
         onOpenEquipment: () => openSubScreen('equipment'),
         onOpenEssence: () => openSubScreen('essence'),
         onUsePotion: usePotion,
+        onShowLocalView: showLocalDungeonView,
+        onShowFullMap: showFullDungeonMap,
       }
     );
     return;
@@ -731,6 +738,9 @@ function stopAutoBattleTurnLoop() {
 function enterDungeon() {
   dungeonFloor = 1;
   dungeonThemeZone = null;
+  // 로컬 뷰/전체맵 토글은 세이브에 남기지 않는 순수 UI 상태라 매번 여기서
+  // 로컬 뷰로 리셋한다(designnotes.md 20번 참고).
+  dungeonShowFullMap = false;
   if (profile.floor1MazeTemplate) {
     maze = deserializeMaze(profile.floor1MazeTemplate);
   } else {
@@ -746,7 +756,7 @@ function enterDungeon() {
   // Brand-new dungeon entry is the only place HP resets to full — floor
   // transitions and backtracking leave whatever's left in dungeonHp alone.
   dungeonHp = selectedRace ? computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus).maxHp : null;
-  arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, '미궁에 들어섰다. 주변을 살핀다.');
+  arriveAt(randomStartPosition(maze), BASE_BATTLE_CHANCE, '미궁에 들어섰다. 주변을 살핀다.');
 }
 
 // Time's up: the dungeon closes around the player regardless of what
@@ -855,7 +865,7 @@ function enterFloorTwo(themeZone: ArmZone) {
     maze = generateFloor2Maze(themeZone);
     profile = { ...profile, floor2MazeTemplates: { ...profile.floor2MazeTemplates, [themeZone]: serializeMaze(maze) } };
   }
-  arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, `${zoneLabel(themeZone)} 미궁(2층)에 들어섰다. 주변을 살핀다.`);
+  arriveAt(randomStartPosition(maze), BASE_BATTLE_CHANCE, `${zoneLabel(themeZone)} 미궁(2층)에 들어섰다. 주변을 살핀다.`);
 }
 
 // Only reachable from floor 2's portal cell, and only before the 7-day
@@ -872,6 +882,7 @@ function revertToFloor1() {
   }
   dungeonFloor = 1;
   dungeonThemeZone = null;
+  dungeonShowFullMap = false;
   maze = floor1Maze;
   pos = floor1Pos;
   floor1Maze = null;
@@ -921,6 +932,18 @@ function usePotion() {
   profile = consumeItem(profile, 'potion');
   dungeonHp = Math.min(maxHp, dungeonHp + Math.round((maxHp * POTION_HEAL_PERCENT) / 100));
   persistProfile();
+  render();
+}
+
+// 1층 동굴(그리드)의 로컬 뷰/전체맵 토글 — 세이브에 저장하지 않는 순수 UI
+// 상태라 profile을 건드리지 않고 render()만 다시 호출한다.
+function showLocalDungeonView() {
+  dungeonShowFullMap = false;
+  render();
+}
+
+function showFullDungeonMap() {
+  dungeonShowFullMap = true;
   render();
 }
 

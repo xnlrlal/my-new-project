@@ -2,6 +2,7 @@ import type { ArmZone, CellId, DungeonCell, DungeonMaze, DungeonMove } from '../
 import { zoneFlavor, zoneLabel } from '../engine/dungeon';
 import { POTION } from '../engine/consumables';
 import { renderMinimapSvg } from './dungeon-minimap';
+import { renderLocalViewportSvg, renderGridFullMapSvg } from './dungeon-viewport';
 
 export interface DungeonMapHandlers {
   onMove: (move: DungeonMove) => void;
@@ -11,6 +12,12 @@ export interface DungeonMapHandlers {
   onOpenEquipment: () => void;
   onOpenEssence: () => void;
   onUsePotion: () => void;
+  // 1층 동굴(그리드)에서만 쓰인다 — 폴라(2층, 구세이브 1층)는 로컬 뷰/전체맵
+  // 개념 자체가 없어 토글 버튼도 안 뜨고 이 두 핸들러도 호출되지 않는다.
+  // 단일 토글(onToggleFullMap) 대신 명시적 두 핸들러로 나눈 이유: "이미 그
+  // 상태인데 또 토글"되는 모호함을 없애기 위함.
+  onShowLocalView: () => void;
+  onShowFullMap: () => void;
 }
 
 export function renderDungeonMap(
@@ -28,6 +35,8 @@ export function renderDungeonMap(
   hp: number,
   maxHp: number,
   potionCount: number,
+  // 1층 동굴(그리드)에서만 의미 있음 — 폴라 미궁에서는 무시된다(아래 분기).
+  showFullMap: boolean,
   handlers: DungeonMapHandlers
 ) {
   const clockHtml = dungeonClockLabel
@@ -77,6 +86,19 @@ export function renderDungeonMap(
     .map((move, index) => `<button class="race-card" data-move-index="${index}">${move.label}</button>`)
     .join('');
 
+  // 폴라(2층, 구세이브 1층)는 기존 풀 미니맵을 그대로 쓰고 토글 버튼 자체가
+  // 없다 — 1층 동굴(그리드)만 로컬 뷰(기본)/전체맵 두 버튼을 갖는다.
+  const mapHtml =
+    maze.topology === 'polar'
+      ? `<div class="dungeon-minimap-wrap">${renderMinimapSvg(maze, pos)}</div>`
+      : `
+        <div class="dungeon-minimap-wrap">${showFullMap ? renderGridFullMapSvg(maze, pos) : renderLocalViewportSvg(maze, pos)}</div>
+        <div class="nav-row">
+          <button class="menu-return small${showFullMap ? '' : ' active'}" id="show-local-view">로컬 뷰</button>
+          <button class="menu-return small${showFullMap ? ' active' : ''}" id="show-full-map">전체맵</button>
+        </div>
+      `;
+
   root.innerHTML = `
     <div class="battle-nav">
       <button class="nav-link" id="open-inventory">인벤토리</button>
@@ -85,7 +107,7 @@ export function renderDungeonMap(
     </div>
     <div class="dungeon-floor">${floorLabel}</div>
     ${clockHtml}
-    <div class="dungeon-minimap-wrap">${renderMinimapSvg(maze, pos)}</div>
+    ${mapHtml}
     <div class="dungeon-screen">
       <div class="stats-card">
         <div class="stats-race">${zoneLabel(cell.zone)}</div>
@@ -115,4 +137,6 @@ export function renderDungeonMap(
   document.getElementById('open-equipment')?.addEventListener('click', handlers.onOpenEquipment);
   document.getElementById('open-codex')?.addEventListener('click', handlers.onOpenEssence);
   document.getElementById('use-potion')?.addEventListener('click', handlers.onUsePotion);
+  document.getElementById('show-local-view')?.addEventListener('click', handlers.onShowLocalView);
+  document.getElementById('show-full-map')?.addEventListener('click', handlers.onShowFullMap);
 }
