@@ -41,6 +41,12 @@ export interface MonsterDef {
   // 궁수 참고). 근접 몬스터도 즉사가 아예 없는 건 아니지만(등급이 높을수록
   // 소폭의 확률이 있음), 원거리는 그 위에 "헤드샷" 고정 확률이 더해진다.
   ranged: boolean;
+  // 공격속도(designnotes.md 3-10번)의 입력값 — 없으면(대부분) 0(engine.ts의
+  // createEnemyLikeActor가 기본 처리)으로 attackSpeed() 기본값만 나온다.
+  // combatStatsForGrade()의 대상이 아니다(등급이 오른다고 자동으로 빨라지면
+  // "마나=행동 횟수" 문제가 그대로 재발하기 때문) — 서사적으로 확인된
+  // 몬스터에게만(예: 구울) 개별 부여한다.
+  agility?: number;
   essence: EssenceTemplate;
 }
 
@@ -88,6 +94,13 @@ export const MONSTERS: MonsterDef[] = [
     name: '구울',
     grade: 9,
     ...combatStatsForGrade(9),
+    // 같은 9등급이라도 고블린보다 강함(designnotes.md 4-4번 마스터 설정
+    // 원문 "힘도 훨씬 셌고 속도도 빨랐다") — combatStatsForGrade(9)의
+    // 기본값(전부 0)을 근력/민첩성만 개별적으로 웃돌게 덮어쓴다. 손재주는
+    // 원문에 언급이 없어 손대지 않음. 수치 자체(근력1/민첩성3)는 마스터
+    // 설정에 없는 1차 추정치.
+    strength: 1,
+    agility: 3,
     maxHp: 100,
     maxMana: 2,
     floor: 1,
@@ -130,11 +143,18 @@ export const MONSTERS: MonsterDef[] = [
   },
 
   // ── 2층: 고블린 숲(북) (designnotes.md 4-3/4-3-2번) ──
+  // ⚠️ 고블린 검사/궁수는 grade: 9다(8이 아님) — designnotes.md 4-3-3번
+  // 마스터 설정 원문 "같은 9등급이라도 일반 고블린보다 고블린 검사의 마석
+  // 중량이 더 높다"와 4-3-2번의 고블린 궁수 처치 EXP+1(9등급 공식과 정확히
+  // 일치, 8등급이었다면 +2여야 함)이 둘 다 9등급임을 확정한다. "상위 개체"
+  // 서사는 등급 승격이 아니라 combatStatsForGrade(9)의 기본값(전부 0) 위에
+  // 근력을 개별적으로 얹어(구울과 같은 패턴) 표현한다.
   {
     id: 'goblin-swordsman',
     name: '고블린 검사',
-    grade: 8,
-    ...combatStatsForGrade(8),
+    grade: 9,
+    ...combatStatsForGrade(9),
+    strength: 1,
     maxHp: 100,
     maxMana: 3,
     floor: 2,
@@ -148,8 +168,9 @@ export const MONSTERS: MonsterDef[] = [
   {
     id: 'goblin-archer',
     name: '고블린 궁수',
-    grade: 8,
-    ...combatStatsForGrade(8),
+    grade: 9,
+    ...combatStatsForGrade(9),
+    strength: 1,
     maxHp: 100,
     maxMana: 3,
     floor: 2,

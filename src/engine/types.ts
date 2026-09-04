@@ -50,14 +50,18 @@ export interface Actor {
   // 원천이기도 하다(engine.ts의 DEXTERITY_DEFENSE_COEF).
   dexterity: number;
   // 2단계(확률 판정)에서 추가된 네 필드 — applyCard의 명중/치명타 판정에 쓰임
-  // (engine.ts). 나머지 세부스탯(인지력/민첩성/시각/후각/독내성)은 아직 어떤
-  // 전투 판정도 소비하지 않아 Actor에 싣지 않았다 — 각각을 실제로 쓰는
-  // 단계에서 필요한 만큼만 추가하는 편이 낫다는 판단.
+  // (engine.ts). 나머지 세부스탯(인지력/시각/후각/독내성)은 아직 어떤 전투
+  // 판정도 소비하지 않아 Actor에 싣지 않았다 — 각각을 실제로 쓰는 단계에서
+  // 필요한 만큼만 추가하는 편이 낫다는 판단.
   accuracy: number; // 명중률 — 내 명중 판정 보정
   flexibility: number; // 유연성 — 상대 명중 판정 회피 + 내 치명타 확률
   perceptionJam: number; // 인식방해 — 상대가 나를 공격할 때 상대 명중률 저하
   obsession: number; // 집착 — 내 치명타 피해 배율
   poisonResist: number; // 독내성 — 독 상태이상 피해 경감(status-effects.ts)
+  // 민첩성 — 공격속도(designnotes.md 3-10번)의 유일한 입력값. 마나는 더 이상
+  // 라운드당 행동 횟수를 결정하지 않고(카드 코스트 지불 자원으로만 남음),
+  // engine.ts의 attackSpeed()가 이 값으로부터 라운드당 행동 횟수를 계산한다.
+  agility: number;
   // 이능 — 정수 스킬 카드(essence.ts)의 위력 배율(engine.ts의
   // ARCANE_ESSENCE_COEF)로만 쓰인다. 플레이어만 정수를 흡수하므로 실질적으로
   // 항상 player Actor에서만 의미가 있고, 몬스터/NPC(EnemyCombatant에 필드
@@ -66,6 +70,11 @@ export interface Actor {
   // 인내심 — 자연재생력. 매 라운드 종료 시 최대체력의 일정 %를 회복시킨다
   // (engine.ts의 WILLPOWER_REGEN_COEF).
   willpower: number;
+  // 이번 라운드에 아직 낼 수 있는 카드(행동) 수 — attackSpeed()로 계산된
+  // 값에서 카드를 낼 때마다(applyCard) 1씩 줄고, 매 라운드 시작 시
+  // attackSpeed()로 다시 채워진다(engine.ts의 endTurn). 마나가 남아있어도
+  // 이게 0이면 더 이상 카드를 낼 수 없다.
+  actionsRemaining: number;
   statusEffects: StatusEffect[];
   // 이번 전투에서 이미 손상된 부위 목록(body-parts.ts) — 같은 부위는 이번
   // 전투 동안 두 번 손상되지 않는다(1차 구현, 아래 body-parts.ts 문서 참고).

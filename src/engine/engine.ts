@@ -26,6 +26,11 @@ export interface EnemyCombatant {
   // 몬스터/NPC는 정수를 흡수하지 않아 이 필드 자체가 없다 — createEnemyLikeActor가
   // 0으로 기본 처리한다(다른 다섯 필드와 같은 이유).
   arcane?: number;
+  // 공격속도(designnotes.md 3-10번)의 입력값 — 없으면(대부분의 몬스터) 0으로
+  // 처리되어 attackSpeed()가 기본값(BASE_ACTIONS_PER_ROUND)만 준다. 등급별로
+  // 자동 산출되지 않고(monsters.ts의 combatStatsForGrade 대상이 아님) 서사적
+  // 근거가 확인된 몬스터에게만 개별 부여한다.
+  agility?: number;
   grade: number;
   ranged: boolean;
 }
@@ -60,6 +65,20 @@ function drawCards(actor: Actor, count: number): Actor {
   return { ...actor, hand, deck, discard };
 }
 
+// 공격속도(designnotes.md 3-10번) — "마나=행동 횟수"였던 이전 규칙을 대체.
+// 마나는 이제 카드 코스트를 지불하는 자원으로만 남고, 라운드당 몇 번 카드를
+// 낼 수 있는지는 이 함수(민첩성 기반)가 정한다. 민첩성이 0(현재 대부분의
+// 종족/몬스터 기본값)이면 BASE_ACTIONS_PER_ROUND(=1)만 나온다 — 즉 이 시스템을
+// 도입하는 순간 아무 것도 손대지 않아도 전원이 "라운드당 1행동"으로
+// 재설정되고, 그 위에 개별적으로 민첩성을 부여해 빠른 개체를 표현한다.
+const BASE_ACTIONS_PER_ROUND = 1;
+const AGILITY_PER_ACTION = 3; // 민첩성 3당 라운드당 행동 +1
+const MAX_ACTIONS_PER_ROUND = 3; // 다른 확률/배율형 스탯과 같은 원칙의 상한 — 무한 스노우볼 방지
+
+export function attackSpeed(actor: { agility: number }): number {
+  return Math.min(MAX_ACTIONS_PER_ROUND, BASE_ACTIONS_PER_ROUND + Math.floor(actor.agility / AGILITY_PER_ACTION));
+}
+
 function createActor(
   id: ActorId,
   name: string,
@@ -75,6 +94,7 @@ function createActor(
     poisonResist: number;
     willpower: number;
     arcane: number;
+    agility: number;
   },
   bonusCards: Card[] = []
 ): Actor {
@@ -95,6 +115,8 @@ function createActor(
     poisonResist: stats.poisonResist,
     willpower: stats.willpower,
     arcane: stats.arcane,
+    agility: stats.agility,
+    actionsRemaining: attackSpeed(stats),
     statusEffects: [],
     damagedParts: [],
     hand: [],
@@ -137,6 +159,7 @@ function createEnemyLikeActor(id: ActorId, combatant: EnemyCombatant, bonusCards
       obsession: combatant.obsession ?? 0,
       poisonResist: combatant.poisonResist ?? 0,
       arcane: combatant.arcane ?? 0,
+      agility: combatant.agility ?? 0,
     },
     bonusCards
   );
@@ -401,10 +424,25 @@ function applyCard(state: GameState, source: ActorId, card: Card, explicitTarget
     }
   }
 
+  // actionsRemaining을 여기서 공통으로 1 차감 — 플레이어(playCard)/동료
+  // (companionAct)/적(enemyAct) 세 소스 전부 결국 이 함수를 거치므로, 공격속도
+  // 캡(designnotes.md 3-10번)이 한 곳에서 일관되게 적용된다.
   const updatedSource: Actor =
     source === targetId
-      ? { ...updatedTarget, mana: sourceActor.mana - card.cost, hand: sourceActor.hand.filter((c) => c.id !== card.id), discard: [...sourceActor.discard, card] }
-      : { ...sourceActor, mana: sourceActor.mana - card.cost, hand: sourceActor.hand.filter((c) => c.id !== card.id), discard: [...sourceActor.discard, card] };
+      ? {
+          ...updatedTarget,
+          mana: sourceActor.mana - card.cost,
+          actionsRemaining: sourceActor.actionsRemaining - 1,
+          hand: sourceActor.hand.filter((c) => c.id !== card.id),
+          discard: [...sourceActor.discard, card],
+        }
+      : {
+          ...sourceActor,
+          mana: sourceActor.mana - card.cost,
+          actionsRemaining: sourceActor.actionsRemaining - 1,
+          hand: sourceActor.hand.filter((c) => c.id !== card.id),
+          discard: [...sourceActor.discard, card],
+        };
 
   let next: GameState = {
     ...state,
@@ -427,6 +465,9 @@ function trackLowestPlayerHp(state: GameState): GameState {
 export function playCard(state: GameState, cardId: string): GameState {
   if (state.status !== 'playing') return state;
   if (isStunned(state.player)) return state;
+  // 공격속도 캡(designnotes.md 3-10번) — 마나가 남아있어도 이번 라운드의
+  // 행동을 다 썼으면 더 낼 수 없다.
+  if (state.player.actionsRemaining <= 0) return state;
   const card = state.player.hand.find((c) => c.id === cardId);
   if (!card || card.cost > state.player.mana) return state;
   return applyCard(state, 'player', card);
@@ -514,7 +555,12 @@ export function endTurn(state: GameState): GameState {
   // companionTick.wasStunned 기준으로 건너뛸지 정한다(적의 wasStunned와
   // 같은 원칙).
   if (next.companion && !(companionTick?.wasStunned ?? false)) {
-    while (next.status === 'playing' && next.companion && next.companion.hand.some((c) => c.cost <= next.companion!.mana)) {
+    while (
+      next.status === 'playing' &&
+      next.companion &&
+      next.companion.actionsRemaining > 0 &&
+      next.companion.hand.some((c) => c.cost <= next.companion!.mana)
+    ) {
       const before = next;
       next = companionAct(next);
       if (next === before) break;
@@ -523,7 +569,7 @@ export function endTurn(state: GameState): GameState {
   }
 
   if (!enemyTick.wasStunned) {
-    while (next.status === 'playing' && next.enemy.hand.some((c) => c.cost <= next.enemy.mana)) {
+    while (next.status === 'playing' && next.enemy.actionsRemaining > 0 && next.enemy.hand.some((c) => c.cost <= next.enemy.mana)) {
       const before = next;
       next = enemyAct(next);
       if (next === before) break;
@@ -556,11 +602,22 @@ export function endTurn(state: GameState): GameState {
   };
 
   const nextTurn = next.turn + 1;
-  const refreshedPlayer = drawCards({ ...next.player, mana: next.player.maxMana }, HAND_SIZE - next.player.hand.length);
+  // 마나 리필과 같은 지점에서 actionsRemaining도 attackSpeed()로 다시 채운다
+  // (designnotes.md 3-10번) — 매 라운드 공격속도만큼 새로 행동할 수 있다.
+  const refreshedPlayer = drawCards(
+    { ...next.player, mana: next.player.maxMana, actionsRemaining: attackSpeed(next.player) },
+    HAND_SIZE - next.player.hand.length
+  );
   const refreshedCompanion = next.companion
-    ? drawCards({ ...next.companion, mana: next.companion.maxMana }, HAND_SIZE - next.companion.hand.length)
+    ? drawCards(
+        { ...next.companion, mana: next.companion.maxMana, actionsRemaining: attackSpeed(next.companion) },
+        HAND_SIZE - next.companion.hand.length
+      )
     : null;
-  const refreshedEnemy = drawCards({ ...next.enemy, mana: next.enemy.maxMana }, HAND_SIZE - next.enemy.hand.length);
+  const refreshedEnemy = drawCards(
+    { ...next.enemy, mana: next.enemy.maxMana, actionsRemaining: attackSpeed(next.enemy) },
+    HAND_SIZE - next.enemy.hand.length
+  );
 
   return {
     ...next,
