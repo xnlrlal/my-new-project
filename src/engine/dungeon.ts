@@ -17,7 +17,10 @@ function zoneForIndex(idx: number): ArmZone {
   return 'west';
 }
 
-function ringId(ring: number, i: number): CellId {
+// export됨 — 미니맵(ui/dungeon-minimap.ts)이 어떤 칸의 반지름 방향/원주
+// 방향 이웃 슬롯 id를 직접 계산해(그 슬롯이 실제로 존재하는지, open에
+// 포함되는지) 미로 벽을 그리는 데 재사용한다.
+export function ringId(ring: number, i: number): CellId {
   return `ring${ring}-${((i % RING_SIZE) + RING_SIZE) % RING_SIZE}`;
 }
 
@@ -174,20 +177,21 @@ const GOBLIN_TRAP_CHANCE = 0.25;
 // 구조를 유지한다. 1층만 아래 FLOOR1_RING_COUNT로 확장됨.
 const DEFAULT_RING_COUNT = 2;
 
-// 1층을 "더 넓히도록" 링을 추가한 값(1차 결정치, 2026-09-04에 2→3링으로
-// 한 번 확장한 데 이어 3→4링으로 재확장) — 4링(중심부+32칸, 총 33칸)으로
-// 원래(2링, 17칸) 대비 약 94% 넓어진다. 실제 좌표/타일 기반 설계
-// (designnotes.md 13번, 2D 렌더러 전환) 이전까지는 이 추상 링 구조를 그대로
-// 확장하는 쪽을 택함 — 몬스터 배치(구역=zone)나 함정 로직 등 기존 규칙을
-// 전혀 새로 설계하지 않고도 적용 가능하기 때문. 정확히 몇 링이 맞는
-// 확장 폭인지는 마스터 설정에 근거가 없어 1차 추정치.
+// 1층을 "더 넓히도록" 링을 추가한 값(1차 결정치) — 2026-09-04 하루 동안
+// 2→3링(25칸)→4링(33칸)으로 두 차례 확장한 데 이어, 사용자가 "약 2배로
+// 더 키워달라"고 재요청해 8링(중심부+64칸, 총 65칸 — 직전 33칸 대비 약
+// 97%, 원래 2링/17칸 대비 약 282% 확장)으로 재확장했다. 실제 좌표/타일
+// 기반 설계(designnotes.md 13번, 2D 렌더러 전환) 이전까지는 이 추상 링
+// 구조를 그대로 확장하는 쪽을 택함 — 몬스터 배치(구역=zone)나 함정 로직 등
+// 기존 규칙을 전혀 새로 설계하지 않고도 적용 가능하기 때문. 정확히 몇 링이
+// 맞는 확장 폭인지는 마스터 설정에 근거가 없어 1차 추정치.
 //
 // 이미 floor1MazeTemplate을 저장한(=1층에 한 번이라도 들어간 적 있는)
 // 기존 캐릭터는 이 값을 바꿔도 영향받지 않는다 — enterDungeon()(main.ts)이
 // 저장된 템플릿을 그대로 이어받고 재생성하지 않기 때문. 새 링 구조는
 // 아직 1층에 들어간 적 없는 캐릭터(신규 생성 포함)부터 적용되고, 기존
 // 캐릭터는 사망(페르마데스) 후 다음 캐릭터부터 새 구조를 만난다.
-export const FLOOR1_RING_COUNT = 4;
+export const FLOOR1_RING_COUNT = 8;
 
 // index 0=북쪽으로 시작해 시계 방향으로 45°씩(COMPASS_LABEL 순서와 동일)
 // 배치되는 극좌표 → 직교좌표 변환. y는 북쪽(+)이 양수인 수학 좌표계.
@@ -203,7 +207,15 @@ export function generateMaze(
   themeZone: ArmZone | null,
   allowTraps = false,
   ringCount = DEFAULT_RING_COUNT,
-  random: () => number = Math.random
+  random: () => number = Math.random,
+  // true면 4개 포탈 방향(동/서/남/북, PORTAL_INDEX)마다 중심부에서 그
+  // 포탈까지 일직선으로 뚫린 방사형 통로를 강제로 보장한다 — "각 방향으로
+  // 계속 나가면 그 방향 포탈에 도착해야 한다"(1층 전용 요구, 아래
+  // generateFloor1Maze 참고)는 요구를 만족시키기 위함. 나머지(대각선 4방향의
+  // 스포크, 각 링의 원주 방향 통로)는 기존과 동일하게 Kruskal로 무작위
+  // 배정되어 여전히 미로 구조(막다른 길 포함)를 유지한다. 2층은 기존 동작을
+  // 그대로 유지하기 위해 기본값 false.
+  directPortalSpokes = false
 ): DungeonMaze {
   const cells = new Map<CellId, DungeonCell>();
 
@@ -243,6 +255,22 @@ export function generateMaze(
     uf.union(ringId(ringCount, i), ringId(ringCount, i + 1));
   }
 
+  // 4개 포탈 방향(동/서/남/북)마다 중심부→링1→...→ringCount(포탈)까지
+  // 일직선 방사형 통로를 강제로 열어둔다 — Kruskal이 돌기 전에 미리
+  // union해두므로, 아래 Kruskal은 이 칸들을 다시 무작위로 고를 필요가 없어
+  // 그만큼 다른(대각선) 통로를 뚫는 데 후보를 더 쓰게 된다.
+  if (directPortalSpokes) {
+    for (const idx of Object.values(PORTAL_INDEX)) {
+      let prev: CellId = 'center';
+      for (let r = 1; r <= ringCount; r++) {
+        const cur = ringId(r, idx);
+        connect(cells, prev, cur);
+        uf.union(prev, cur);
+        prev = cur;
+      }
+    }
+  }
+
   // Randomized Kruskal's algorithm over the remaining candidate passages
   // (center<->ring1 spokes, and for every inner ring r<ringCount: its own
   // circumferential edges plus its spokes out to ring r+1) connects the
@@ -277,12 +305,17 @@ const FLOOR1_MAZE_SEED = 20260904;
 // 16번 갱신 참고)는 요구를 만족시키는 유일한 진입점 — 매번 Math.random()으로
 // 새로 뽑던 구조를, 고정된 시드로 결정적으로 재생산한다. 함정 배치까지
 // 포함해 완전히 결정적이라, 이 함수를 몇 번을 다시 호출해도 항상 정확히
-// 같은 25칸짜리 미로가 나온다(위 mulberry32 참고). 캐릭터별로 남는 차이는
+// 같은 65칸짜리 미로가 나온다(위 mulberry32 참고). 캐릭터별로 남는 차이는
 // 오직 그 캐릭터 자신의 진행 상태(탐험 기록 visited, 처치해서 해제한 함정,
 // 포탈 발견 여부)뿐이며, 그건 이 함수가 아니라 main.ts가
 // PlayerProfile.floor1MazeTemplate에 별도로 보존한다.
+//
+// directPortalSpokes=true — "동/서/남/북 방향으로 계속 나가면 그 방향
+// 포탈에 도착해야 한다, 지금은 너무 돌아간다"는 사용자 피드백에 따라 1층만
+// 4개 포탈 방향에 중심부↔포탈 직행 통로를 보장한다(2층은 기존 동작 유지 —
+// generateFloor2Maze는 이 인자를 넘기지 않음).
 export function generateFloor1Maze(): DungeonMaze {
-  return generateMaze(null, true, FLOOR1_RING_COUNT, mulberry32(FLOOR1_MAZE_SEED));
+  return generateMaze(null, true, FLOOR1_RING_COUNT, mulberry32(FLOOR1_MAZE_SEED), true);
 }
 
 // 2층도 1층과 같은 이유로 무작위 생성을 그만둔다(사용자 지시, designnotes.md
