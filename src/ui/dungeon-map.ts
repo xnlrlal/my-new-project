@@ -1,6 +1,7 @@
-import type { ArmZone, DungeonCell, DungeonMove } from '../engine/dungeon';
+import type { ArmZone, CellId, DungeonCell, DungeonMaze, DungeonMove } from '../engine/dungeon';
 import { zoneFlavor, zoneLabel } from '../engine/dungeon';
 import { POTION } from '../engine/consumables';
+import { renderMinimapSvg } from './dungeon-minimap';
 
 export interface DungeonMapHandlers {
   onMove: (move: DungeonMove) => void;
@@ -16,6 +17,8 @@ export function renderDungeonMap(
   root: HTMLElement,
   floorLabel: string,
   floor: number,
+  maze: DungeonMaze,
+  pos: CellId,
   cell: DungeonCell,
   moves: DungeonMove[],
   message: string | null,
@@ -82,6 +85,7 @@ export function renderDungeonMap(
     </div>
     <div class="dungeon-floor">${floorLabel}</div>
     ${clockHtml}
+    <div class="dungeon-minimap-wrap">${renderMinimapSvg(maze, pos)}</div>
     <div class="dungeon-screen">
       <div class="stats-card">
         <div class="stats-race">${zoneLabel(cell.zone)}</div>

@@ -7,6 +7,7 @@ import type { RaceId } from './races';
 import type { BodyPart } from './types';
 import { getConsumable, type ConsumableId } from './consumables';
 import { sanitizeResumeSession, type ResumeSession } from './session';
+import type { SerializedDungeonMaze } from './dungeon';
 import { SECONDS_PER_HOUR, type ClockSpeed } from './village-clock';
 import { STARTER_ARMOR, findWeaponChoice } from './ritual';
 import type { StatBonus } from './stat-bonus';
@@ -113,6 +114,19 @@ export interface PlayerProfile {
   // (1차 구현 범위, 교체/해산 UI 없음 — 전투 중 쓰러지면 자동으로 null이
   // 됨). 페르마데스 원칙에 따라 사망 시 resetProfile()로 함께 초기화.
   companionNpcId: string | null;
+  // 1층 미궁의 영구 구조(designnotes.md 4-1번 갱신 참고) — 예전엔 미궁에
+  // 들어설 때마다(enterDungeon) 매번 새로 생성했으나, "구조가 바뀌는 일은
+  // 없다"는 요구에 따라 이 캐릭터가 처음 1층에 들어선 순간 딱 한 번
+  // 생성되어 여기 저장되고, 이후로는 계속 재사용된다(main.ts의
+  // enterDungeon/persistProfileLocalOnly가 관리). 탐험 기록(visited)과 함정
+  // 해제 상태도 이 안에 함께 보존되므로, 마을에 다녀와도 이미 가본 곳/이미
+  // 처치한 함정 고블린은 그대로 기억된다. null = 아직 한 번도 1층에
+  // 들어간 적 없음(다음 진입 시 새로 생성). 페르마데스 원칙에 따라 사망 시
+  // 다른 진행 상황과 함께 초기화된다 — "고정된 구조"는 캐릭터의 생애 동안만
+  // 유지되는 것으로 취급(세계 자체의 영구 상태를 저장할 별도 장치가 아직
+  // 없어, 기존 PlayerProfile 필드들과 같은 수명 주기를 따르는 게 가장
+  // 일관적이라는 판단 — 필요해지면 재검토).
+  floor1MazeTemplate: SerializedDungeonMaze | null;
   // Wall-clock timestamp (Date.now()) of the last time this profile was
   // actually persisted (main.ts's persistProfileLocalOnly stamps it on
   // every local save). Lets adoptLoggedInProfile/restoreLoggedInSession
@@ -152,6 +166,7 @@ function defaultProfile(): PlayerProfile {
     lastTaxedYear: null,
     hasCompletedComingOfAge: false,
     companionNpcId: null,
+    floor1MazeTemplate: null,
     achievementStatBonus: {},
     achievementHp2PctGranted: false,
     achievementHp01PctGranted: false,
@@ -537,6 +552,10 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
     achievementHp2PctGranted: typeof parsed.achievementHp2PctGranted === 'boolean' ? parsed.achievementHp2PctGranted : false,
     achievementHp01PctGranted: typeof parsed.achievementHp01PctGranted === 'boolean' ? parsed.achievementHp01PctGranted : false,
     companionNpcId: typeof parsed.companionNpcId === 'string' ? parsed.companionNpcId : null,
+    floor1MazeTemplate:
+      parsed.floor1MazeTemplate && typeof parsed.floor1MazeTemplate === 'object'
+        ? (parsed.floor1MazeTemplate as SerializedDungeonMaze)
+        : null,
     updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : 0,
   };
 }

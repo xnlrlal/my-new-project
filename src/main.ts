@@ -50,9 +50,11 @@ import {
   availableMoves,
   rollBattle,
   resolveTrap,
+  markVisited,
   serializeMaze,
   deserializeMaze,
   BASE_BATTLE_CHANCE,
+  FLOOR1_RING_COUNT,
   zoneLabel,
   type ArmZone,
   type CellId,
@@ -479,6 +481,8 @@ function render() {
       app,
       floorLabel,
       dungeonFloor,
+      maze,
+      pos,
       cell,
       moves,
       dungeonMessage,
@@ -714,10 +718,20 @@ function stopAutoBattleTurnLoop() {
   }
 }
 
+// 1층 미궁의 구조는 이 캐릭터가 처음 들어선 순간 딱 한 번만 생성되고, 이후
+// 마을을 오가도 계속 재사용된다(profile.floor1MazeTemplate, profile.ts 참고)
+// — "구조가 바뀌는 일은 없다"는 요구에 따라 매 진입마다 새로 만들던 이전
+// 동작을 대체함. 입장 시 스폰 위치는 지금까지처럼 매번 새로 무작위 결정된다
+// (randomStartPosition — 구조와 무관하게 유지).
 function enterDungeon() {
   dungeonFloor = 1;
   dungeonThemeZone = null;
-  maze = generateMaze(null, true);
+  if (profile.floor1MazeTemplate) {
+    maze = deserializeMaze(profile.floor1MazeTemplate);
+  } else {
+    maze = generateMaze(null, true, FLOOR1_RING_COUNT);
+    profile = { ...profile, floor1MazeTemplate: serializeMaze(maze) };
+  }
   dungeonElapsedSeconds = 0;
   floor1Maze = null;
   floor1Pos = null;
@@ -893,6 +907,7 @@ function usePotion() {
 function arriveAt(id: CellId, battleChance: number, safeMessage: string, options?: { forcedMonsterId?: string; ambush?: boolean }) {
   if (!maze) return;
   pos = id;
+  markVisited(maze, id);
   const cell = cellAt(maze, id);
 
   if (cell.portal) {
@@ -1230,12 +1245,24 @@ function captureSession(): ResumeSession | undefined {
 // reload without pushing a network write every single second.
 function persistProfileLocalOnly() {
   const captured = captureSession();
+  // 1층 미궁의 "고정된 구조"는 캐릭터 생애 동안 계속 재사용되므로(위
+  // enterDungeon 주석 참고), 그 사이의 변화(탐험 기록·함정 해제·포탈 발견)도
+  // profile.floor1MazeTemplate에 그대로 흘려보내야 다음 진입에도 남는다.
+  // captureSession과 같은 주기(초당 틱 + 실제 액션마다)로 동기화 — 지금
+  // 살아있는 floor1 미궁 인스턴스는 1층에 있으면 `maze`, 2층에 올라가 있으면
+  // 잠시 파킹해둔 `floor1Maze`(둘 다 main.ts 상단 모듈 변수) 둘 중 하나다.
+  const liveFloor1Maze = dungeonFloor === 1 ? maze : floor1Maze;
   // Always stamp updatedAt, even when there's no resumable session to
   // capture (auth/menu/character-select) — it's the "this device's save is
   // current as of now" signal that adoptLoggedInProfile/restoreLoggedInSession
   // use to merge against the cloud by recency (see updatedAt's doc comment
   // in profile.ts).
-  profile = { ...profile, updatedAt: Date.now(), session: captured !== undefined ? captured : profile.session };
+  profile = {
+    ...profile,
+    updatedAt: Date.now(),
+    session: captured !== undefined ? captured : profile.session,
+    floor1MazeTemplate: liveFloor1Maze ? serializeMaze(liveFloor1Maze) : profile.floor1MazeTemplate,
+  };
   saveProfile(profile);
 }
 

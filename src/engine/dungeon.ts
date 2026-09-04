@@ -17,12 +17,8 @@ function zoneForIndex(idx: number): ArmZone {
   return 'west';
 }
 
-function ring1Id(i: number): CellId {
-  return `ring1-${((i % RING_SIZE) + RING_SIZE) % RING_SIZE}`;
-}
-
-function ring2Id(i: number): CellId {
-  return `ring2-${((i % RING_SIZE) + RING_SIZE) % RING_SIZE}`;
+function ringId(ring: number, i: number): CellId {
+  return `ring${ring}-${((i % RING_SIZE) + RING_SIZE) % RING_SIZE}`;
 }
 
 // 고블린 필드 함정(남쪽 구역 전용, 1층 한정 — generateMaze의 allowTraps 참고).
@@ -49,7 +45,7 @@ export interface CellPosition {
 
 export interface DungeonCell {
   id: CellId;
-  ring: 0 | 1 | 2;
+  ring: number; // 0=중심부, 1..ringCount=바깥으로 갈수록 증가, ringCount가 가장자리(포탈) 링
   index: number;
   open: Set<CellId>;
   zone: Zone;
@@ -62,6 +58,16 @@ export interface DungeonMaze {
   cells: Map<CellId, DungeonCell>;
   portalsFound: Set<ArmZone>;
   themeZone: ArmZone | null;
+  // 링 개수(중심부 제외) — floor 1은 FLOOR1_RING_COUNT(3), floor 2는 기본값
+  // 2. cellLabel/미니맵(ui/dungeon-minimap.ts)이 "이 링이 가장자리인가"를
+  // 판단하는 데 쓴다.
+  ringCount: number;
+  // 실제로 발을 들인 칸의 집합 — 미니맵이 "대략적으로 파악 가능"한 수준만
+  // 보여주기 위한 탐험 기록. portalsFound(보상 지급 여부)와는 별개 개념.
+  // 1층은 이제 profile.floor1MazeTemplate로 영구 보관되므로, 이 기록도
+  // 캐릭터가 살아있는 한 함께 유지된다(같은 곳을 다시 가면 이미 가본 곳으로
+  // 표시).
+  visited: Set<CellId>;
 }
 
 function shuffle<T>(items: T[]): T[] {
@@ -105,7 +111,7 @@ function connect(cells: Map<CellId, DungeonCell>, a: CellId, b: CellId): void {
 
 export interface SerializedDungeonCell {
   id: CellId;
-  ring: 0 | 1 | 2;
+  ring: number;
   index: number;
   open: CellId[];
   zone: Zone;
@@ -118,6 +124,8 @@ export interface SerializedDungeonMaze {
   cells: SerializedDungeonCell[];
   portalsFound: ArmZone[];
   themeZone: ArmZone | null;
+  ringCount: number;
+  visited: CellId[];
 }
 
 export function serializeMaze(maze: DungeonMaze): SerializedDungeonMaze {
@@ -125,6 +133,8 @@ export function serializeMaze(maze: DungeonMaze): SerializedDungeonMaze {
     cells: [...maze.cells.values()].map((cell) => ({ ...cell, open: [...cell.open] })),
     portalsFound: [...maze.portalsFound],
     themeZone: maze.themeZone,
+    ringCount: maze.ringCount,
+    visited: [...maze.visited],
   };
 }
 
@@ -133,6 +143,10 @@ export function deserializeMaze(serialized: SerializedDungeonMaze): DungeonMaze 
     cells: new Map(serialized.cells.map((cell) => [cell.id, { ...cell, open: new Set(cell.open) }])),
     portalsFound: new Set(serialized.portalsFound),
     themeZone: serialized.themeZone,
+    // 이 필드들이 없는 구세이브(ringCount/visited 도입 이전)를 위한 폴백 —
+    // 기존 2층짜리 미궁으로, 지금까지 아무 데도 안 가본 것으로 취급한다.
+    ringCount: typeof serialized.ringCount === 'number' ? serialized.ringCount : 2,
+    visited: new Set(Array.isArray(serialized.visited) ? serialized.visited : []),
   };
 }
 
@@ -141,57 +155,80 @@ export function deserializeMaze(serialized: SerializedDungeonMaze): DungeonMaze 
 // 등장하지 않는 목표 등급 분포라(rollTargetGrade 참고) 대상에서 제외한다.
 const GOBLIN_TRAP_CHANCE = 0.25;
 
-// 링별 반지름(단위 없는 추상 스케일) — 실제 미터/타일 값이 아니라, 8방위
-// 각 슬롯을 원형으로 균등 배치하기 위한 상대적 비율일 뿐이다. 2D 미궁이
-// 실제로 설계될 때(designnotes.md 13번) 진짜 좌표계로 교체되는 걸 전제로
-// 지금은 "어느 칸이 어느 칸보다 중심에서 먼가"만 일관되게 표현한다.
-const RING1_RADIUS = 1;
-const RING2_RADIUS = 2;
+// 기본 링 개수(중심부 제외) — 2층(zone별 미궁)은 지금까지와 동일하게 2링
+// 구조를 유지한다. 1층만 아래 FLOOR1_RING_COUNT로 확장됨.
+const DEFAULT_RING_COUNT = 2;
+
+// 1층을 "더 넓히도록" 링 하나를 추가한 값(1차 결정치) — 3링(중심부+24칸,
+// 총 25칸)으로 기존(2링, 17칸) 대비 약 47% 넓어진다. 실제 좌표/타일 기반
+// 설계(designnotes.md 13번, 2D 렌더러 전환) 이전까지는 이 추상 링 구조를
+// 그대로 확장하는 쪽을 택함 — 몬스터 배치(구역=zone)나 함정 로직 등 기존
+// 규칙을 전혀 새로 설계하지 않고도 적용 가능하기 때문. 정확히 "링 1개
+// 추가"가 맞는 확장 폭인지는 마스터 설정에 근거가 없어 1차 추정치.
+export const FLOOR1_RING_COUNT = 3;
 
 // index 0=북쪽으로 시작해 시계 방향으로 45°씩(COMPASS_LABEL 순서와 동일)
 // 배치되는 극좌표 → 직교좌표 변환. y는 북쪽(+)이 양수인 수학 좌표계.
+// radius는 링 번호를 그대로 쓴다(단위 없는 추상 스케일 — 미터/타일 값이
+// 아니라 "어느 칸이 더 중심에서 먼가"만 일관되게 표현하면 충분하므로 링
+// 번호 자체를 반지름으로 재사용, 별도 상수 불필요).
 function ringPos(radius: number, index: number): CellPosition {
   const angleRad = ((90 - index * 45) * Math.PI) / 180;
   return { x: Math.round(radius * Math.cos(angleRad) * 100) / 100, y: Math.round(radius * Math.sin(angleRad) * 100) / 100 };
 }
 
-export function generateMaze(themeZone: ArmZone | null, allowTraps = false): DungeonMaze {
+export function generateMaze(themeZone: ArmZone | null, allowTraps = false, ringCount = DEFAULT_RING_COUNT): DungeonMaze {
   const cells = new Map<CellId, DungeonCell>();
 
   const rollTrap = (zone: Zone, portal: ArmZone | null): TrapType | null =>
     allowTraps && zone === 'south' && !portal && Math.random() < GOBLIN_TRAP_CHANCE ? 'goblin' : null;
 
   cells.set('center', { id: 'center', ring: 0, index: -1, open: new Set(), zone: 'center', portal: null, trap: null, pos: { x: 0, y: 0 } });
-  for (let i = 0; i < RING_SIZE; i++) {
-    const zone = themeZone ?? zoneForIndex(i);
-    cells.set(ring1Id(i), { id: ring1Id(i), ring: 1, index: i, open: new Set(), zone, portal: null, trap: rollTrap(zone, null), pos: ringPos(RING1_RADIUS, i) });
-  }
-  for (let i = 0; i < RING_SIZE; i++) {
-    const zone = themeZone ?? zoneForIndex(i);
-    const portal = (Object.keys(PORTAL_INDEX) as ArmZone[]).find((z) => PORTAL_INDEX[z] === i) ?? null;
-    cells.set(ring2Id(i), { id: ring2Id(i), ring: 2, index: i, open: new Set(), zone, portal, trap: rollTrap(zone, portal), pos: ringPos(RING2_RADIUS, i) });
+
+  // 링 1..ringCount를 전부 같은 방식으로 생성 — 포탈은 언제나 가장 바깥
+  // 링(ringCount)에만 배정된다("가장자리 고리는 항상 완전히 순환 연결"
+  // 원칙도 가장 바깥 링에만 적용, 아래 outer-loop 참고).
+  for (let r = 1; r <= ringCount; r++) {
+    const isOuter = r === ringCount;
+    for (let i = 0; i < RING_SIZE; i++) {
+      const zone = themeZone ?? zoneForIndex(i);
+      const portal = isOuter ? ((Object.keys(PORTAL_INDEX) as ArmZone[]).find((z) => PORTAL_INDEX[z] === i) ?? null) : null;
+      cells.set(ringId(r, i), {
+        id: ringId(r, i),
+        ring: r,
+        index: i,
+        open: new Set(),
+        zone,
+        portal,
+        trap: rollTrap(zone, portal),
+        pos: ringPos(r, i),
+      });
+    }
   }
 
   const uf = new UnionFind();
 
-  // The outer ring (가장자리) is always a fully open loop, so every cell on
-  // it — including all 4 portals — is directly reachable from its neighbors
-  // with no dead ends, no matter how the inward maze turns out.
+  // The outermost ring (가장자리) is always a fully open loop, so every cell
+  // on it — including all 4 portals — is directly reachable from its
+  // neighbors with no dead ends, no matter how the inward maze turns out.
   for (let i = 0; i < RING_SIZE; i++) {
-    connect(cells, ring2Id(i), ring2Id(i + 1));
-    uf.union(ring2Id(i), ring2Id(i + 1));
+    connect(cells, ringId(ringCount, i), ringId(ringCount, i + 1));
+    uf.union(ringId(ringCount, i), ringId(ringCount, i + 1));
   }
 
   // Randomized Kruskal's algorithm over the remaining candidate passages
-  // (center<->ring1 spokes, ring1<->ring2 spokes, ring1 circumferential)
-  // connects the center and inner ring into the already-unified outer loop.
-  // Only as many edges as needed to reach full connectivity get opened, so
-  // this branch of the maze still produces genuine dead ends.
+  // (center<->ring1 spokes, and for every inner ring r<ringCount: its own
+  // circumferential edges plus its spokes out to ring r+1) connects the
+  // center and every inner ring into the already-unified outer loop. Only as
+  // many edges as needed to reach full connectivity get opened, so this
+  // branch of the maze still produces genuine dead ends.
   const candidates: [CellId, CellId][] = [];
-  for (let i = 0; i < RING_SIZE; i++) {
-    candidates.push(['center', ring1Id(i)]);
-    candidates.push([ring1Id(i), ring2Id(i)]);
-    candidates.push([ring1Id(i), ring1Id(i + 1)]);
+  for (let i = 0; i < RING_SIZE; i++) candidates.push(['center', ringId(1, i)]);
+  for (let r = 1; r < ringCount; r++) {
+    for (let i = 0; i < RING_SIZE; i++) {
+      candidates.push([ringId(r, i), ringId(r, i + 1)]);
+      candidates.push([ringId(r, i), ringId(r + 1, i)]);
+    }
   }
 
   for (const [a, b] of shuffle(candidates)) {
@@ -201,7 +238,7 @@ export function generateMaze(themeZone: ArmZone | null, allowTraps = false): Dun
     }
   }
 
-  return { cells, portalsFound: new Set(), themeZone };
+  return { cells, portalsFound: new Set(), themeZone, ringCount, visited: new Set() };
 }
 
 export function cellAt(maze: DungeonMaze, id: CellId): DungeonCell {
@@ -218,10 +255,21 @@ export function resolveTrap(maze: DungeonMaze, id: CellId): void {
   cellAt(maze, id).trap = null;
 }
 
+// 입장 시 스폰 위치 — 링 개수와 무관하게 항상 "중심부 부근"(중심부 +
+// 가장 안쪽 링1)으로 고정. 미궁이 넓어져도(FLOOR1_RING_COUNT) 이 규칙 자체는
+// 그대로 유지하기로 함(사용자 지시) — 더 넓어진 바깥 링까지 무작위 스폰
+// 대상에 넣지 않는다.
 export function randomStartPosition(): CellId {
   const candidates: CellId[] = ['center'];
-  for (let i = 0; i < RING_SIZE; i++) candidates.push(ring1Id(i));
+  for (let i = 0; i < RING_SIZE; i++) candidates.push(ringId(1, i));
   return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+// 그 칸에 실제로 도착했음을 기록 — 미니맵(ui/dungeon-minimap.ts)이 "가본
+// 곳"과 "안 가본 곳"을 구분하는 유일한 근거. DungeonMaze는 세이브/복원되는
+// 참조 데이터라 resolveTrap과 같은 패턴으로 그 자리에서 고친다.
+export function markVisited(maze: DungeonMaze, id: CellId): void {
+  maze.visited.add(id);
 }
 
 export const BASE_BATTLE_CHANCE = 0.55;
@@ -230,11 +278,14 @@ export function rollBattle(chance: number): boolean {
   return Math.random() < chance;
 }
 
-function cellLabel(cell: DungeonCell): string {
+function cellLabel(cell: DungeonCell, ringCount: number): string {
   if (cell.id === 'center') return '중심부';
   const compass = COMPASS_LABEL[cell.index];
   if (cell.portal) return `${compass} 포탈`;
-  return cell.ring === 1 ? `${compass} (중간 고리)` : `${compass} (가장자리)`;
+  if (cell.ring === ringCount) return `${compass} (가장자리)`;
+  // 중간 링이 여러 겹(1층, ringCount=3)일 때만 몇 번째 링인지 번호를
+  // 붙인다 — 기존처럼 중간 링이 하나뿐인 2층은 지금까지와 같은 문구 유지.
+  return ringCount > 2 ? `${compass} (중간 고리${cell.ring})` : `${compass} (중간 고리)`;
 }
 
 export interface DungeonMove {
@@ -259,11 +310,11 @@ export function availableMoves(maze: DungeonMaze, pos: CellId): DungeonMove[] {
     const chanceLabel = neighbor.portal ? '전투 없음' : `전투 확률 ${Math.round(BASE_BATTLE_CHANCE * 100)}%`;
 
     if (neighbor.trap) {
-      const label = cellLabel(neighbor);
+      const label = cellLabel(neighbor, maze.ringCount);
       return [{ label: `${label} (고블린 덫 감지 — 접근하면 기습당함)`, next: neighborId, battleChance: 1, trapChoice: 'ambush' }];
     }
 
-    return [{ label: `${cellLabel(neighbor)}로 이동 · ${chanceLabel}`, next: neighborId, battleChance, trapChoice: null }];
+    return [{ label: `${cellLabel(neighbor, maze.ringCount)}로 이동 · ${chanceLabel}`, next: neighborId, battleChance, trapChoice: null }];
   });
 }
 
