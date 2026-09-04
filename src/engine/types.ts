@@ -26,6 +26,10 @@ export interface Card {
   // 지금은 '관통'(cards.ts) 하나만 이 필드를 쓴다 — 상태이상 시스템의 최소
   // 실사용 경로(status-effects.ts 설계 문서 참고).
   appliesStatusEffect?: { type: StatusEffectType; duration: number };
+  // 이 카드가 정수(essence.ts)에서 나온 스킬 카드인지 — engine.ts의
+  // ARCANE_ESSENCE_COEF가 이 플래그가 있는 카드에만 이능 배율을 적용한다.
+  // 기본 카드 풀(cards.ts)은 이 필드를 아예 안 쓴다.
+  isEssenceSkill?: boolean;
 }
 
 // 'companion'(동료 NPC, designnotes.md 10번 "파티(결속)"의 최소 구현) — 항상
@@ -54,6 +58,11 @@ export interface Actor {
   perceptionJam: number; // 인식방해 — 상대가 나를 공격할 때 상대 명중률 저하
   obsession: number; // 집착 — 내 치명타 피해 배율
   poisonResist: number; // 독내성 — 독 상태이상 피해 경감(status-effects.ts)
+  // 이능 — 정수 스킬 카드(essence.ts)의 위력 배율(engine.ts의
+  // ARCANE_ESSENCE_COEF)로만 쓰인다. 플레이어만 정수를 흡수하므로 실질적으로
+  // 항상 player Actor에서만 의미가 있고, 몬스터/NPC(EnemyCombatant에 필드
+  // 자체가 없음)는 0으로 고정된다.
+  arcane: number;
   // 인내심 — 자연재생력. 매 라운드 종료 시 최대체력의 일정 %를 회복시킨다
   // (engine.ts의 WILLPOWER_REGEN_COEF).
   willpower: number;

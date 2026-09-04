@@ -59,7 +59,7 @@ export function renderEssenceScreen(
     <div class="inventory-screen">
       <h2 class="screen-title">정수 창</h2>
       ${clockHtml}
-      <p class="inventory-note">정수는 몬스터의 영혼을 흡수하는 개념이라 무기/방어구처럼 자유롭게 바꿔 낄 수 없습니다. 한 번 흡수하면 특수한 방법으로만 해제할 수 있습니다.</p>
+      <p class="inventory-note">정수는 몬스터의 영혼을 흡수하는 개념이라 무기/방어구처럼 자유롭게 바꿔 낄 수 없습니다. 해제하려면 신전을 방문하세요 — 캐릭터당 평생 3회까지만 가능하고, 회차마다 비용이 크게 오릅니다.</p>
 
       <div class="stat-line" style="font-weight:600">장착 중인 정수 (${profile.essences.length} / ${slots})</div>
       <div class="essence-slots">${equippedHtml}</div>

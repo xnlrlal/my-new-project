@@ -15,6 +15,7 @@ export interface VillageHandlers {
   onOpenShop: () => void;
   onOpenLibrary: () => void;
   onOpenExchange: () => void;
+  onOpenTemple: () => void;
   onSetSpeed: (speed: ClockSpeed) => void;
   onSkip: () => void;
   onAcceptJudgment: () => void;
@@ -88,6 +89,7 @@ export function renderVillage(
         <button class="menu-return small" id="shop-btn" ${judging ? 'disabled' : ''}>상점</button>
         <button class="menu-return small" id="library-btn" ${judging ? 'disabled' : ''}>도서관</button>
         <button class="menu-return small" id="exchange-btn" ${judging || !hasVisitedDungeonExchange ? 'disabled' : ''}>환전소${hasVisitedDungeonExchange ? '' : ' <span class="race-locked-badge">잠김</span>'}</button>
+        <button class="menu-return small" id="temple-btn" ${judging ? 'disabled' : ''}>신전</button>
       </div>
       <button class="menu-return small" id="quit-btn" ${judging ? 'disabled' : ''}>게임 종료</button>
       ${backButton}
@@ -101,6 +103,7 @@ export function renderVillage(
   document.getElementById('shop-btn')?.addEventListener('click', handlers.onOpenShop);
   document.getElementById('library-btn')?.addEventListener('click', handlers.onOpenLibrary);
   document.getElementById('exchange-btn')?.addEventListener('click', handlers.onOpenExchange);
+  document.getElementById('temple-btn')?.addEventListener('click', handlers.onOpenTemple);
   document.getElementById('skip-btn')?.addEventListener('click', handlers.onSkip);
   document.getElementById('quit-btn')?.addEventListener('click', handlers.onQuitToMenu);
   document.getElementById('accept-judgment')?.addEventListener('click', handlers.onAcceptJudgment);

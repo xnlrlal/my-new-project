@@ -23,6 +23,9 @@ export interface EnemyCombatant {
   perceptionJam?: number;
   obsession?: number;
   poisonResist?: number;
+  // 몬스터/NPC는 정수를 흡수하지 않아 이 필드 자체가 없다 — createEnemyLikeActor가
+  // 0으로 기본 처리한다(다른 다섯 필드와 같은 이유).
+  arcane?: number;
   grade: number;
   ranged: boolean;
 }
@@ -71,6 +74,7 @@ function createActor(
     obsession: number;
     poisonResist: number;
     willpower: number;
+    arcane: number;
   },
   bonusCards: Card[] = []
 ): Actor {
@@ -90,6 +94,7 @@ function createActor(
     obsession: stats.obsession,
     poisonResist: stats.poisonResist,
     willpower: stats.willpower,
+    arcane: stats.arcane,
     statusEffects: [],
     damagedParts: [],
     hand: [],
@@ -131,6 +136,7 @@ function createEnemyLikeActor(id: ActorId, combatant: EnemyCombatant, bonusCards
       perceptionJam: combatant.perceptionJam ?? 0,
       obsession: combatant.obsession ?? 0,
       poisonResist: combatant.poisonResist ?? 0,
+      arcane: combatant.arcane ?? 0,
     },
     bonusCards
   );
@@ -221,6 +227,21 @@ const MAX_CRIT_MULTIPLIER = 2;
 // 커진 카드 값 대비 상대적으로 무의미해진다. %가산은 카드 값 크기와 무관하게
 // 항상 같은 비율로 작동해 이 문제가 없다.
 const STRENGTH_ATTACK_COEF = 0.1; // 근력 1당 카드 피해 +10%
+
+// 이능 활성화(README 로드맵 1번) — 정수 스킬 카드(essence.ts, Card.isEssenceSkill)
+// 에만 적용되는 위력 배율. designnotes.md 5-1번이 예시로 든 "정수 스킬값×
+// (1+이능×0.05)" 공식을 그대로 1차 채택했다 — 마스터 설정에 정확한 수치가
+// 없어 요청하면 언제든 바꿀 수 있는 1차 추정치. 기본 카드 풀(cards.ts)은
+// isEssenceSkill이 없어 이 배율의 영향을 받지 않는다.
+const ARCANE_ESSENCE_COEF = 0.05; // 이능 1당 정수 스킬 카드 위력 +5%
+
+// damage/heal/shield 세 효과 모두 card.value를 그대로 쓰던 걸, 정수 스킬
+// 카드일 때만 여기서 미리 배율을 먹여 넘긴다 — 세 분기 각각에 배율 로직을
+// 중복해서 넣지 않기 위한 단일 지점.
+function effectiveCardValue(card: Card, source: Actor): number {
+  if (!card.isEssenceSkill) return card.value;
+  return Math.round(card.value * (1 + source.arcane * ARCANE_ESSENCE_COEF));
+}
 
 // 3단계: 명중/치명타 판정을 통과한 피해에 방어력 경감을 얹는다. 손재주는
 // 기존 방어막 카드 보정과 별개로, 카드를 쓰지 않아도 매번 적용되는 상시
@@ -314,6 +335,7 @@ function applyCard(state: GameState, source: ActorId, card: Card, explicitTarget
 
   let updatedTarget: Actor = targetActor;
   let message = '';
+  const value = effectiveCardValue(card, sourceActor);
 
   switch (card.effect) {
     case 'damage': {
@@ -324,7 +346,7 @@ function applyCard(state: GameState, source: ActorId, card: Card, explicitTarget
       // 참고).
       const instantDeath = isHit && source === 'enemy' && Math.random() * 100 < instantDeathChance(state.enemyGrade, state.enemyRanged);
       const rawDamage = isHit
-        ? Math.round(card.value * (1 + sourceActor.strength * STRENGTH_ATTACK_COEF) * (isCrit ? critMultiplier(sourceActor) : 1))
+        ? Math.round(value * (1 + sourceActor.strength * STRENGTH_ATTACK_COEF) * (isCrit ? critMultiplier(sourceActor) : 1))
         : 0;
       const reductionPct = defenseReduction(targetActor);
       const totalDamage = Math.round(rawDamage * (1 - reductionPct / 100));
@@ -366,13 +388,13 @@ function applyCard(state: GameState, source: ActorId, card: Card, explicitTarget
       break;
     }
     case 'heal': {
-      const healValue = Math.floor(card.value * bleedHealMultiplier(targetActor));
+      const healValue = Math.floor(value * bleedHealMultiplier(targetActor));
       updatedTarget = { ...targetActor, hp: Math.min(targetActor.maxHp, targetActor.hp + healValue) };
       message = `${sourceActor.name}이(가) [${card.name}]로 체력을 ${healValue} 회복!`;
       break;
     }
     case 'shield': {
-      const totalShield = card.value + sourceActor.dexterity;
+      const totalShield = value + sourceActor.dexterity;
       updatedTarget = { ...targetActor, shield: targetActor.shield + totalShield };
       message = `${sourceActor.name}이(가) [${card.name}]로 방어막 ${totalShield}을 얻음!`;
       break;

@@ -9,6 +9,12 @@
 // 범위 밖 — 붕대를 먼저 고른 이유는 "출혈을 치료한다"는 효과가 이미
 // 구현된 상태이상 시스템(status-effects.ts)에 곧바로 연결할 수 있는
 // 유일한 항목이었기 때문이다.
+//
+// 정수 해제(README 로드맵 1번)는 이 소모품 카테고리가 아니라 신전
+// 시설(ui/temple.ts, profile.ts의 releaseEssence())에서 스톤으로 직접
+// 처리한다 — 한때 'essence-unbinder' 소모품으로 구현했었으나, 사용자
+// 지시로 신전 방식(회차별 500만/1000만/2000만 스톤, 캐릭터당 3회 한정)으로
+// 대체됨.
 export type ConsumableId = 'bandage';
 
 export interface ConsumableDef {

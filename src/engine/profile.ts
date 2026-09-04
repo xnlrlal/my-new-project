@@ -45,6 +45,11 @@ export interface PlayerProfile {
   monsterKillCounts: Partial<Record<string, number>>;
   essences: EquippedEssence[];
   discoveredEssenceIds: string[];
+  // 신전에서 정수를 해제한 누적 횟수(0~3) — essenceReleasePrice()가 다음
+  // 회차 가격을 여기서 읽고, 3에 도달하면 더 이상 해제 자체가 불가능해진다.
+  // 페르마데스 원칙에 따라 사망 시 다른 진행 상황과 함께 초기화된다(새
+  // 캐릭터는 다시 3회를 온전히 가짐).
+  essenceReleaseCount: number;
   manaStones: ManaStoneCounts;
   // 소모품(designnotes.md 6-1번, consumables.ts) — 마석과 같은 카운터
   // 저장 방식. 개별 인스턴스가 없어 GearInstance/EquippedEssence와 달리
@@ -129,6 +134,7 @@ function defaultProfile(): PlayerProfile {
     monsterKillCounts: {},
     essences: [],
     discoveredEssenceIds: [],
+    essenceReleaseCount: 0,
     manaStones: {},
     consumables: {},
     inventoryGear: [],
@@ -175,6 +181,37 @@ export function absorbEssence(profile: PlayerProfile, essence: EquippedEssence):
 export function recordEssenceDiscovery(profile: PlayerProfile, monsterId: string): PlayerProfile {
   if (profile.discoveredEssenceIds.includes(monsterId)) return profile;
   return { ...profile, discoveredEssenceIds: [...profile.discoveredEssenceIds, monsterId] };
+}
+
+// 정수 해제(README 로드맵 1번 "정수 해제(특수 장치) 시스템") — 신전
+// 시설(ui/temple.ts)에서 스톤을 내고 처리한다(사용자 지시로 확정, 소모품
+// 판매 방식이었던 이전 시도를 대체함). 캐릭터당 평생 딱 3번까지만
+// 가능하고, 회차가 늘수록 값이 훨씬 비싸진다 — 정수가 "영구 장착"이라는
+// 원칙을 되돌리는 특수한 방법인 만큼 남용을 막기 위한 설계.
+export const ESSENCE_RELEASE_MAX_USES = 3;
+const ESSENCE_RELEASE_PRICES = [5_000_000, 10_000_000, 20_000_000];
+
+// null이면 이미 3회를 모두 써서 더 이상 해제 자체가 불가능하다는 뜻.
+export function essenceReleasePrice(profile: PlayerProfile): number | null {
+  if (profile.essenceReleaseCount >= ESSENCE_RELEASE_MAX_USES) return null;
+  return ESSENCE_RELEASE_PRICES[profile.essenceReleaseCount];
+}
+
+// 해제된 정수는 별도로 보관되지 않고 그대로 사라진다 — 도감
+// (discoveredEssenceIds) 기록만 남고, 다시 장착하려면 같은 몬스터를
+// 처치해 정수를 다시 드랍받아야 한다(드랍 시 "흡수/버리기"만 선택
+// 가능한 기존 원칙과 동일선상). 3회를 이미 다 썼거나, 스톤이 부족하거나,
+// 대상 정수를 갖고 있지 않으면 아무 일도 일어나지 않는다.
+export function releaseEssence(profile: PlayerProfile, essenceId: string): PlayerProfile {
+  const price = essenceReleasePrice(profile);
+  if (price === null || profile.gold < price) return profile;
+  if (!profile.essences.some((e) => e.id === essenceId)) return profile;
+  return {
+    ...profile,
+    gold: profile.gold - price,
+    essences: profile.essences.filter((e) => e.id !== essenceId),
+    essenceReleaseCount: profile.essenceReleaseCount + 1,
+  };
 }
 
 export function addManaStone(profile: PlayerProfile, grade: number): PlayerProfile {
@@ -477,6 +514,7 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
         : {},
     essences: Array.isArray(parsed.essences) ? (parsed.essences as EquippedEssence[]) : [],
     discoveredEssenceIds: Array.isArray(parsed.discoveredEssenceIds) ? (parsed.discoveredEssenceIds as string[]) : [],
+    essenceReleaseCount: typeof parsed.essenceReleaseCount === 'number' ? parsed.essenceReleaseCount : 0,
     manaStones: parsed.manaStones && typeof parsed.manaStones === 'object' ? (parsed.manaStones as ManaStoneCounts) : {},
     consumables:
       parsed.consumables && typeof parsed.consumables === 'object' ? (parsed.consumables as Partial<Record<ConsumableId, number>>) : {},

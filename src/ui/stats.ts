@@ -56,7 +56,7 @@ export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerPro
           <div class="stat-box"><span>종합 전투 지수</span><strong>${combatIndex}</strong></div>
         </div>
         <div class="stat-line">기본 종족 스텟에 장비·정수 보너스가 합산된 값입니다.</div>
-        <div class="stat-line">이능은 정수 스킬 카드가 아직 없어 현재 전투에는 영향을 주지 않습니다.</div>
+        <div class="stat-line">이능은 장착 중인 정수의 스킬 카드 위력을 높입니다(1당 +5%).</div>
         <details class="stats-substats">
           <summary>세부스탯 자세히 보기</summary>
           <div class="stat-line">육체 — 근력 ${totalStats.strength} · 유연성 ${totalStats.flexibility} · 시각 ${totalStats.sight} · 명중률 ${totalStats.accuracy}</div>

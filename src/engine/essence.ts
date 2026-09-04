@@ -25,5 +25,5 @@ export function createEssenceFromMonster(monster: MonsterDef): EquippedEssence {
 }
 
 export function essenceSkillCards(essences: EquippedEssence[]): Card[] {
-  return essences.map((essence, index) => ({ ...essence.skill, id: `${essence.id}-skill-${index}` }));
+  return essences.map((essence, index) => ({ ...essence.skill, id: `${essence.id}-skill-${index}`, isEssenceSkill: true }));
 }
