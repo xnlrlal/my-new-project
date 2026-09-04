@@ -54,7 +54,7 @@ import {
   serializeMaze,
   deserializeMaze,
   BASE_BATTLE_CHANCE,
-  FLOOR1_RING_COUNT,
+  generateFloor1Maze,
   zoneLabel,
   type ArmZone,
   type CellId,
@@ -718,18 +718,23 @@ function stopAutoBattleTurnLoop() {
   }
 }
 
-// 1층 미궁의 구조는 이 캐릭터가 처음 들어선 순간 딱 한 번만 생성되고, 이후
-// 마을을 오가도 계속 재사용된다(profile.floor1MazeTemplate, profile.ts 참고)
-// — "구조가 바뀌는 일은 없다"는 요구에 따라 매 진입마다 새로 만들던 이전
-// 동작을 대체함. 입장 시 스폰 위치는 지금까지처럼 매번 새로 무작위 결정된다
-// (randomStartPosition — 구조와 무관하게 유지).
+// 1층 미궁의 구조는 어떤 캐릭터든 항상 완전히 똑같다(generateFloor1Maze —
+// 고정 시드로 결정적 생성, dungeon.ts 참고) — 예전엔 캐릭터별로 무작위
+// 생성해 그 캐릭터 생애 동안만 고정했었지만, "그냥 고정해버려 어떤
+// 캐릭터든 똑같도록"이라는 지시에 따라 구조 자체를 세계 공통 상수로
+// 바꿨다. 그래도 profile.floor1MazeTemplate는 계속 필요하다 — 구조는
+// 고정이어도, "이 캐릭터가 지금까지 어딜 가봤는지·어느 함정을 처치해
+// 해제했는지·어느 포탈을 발견했는지"는 여전히 캐릭터마다 다른 진행
+// 상태이기 때문(첫 진입 이후로는 매번 다시 만들지 않고 그 진행 상태를
+// 그대로 이어받기 위해 저장해둔다). 입장 시 스폰 위치는 지금까지처럼
+// 매번 새로 무작위 결정된다(randomStartPosition — 구조와 무관하게 유지).
 function enterDungeon() {
   dungeonFloor = 1;
   dungeonThemeZone = null;
   if (profile.floor1MazeTemplate) {
     maze = deserializeMaze(profile.floor1MazeTemplate);
   } else {
-    maze = generateMaze(null, true, FLOOR1_RING_COUNT);
+    maze = generateFloor1Maze();
     profile = { ...profile, floor1MazeTemplate: serializeMaze(maze) };
   }
   dungeonElapsedSeconds = 0;

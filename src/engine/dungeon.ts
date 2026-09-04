@@ -70,13 +70,28 @@ export interface DungeonMaze {
   visited: Set<CellId>;
 }
 
-function shuffle<T>(items: T[]): T[] {
+function shuffle<T>(items: T[], random: () => number): T[] {
   const result = [...items];
   for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(random() * (i + 1));
     [result[i], result[j]] = [result[j], result[i]];
   }
   return result;
+}
+
+// 1층 미궁 구조를 "어떤 캐릭터든 항상 똑같도록" 고정하기 위한 결정적
+// 의사난수 생성기(mulberry32) — 같은 시드를 주면 항상 같은 순서의 0~1
+// 실수열을 낸다. generateMaze()가 미로 생성 중 굴리는 모든 주사위(함정
+// 배치, 통로 셔플)를 이 함수로 바꿔치기하면, Math.random() 대신 이 결과만
+// 사용하는 한 몇 번을 다시 생성해도 완전히 같은 구조가 나온다.
+function mulberry32(seed: number): () => number {
+  let t = seed >>> 0;
+  return () => {
+    t = (t + 0x6d2b79f5) | 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 class UnionFind {
@@ -177,11 +192,16 @@ function ringPos(radius: number, index: number): CellPosition {
   return { x: Math.round(radius * Math.cos(angleRad) * 100) / 100, y: Math.round(radius * Math.sin(angleRad) * 100) / 100 };
 }
 
-export function generateMaze(themeZone: ArmZone | null, allowTraps = false, ringCount = DEFAULT_RING_COUNT): DungeonMaze {
+export function generateMaze(
+  themeZone: ArmZone | null,
+  allowTraps = false,
+  ringCount = DEFAULT_RING_COUNT,
+  random: () => number = Math.random
+): DungeonMaze {
   const cells = new Map<CellId, DungeonCell>();
 
   const rollTrap = (zone: Zone, portal: ArmZone | null): TrapType | null =>
-    allowTraps && zone === 'south' && !portal && Math.random() < GOBLIN_TRAP_CHANCE ? 'goblin' : null;
+    allowTraps && zone === 'south' && !portal && random() < GOBLIN_TRAP_CHANCE ? 'goblin' : null;
 
   cells.set('center', { id: 'center', ring: 0, index: -1, open: new Set(), zone: 'center', portal: null, trap: null, pos: { x: 0, y: 0 } });
 
@@ -231,7 +251,7 @@ export function generateMaze(themeZone: ArmZone | null, allowTraps = false, ring
     }
   }
 
-  for (const [a, b] of shuffle(candidates)) {
+  for (const [a, b] of shuffle(candidates, random)) {
     if (!uf.connected(a, b)) {
       uf.union(a, b);
       connect(cells, a, b);
@@ -239,6 +259,23 @@ export function generateMaze(themeZone: ArmZone | null, allowTraps = false, ring
   }
 
   return { cells, portalsFound: new Set(), themeZone, ringCount, visited: new Set() };
+}
+
+// 1층 전용 시드 — 값 자체엔 의미 없음, "항상 같은 시드"라는 사실만 중요.
+// 바꾸면 그 순간부터 1층 구조 자체가(이미 생성해서 profile에 저장해둔
+// 캐릭터를 제외하고) 통째로 달라지므로, 함부로 바꾸지 않는다.
+const FLOOR1_MAZE_SEED = 20260904;
+
+// "1층 미궁은 어떤 캐릭터든 항상 똑같아야 한다"(사용자 지시, designnotes.md
+// 16번 갱신 참고)는 요구를 만족시키는 유일한 진입점 — 매번 Math.random()으로
+// 새로 뽑던 구조를, 고정된 시드로 결정적으로 재생산한다. 함정 배치까지
+// 포함해 완전히 결정적이라, 이 함수를 몇 번을 다시 호출해도 항상 정확히
+// 같은 25칸짜리 미로가 나온다(위 mulberry32 참고). 캐릭터별로 남는 차이는
+// 오직 그 캐릭터 자신의 진행 상태(탐험 기록 visited, 처치해서 해제한 함정,
+// 포탈 발견 여부)뿐이며, 그건 이 함수가 아니라 main.ts가
+// PlayerProfile.floor1MazeTemplate에 별도로 보존한다.
+export function generateFloor1Maze(): DungeonMaze {
+  return generateMaze(null, true, FLOOR1_RING_COUNT, mulberry32(FLOOR1_MAZE_SEED));
 }
 
 export function cellAt(maze: DungeonMaze, id: CellId): DungeonCell {
