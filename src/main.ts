@@ -44,7 +44,6 @@ import { huntingProficiencyBonus, huntingProficiencyLabel, huntingProficiencyTie
 import { autoPlayOneTurn, estimateWinProbability } from './engine/battle-ai';
 import { type EquipmentSlot } from './engine/gear';
 import {
-  generateMaze,
   randomStartPosition,
   cellAt,
   availableMoves,
@@ -55,6 +54,7 @@ import {
   deserializeMaze,
   BASE_BATTLE_CHANCE,
   generateFloor1Maze,
+  generateFloor2Maze,
   zoneLabel,
   type ArmZone,
   type CellId,
@@ -816,8 +816,12 @@ function forceReturnFromDungeon() {
 
 // Reuses a zone's floor-2 maze if the player has been there before this run
 // (see floor2Zones' declaration comment) — only a zone's very first entry
-// ever generates a fresh maze. "최초 미궁 진입을 제외하고 역행 시엔 재사용이
-// 원칙" applies symmetrically to floor 1 and every floor-2 zone alike.
+// this run calls generateFloor2Maze(). That's no longer "generates a fresh
+// maze" in the random sense, though — generateFloor2Maze는 1층과 같은 이유로
+// (designnotes.md 16번) 구역별 고정 시드를 쓰므로, 같은 구역은 이번 런이든
+// 다음 런이든 항상 같은 구조로 돌아온다. "최초 미궁 진입을 제외하고 역행
+// 시엔 재사용이 원칙" applies symmetrically to floor 1 and every floor-2 zone
+// alike.
 function enterFloorTwo(themeZone: ArmZone) {
   // Snapshot floor 1 exactly as it stands so backtracking can resume it
   // later instead of regenerating (see floor1Maze's declaration comment).
@@ -836,7 +840,7 @@ function enterFloorTwo(themeZone: ArmZone) {
     portalMessage = null;
     goTo('dungeon-map');
   } else {
-    maze = generateMaze(themeZone);
+    maze = generateFloor2Maze(themeZone);
     arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, `${zoneLabel(themeZone)} 미궁(2층)에 들어섰다. 주변을 살핀다.`);
   }
 }

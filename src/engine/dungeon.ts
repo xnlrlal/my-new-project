@@ -278,6 +278,26 @@ export function generateFloor1Maze(): DungeonMaze {
   return generateMaze(null, true, FLOOR1_RING_COUNT, mulberry32(FLOOR1_MAZE_SEED));
 }
 
+// 2층도 1층과 같은 이유로 무작위 생성을 그만둔다(사용자 지시, designnotes.md
+// 16번 갱신 참고) — 방향(구역)마다 완전히 별개인 미궁이라는 기존 구조는
+// 그대로 두되, 그 4개 미궁 각각을 고정 시드로 결정적으로 생성한다. 구역마다
+// 다른 시드를 써서 네 방향의 구조가 서로 겹치지 않게 한다(값 자체엔 의미
+// 없음, 서로 다르기만 하면 됨 — FLOOR1_MAZE_SEED와도 겹치지 않게 배치).
+const FLOOR2_MAZE_SEEDS: Record<ArmZone, number> = {
+  north: 20260905,
+  east: 20260906,
+  south: 20260907,
+  west: 20260908,
+};
+
+// FLOOR1_RING_COUNT 없이 기본값(DEFAULT_RING_COUNT=2)을 그대로 쓴다 — 이번
+// 요청은 "무작위 생성을 멈춰라"였을 뿐 "더 넓혀라"는 아니었으므로 1층처럼
+// 링을 늘리지 않음. allowTraps도 기존과 동일하게 false(2층 덫은 아직
+// 미착수, 4-3-1번 참고).
+export function generateFloor2Maze(zone: ArmZone): DungeonMaze {
+  return generateMaze(zone, false, DEFAULT_RING_COUNT, mulberry32(FLOOR2_MAZE_SEEDS[zone]));
+}
+
 export function cellAt(maze: DungeonMaze, id: CellId): DungeonCell {
   const cell = maze.cells.get(id);
   if (!cell) throw new Error(`No cell with id ${id}`);
