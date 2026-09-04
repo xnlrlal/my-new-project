@@ -44,15 +44,17 @@ import { huntingProficiencyBonus, huntingProficiencyLabel, huntingProficiencyTie
 import { autoPlayOneTurn, estimateWinProbability } from './engine/battle-ai';
 import { type EquipmentSlot } from './engine/gear';
 import {
-  generateMaze,
   randomStartPosition,
   cellAt,
   availableMoves,
   rollBattle,
   resolveTrap,
+  markVisited,
   serializeMaze,
   deserializeMaze,
   BASE_BATTLE_CHANCE,
+  generateFloor1Maze,
+  generateFloor2Maze,
   zoneLabel,
   type ArmZone,
   type CellId,
@@ -479,6 +481,8 @@ function render() {
       app,
       floorLabel,
       dungeonFloor,
+      maze,
+      pos,
       cell,
       moves,
       dungeonMessage,
@@ -714,10 +718,25 @@ function stopAutoBattleTurnLoop() {
   }
 }
 
+// 1층 미궁의 구조는 어떤 캐릭터든 항상 완전히 똑같다(generateFloor1Maze —
+// 고정 시드로 결정적 생성, dungeon.ts 참고) — 예전엔 캐릭터별로 무작위
+// 생성해 그 캐릭터 생애 동안만 고정했었지만, "그냥 고정해버려 어떤
+// 캐릭터든 똑같도록"이라는 지시에 따라 구조 자체를 세계 공통 상수로
+// 바꿨다. 그래도 profile.floor1MazeTemplate는 계속 필요하다 — 구조는
+// 고정이어도, "이 캐릭터가 지금까지 어딜 가봤는지·어느 함정을 처치해
+// 해제했는지·어느 포탈을 발견했는지"는 여전히 캐릭터마다 다른 진행
+// 상태이기 때문(첫 진입 이후로는 매번 다시 만들지 않고 그 진행 상태를
+// 그대로 이어받기 위해 저장해둔다). 입장 시 스폰 위치는 지금까지처럼
+// 매번 새로 무작위 결정된다(randomStartPosition — 구조와 무관하게 유지).
 function enterDungeon() {
   dungeonFloor = 1;
   dungeonThemeZone = null;
-  maze = generateMaze(null, true);
+  if (profile.floor1MazeTemplate) {
+    maze = deserializeMaze(profile.floor1MazeTemplate);
+  } else {
+    maze = generateFloor1Maze();
+    profile = { ...profile, floor1MazeTemplate: serializeMaze(maze) };
+  }
   dungeonElapsedSeconds = 0;
   floor1Maze = null;
   floor1Pos = null;
@@ -795,10 +814,20 @@ function forceReturnFromDungeon() {
   goTo('village');
 }
 
-// Reuses a zone's floor-2 maze if the player has been there before this run
-// (see floor2Zones' declaration comment) — only a zone's very first entry
-// ever generates a fresh maze. "최초 미궁 진입을 제외하고 역행 시엔 재사용이
-// 원칙" applies symmetrically to floor 1 and every floor-2 zone alike.
+// 세 단계로 그 구역의 미궁을 찾는다(designnotes.md 16번 "2층도 진행 상태까지
+// 영구 보존"으로 확장):
+// 1. floor2Zones[themeZone] — 이번 런 안에서 이미 가본 적 있으면 정확한
+//    위치까지 그대로 이어서 재개(기존 동작 그대로).
+// 2. profile.floor2MazeTemplates[themeZone] — 이번 런에선 처음이지만 예전
+//    런(또는 이전 마을 방문)에 이 구역을 가본 적 있으면, 그때 남긴 탐험
+//    기록(visited)·해제한 함정·발견한 포탈을 그대로 이어받는다. 1층
+//    enterDungeon()과 동일하게 위치는 새로 무작위 배치(randomStartPosition).
+// 3. 아무 기록도 없으면 — 이 구역에 이 캐릭터가 처음 발 들이는 순간.
+//    generateFloor2Maze(themeZone)로 (항상 같은) 초기 상태를 만들어
+//    profile.floor2MazeTemplates에도 즉시 저장해둔다.
+// "최초 미궁 진입을 제외하고 역행 시엔 재사용이 원칙" applies symmetrically
+// to floor 1 and every floor-2 zone alike — 이제 그 재사용 범위가 이번 런을
+// 넘어 캐릭터 생애 전체로 넓어졌다는 점만 1층과 같아짐.
 function enterFloorTwo(themeZone: ArmZone) {
   // Snapshot floor 1 exactly as it stands so backtracking can resume it
   // later instead of regenerating (see floor1Maze's declaration comment).
@@ -816,10 +845,17 @@ function enterFloorTwo(themeZone: ArmZone) {
     dungeonMessage = `${zoneLabel(themeZone)} 미궁(2층)으로 돌아왔다.`;
     portalMessage = null;
     goTo('dungeon-map');
-  } else {
-    maze = generateMaze(themeZone);
-    arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, `${zoneLabel(themeZone)} 미궁(2층)에 들어섰다. 주변을 살핀다.`);
+    return;
   }
+
+  const persisted = profile.floor2MazeTemplates[themeZone];
+  if (persisted) {
+    maze = deserializeMaze(persisted);
+  } else {
+    maze = generateFloor2Maze(themeZone);
+    profile = { ...profile, floor2MazeTemplates: { ...profile.floor2MazeTemplates, [themeZone]: serializeMaze(maze) } };
+  }
+  arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, `${zoneLabel(themeZone)} 미궁(2층)에 들어섰다. 주변을 살핀다.`);
 }
 
 // Only reachable from floor 2's portal cell, and only before the 7-day
@@ -893,6 +929,7 @@ function usePotion() {
 function arriveAt(id: CellId, battleChance: number, safeMessage: string, options?: { forcedMonsterId?: string; ambush?: boolean }) {
   if (!maze) return;
   pos = id;
+  markVisited(maze, id);
   const cell = cellAt(maze, id);
 
   if (cell.portal) {
@@ -1230,12 +1267,40 @@ function captureSession(): ResumeSession | undefined {
 // reload without pushing a network write every single second.
 function persistProfileLocalOnly() {
   const captured = captureSession();
+  // 1층 미궁의 "고정된 구조"는 캐릭터 생애 동안 계속 재사용되므로(위
+  // enterDungeon 주석 참고), 그 사이의 변화(탐험 기록·함정 해제·포탈 발견)도
+  // profile.floor1MazeTemplate에 그대로 흘려보내야 다음 진입에도 남는다.
+  // captureSession과 같은 주기(초당 틱 + 실제 액션마다)로 동기화 — 지금
+  // 살아있는 floor1 미궁 인스턴스는 1층에 있으면 `maze`, 2층에 올라가 있으면
+  // 잠시 파킹해둔 `floor1Maze`(둘 다 main.ts 상단 모듈 변수) 둘 중 하나다.
+  const liveFloor1Maze = dungeonFloor === 1 ? maze : floor1Maze;
+  // 2층도 같은 이유로 profile.floor2MazeTemplates에 계속 흘려보낸다 — 다만
+  // 2층은 방향(구역)별로 여러 개가 동시에 "살아있을" 수 있다: 지금 화면에
+  // 떠 있는 구역(dungeonFloor===2일 때의 `maze`)과, 이번 런 동안 방문했다가
+  // 1층으로 돌아가며 파킹해둔 나머지 구역들(`floor2Zones`)이 전부 대상이다.
+  const liveFloor2Mazes: Partial<Record<ArmZone, DungeonMaze>> = {};
+  for (const [zone, saved] of Object.entries(floor2Zones) as [ArmZone, { maze: DungeonMaze; pos: CellId }][]) {
+    liveFloor2Mazes[zone] = saved.maze;
+  }
+  if (dungeonFloor === 2 && dungeonThemeZone && maze) {
+    liveFloor2Mazes[dungeonThemeZone] = maze;
+  }
+  const nextFloor2MazeTemplates = { ...profile.floor2MazeTemplates };
+  for (const [zone, m] of Object.entries(liveFloor2Mazes) as [ArmZone, DungeonMaze][]) {
+    nextFloor2MazeTemplates[zone] = serializeMaze(m);
+  }
   // Always stamp updatedAt, even when there's no resumable session to
   // capture (auth/menu/character-select) — it's the "this device's save is
   // current as of now" signal that adoptLoggedInProfile/restoreLoggedInSession
   // use to merge against the cloud by recency (see updatedAt's doc comment
   // in profile.ts).
-  profile = { ...profile, updatedAt: Date.now(), session: captured !== undefined ? captured : profile.session };
+  profile = {
+    ...profile,
+    updatedAt: Date.now(),
+    session: captured !== undefined ? captured : profile.session,
+    floor1MazeTemplate: liveFloor1Maze ? serializeMaze(liveFloor1Maze) : profile.floor1MazeTemplate,
+    floor2MazeTemplates: nextFloor2MazeTemplates,
+  };
   saveProfile(profile);
 }
 

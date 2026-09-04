@@ -44,6 +44,54 @@ body {
   font-style: italic;
 }
 
+.dungeon-minimap-wrap {
+  display: flex;
+  justify-content: center;
+  background: #1e2129;
+  border: 1px solid #3a3f4b;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.dungeon-minimap {
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+  display: block;
+}
+
+.minimap-edge {
+  stroke: #4a4f5b;
+  stroke-width: 2;
+}
+
+.minimap-node circle {
+  stroke: #14161c;
+  stroke-width: 1.5;
+}
+
+.minimap-node text {
+  font-size: 9px;
+  fill: #14161c;
+}
+
+.minimap-node-unknown circle {
+  fill: #3a3f4b;
+}
+
+.minimap-node-visited circle {
+  fill: #8fbfe0;
+}
+
+.minimap-node-portal circle {
+  fill: #f0c46a;
+}
+
+.minimap-node-current circle {
+  fill: #7be0a8;
+  stroke: #eee;
+}
+
 .board {
   display: flex;
   justify-content: space-between;
