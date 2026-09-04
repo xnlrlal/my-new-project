@@ -177,6 +177,20 @@ export function recordEssenceDiscovery(profile: PlayerProfile, monsterId: string
   return { ...profile, discoveredEssenceIds: [...profile.discoveredEssenceIds, monsterId] };
 }
 
+// 정수 해제(README 로드맵 1번 "정수 해제(특수 장치) 시스템") — 정수는
+// 장비와 달리 자유롭게 뺄 수 없는 게 원칙(README "해제 UI 없음 — 특수한
+// 방법으로만 해제 가능")이라, '정수 해제석'(consumables.ts) 소비를 그
+// "특수한 방법"으로 도입했다. 해제된 정수는 별도로 보관되지 않고 그대로
+// 사라진다 — 도감(discoveredEssenceIds) 기록만 남고, 다시 장착하려면 같은
+// 몬스터를 처치해 정수를 다시 드랍받아야 한다(드랍 시 "흡수/버리기"만
+// 선택 가능한 기존 원칙과 동일선상). 해제석이 없거나 대상 정수를 이미
+// 갖고 있지 않으면 아무 일도 일어나지 않는다.
+export function releaseEssence(profile: PlayerProfile, essenceId: string): PlayerProfile {
+  if (consumableCount(profile, 'essence-unbinder') <= 0) return profile;
+  if (!profile.essences.some((e) => e.id === essenceId)) return profile;
+  return consumeItem({ ...profile, essences: profile.essences.filter((e) => e.id !== essenceId) }, 'essence-unbinder');
+}
+
 export function addManaStone(profile: PlayerProfile, grade: number): PlayerProfile {
   const current = profile.manaStones[grade] ?? 0;
   return { ...profile, manaStones: { ...profile.manaStones, [grade]: current + 1 } };

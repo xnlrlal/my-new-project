@@ -1,9 +1,10 @@
 // 3대 메인스탯(육체/정신/이능). 세부스탯과 별개로 그 자체가 파생값의 입력이 되는
-// 축 — 예: 이능은 essence.ts에서 정수 스킬 카드의 위력 배율로 쓰임(engine.ts).
+// 축 — 예: 이능은 정수 스킬 카드(essence.ts)의 위력 배율로 쓰임(engine.ts의
+// ARCANE_ESSENCE_COEF).
 export interface CoreStats {
   body: number; // 육체
   mind: number; // 정신
-  arcane: number; // 이능 — 정수 스킬 카드가 아직 없어 현재는 전투에 영향 없음
+  arcane: number; // 이능 — 정수 스킬 카드 위력 배율(1당 +5%, engine.ts)
 }
 
 // 세부스탯 12종. 전투 확률 판정(명중/회피/치명타 등)에 개입하는 로직은 2단계에서

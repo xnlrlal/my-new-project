@@ -1,10 +1,11 @@
 import type { PlayerProfile } from '../engine/profile';
-import { maxEssenceSlots } from '../engine/profile';
+import { maxEssenceSlots, consumableCount } from '../engine/profile';
 import { MONSTERS } from '../engine/monsters';
 import { statBonusText } from '../engine/stat-bonus';
 
 export interface EssenceScreenHandlers {
   onBack: () => void;
+  onReleaseEssence: (essenceId: string) => void;
 }
 
 export function renderEssenceScreen(
@@ -17,6 +18,7 @@ export function renderEssenceScreen(
     ? `<div class="stat-line dungeon-clock" style="text-align:center;font-weight:600">${dungeonClockLabel}</div>`
     : '';
   const slots = maxEssenceSlots(profile);
+  const unbinderCount = consumableCount(profile, 'essence-unbinder');
 
   const equippedHtml =
     Array.from({ length: slots }, (_, i) => {
@@ -30,6 +32,7 @@ export function renderEssenceScreen(
             </div>
             <div class="essence-stat">${statBonusText(essence.statBonus)}</div>
             <div class="essence-skill">스킬: ${essence.skill.name} (마나 ${essence.skill.cost}) — ${essence.skill.description}</div>
+            <button class="menu-return small" data-release-essence="${essence.id}" ${unbinderCount > 0 ? '' : 'disabled'}>정수 해제석으로 해제</button>
           </div>
         `;
       }
@@ -59,7 +62,7 @@ export function renderEssenceScreen(
     <div class="inventory-screen">
       <h2 class="screen-title">정수 창</h2>
       ${clockHtml}
-      <p class="inventory-note">정수는 몬스터의 영혼을 흡수하는 개념이라 무기/방어구처럼 자유롭게 바꿔 낄 수 없습니다. 한 번 흡수하면 특수한 방법으로만 해제할 수 있습니다.</p>
+      <p class="inventory-note">정수는 몬스터의 영혼을 흡수하는 개념이라 무기/방어구처럼 자유롭게 바꿔 낄 수 없습니다. 한 번 흡수하면 마을 상점에서 파는 '정수 해제석'을 소비해야만 해제할 수 있습니다(보유 ${unbinderCount}개). 해제된 정수는 보관되지 않고 사라지며, 다시 얻으려면 같은 몬스터의 정수를 다시 드랍받아야 합니다.</p>
 
       <div class="stat-line" style="font-weight:600">장착 중인 정수 (${profile.essences.length} / ${slots})</div>
       <div class="essence-slots">${equippedHtml}</div>
@@ -71,5 +74,8 @@ export function renderEssenceScreen(
     </div>
   `;
 
+  root.querySelectorAll<HTMLButtonElement>('[data-release-essence]').forEach((btn) => {
+    btn.addEventListener('click', () => handlers.onReleaseEssence(btn.dataset.releaseEssence!));
+  });
   document.getElementById('back-btn')?.addEventListener('click', handlers.onBack);
 }

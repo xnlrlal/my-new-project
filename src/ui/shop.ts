@@ -1,12 +1,13 @@
 import type { PlayerProfile } from '../engine/profile';
 import { hasPocketWatch, consumableCount } from '../engine/profile';
 import { POCKET_WATCH_TEMPLATE, POCKET_WATCH_PRICE } from '../engine/gear';
-import { BANDAGE } from '../engine/consumables';
+import { BANDAGE, ESSENCE_UNBINDER } from '../engine/consumables';
 
 export interface ShopHandlers {
   onBack: () => void;
   onBuyPocketWatch: () => void;
   onBuyBandage: () => void;
+  onBuyEssenceUnbinder: () => void;
 }
 
 // 상점 판매 품목: 회중시계(designnotes.md 6-3번, 최초 품목) + 붕대
@@ -49,6 +50,20 @@ export function renderShop(root: HTMLElement, profile: PlayerProfile, handlers: 
     </div>
   `;
 
+  // 회중시계와 달리 보유 여부로 막지 않는다 — 소모품은 반복 구매가
+  // 전제인 자원이라 늘 구매 가능(스톤이 부족할 때만 비활성화).
+  const canAffordUnbinder = profile.gold >= ESSENCE_UNBINDER.price;
+  const unbinderOwned = consumableCount(profile, 'essence-unbinder');
+  const unbinderRow = `
+    <div class="item-row gear-row">
+      <div>
+        <div>${ESSENCE_UNBINDER.name} <span class="grade-tag">${ESSENCE_UNBINDER.price} 스톤</span>${unbinderOwned > 0 ? ` <span class="grade-tag">보유 ${unbinderOwned}개</span>` : ''}</div>
+        <div class="essence-stat">${ESSENCE_UNBINDER.description}</div>
+      </div>
+      <button class="menu-start small" id="buy-essence-unbinder" ${canAffordUnbinder ? '' : 'disabled'}>구매</button>
+    </div>
+  `;
+
   root.innerHTML = `
     <div class="inventory-screen">
       <h2 class="screen-title">상점</h2>
@@ -62,6 +77,7 @@ export function renderShop(root: HTMLElement, profile: PlayerProfile, handlers: 
         <div class="stat-line" style="font-weight:600">판매 품목</div>
         ${pocketWatchRow}
         ${bandageRow}
+        ${unbinderRow}
       </div>
       <button class="menu-return" id="back-btn">뒤로</button>
     </div>
@@ -69,5 +85,6 @@ export function renderShop(root: HTMLElement, profile: PlayerProfile, handlers: 
 
   document.getElementById('buy-pocket-watch')?.addEventListener('click', handlers.onBuyPocketWatch);
   document.getElementById('buy-bandage')?.addEventListener('click', handlers.onBuyBandage);
+  document.getElementById('buy-essence-unbinder')?.addEventListener('click', handlers.onBuyEssenceUnbinder);
   document.getElementById('back-btn')?.addEventListener('click', handlers.onBack);
 }

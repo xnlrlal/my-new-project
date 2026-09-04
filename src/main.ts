@@ -15,6 +15,7 @@ import {
   absorbEssence,
   hasOpenEssenceSlot,
   recordEssenceDiscovery,
+  releaseEssence,
   addManaStone,
   equipGear,
   unequipGear,
@@ -322,7 +323,14 @@ function render() {
   }
 
   if (screen === 'essence') {
-    renderEssenceScreen(app, profile, dungeonClockLabel, { onBack: () => goTo(returnScreen) });
+    renderEssenceScreen(app, profile, dungeonClockLabel, {
+      onBack: () => goTo(returnScreen),
+      onReleaseEssence: (essenceId) => {
+        profile = releaseEssence(profile, essenceId);
+        persistProfile();
+        render();
+      },
+    });
     return;
   }
 
@@ -414,6 +422,11 @@ function render() {
       },
       onBuyBandage: () => {
         profile = buyConsumable(profile, 'bandage');
+        persistProfile();
+        render();
+      },
+      onBuyEssenceUnbinder: () => {
+        profile = buyConsumable(profile, 'essence-unbinder');
         persistProfile();
         render();
       },
