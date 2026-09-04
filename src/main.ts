@@ -90,6 +90,7 @@ import { renderBattle } from './ui/battle';
 import { renderInventory } from './ui/inventory';
 import { renderEquipment } from './ui/equipment';
 import { renderEssenceScreen } from './ui/essence';
+import { renderTemple } from './ui/temple';
 import { renderDungeonMap } from './ui/dungeon-map';
 import { renderAuth, type AuthMode } from './ui/auth';
 import { signIn, signUp, signOut, getCurrentUser, isCloudConfigured, type AuthUser } from './engine/auth';
@@ -109,7 +110,8 @@ type Screen =
   | 'essence'
   | 'shop'
   | 'library'
-  | 'exchange';
+  | 'exchange'
+  | 'temple';
 
 const PORTAL_EXP_BONUS = 2;
 // 전투 없이 안전하게 이동할 때마다 자연재생력(인내심)만큼 소량 회복시킨다 —
@@ -323,14 +325,7 @@ function render() {
   }
 
   if (screen === 'essence') {
-    renderEssenceScreen(app, profile, dungeonClockLabel, {
-      onBack: () => goTo(returnScreen),
-      onReleaseEssence: (essenceId) => {
-        profile = releaseEssence(profile, essenceId);
-        persistProfile();
-        render();
-      },
-    });
+    renderEssenceScreen(app, profile, dungeonClockLabel, { onBack: () => goTo(returnScreen) });
     return;
   }
 
@@ -385,6 +380,7 @@ function render() {
         onOpenShop: () => goTo('shop'),
         onOpenLibrary: () => goTo('library'),
         onOpenExchange: () => goTo('exchange'),
+        onOpenTemple: () => goTo('temple'),
         onQuitToMenu: () => goTo('menu'),
         onSetSpeed: (speed) => {
           profile = { ...profile, clockSpeed: speed };
@@ -425,8 +421,15 @@ function render() {
         persistProfile();
         render();
       },
-      onBuyEssenceUnbinder: () => {
-        profile = buyConsumable(profile, 'essence-unbinder');
+    });
+    return;
+  }
+
+  if (screen === 'temple') {
+    renderTemple(app, profile, {
+      onBack: () => goTo('village'),
+      onReleaseEssence: (essenceId) => {
+        profile = releaseEssence(profile, essenceId);
         persistProfile();
         render();
       },
@@ -1117,6 +1120,7 @@ function toResumableScreen(s: Screen): ResumableScreen | null {
     case 'shop':
     case 'library':
     case 'exchange':
+    case 'temple':
       return s;
     default:
       return null;

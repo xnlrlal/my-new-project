@@ -17,7 +17,8 @@ export type ResumableScreen =
   | 'essence'
   | 'shop'
   | 'library'
-  | 'exchange';
+  | 'exchange'
+  | 'temple';
 
 export interface ResumeSession {
   screen: ResumableScreen;
@@ -87,6 +88,7 @@ const RESUMABLE_SCREENS: readonly ResumableScreen[] = [
   'shop',
   'library',
   'exchange',
+  'temple',
 ];
 
 function isResumableScreen(value: unknown): value is ResumableScreen {
