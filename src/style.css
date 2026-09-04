@@ -103,6 +103,63 @@ body {
   stroke: #eee;
 }
 
+/* 1층 동굴(그리드) 전용 — 로컬 뷰/전체맵(ui/dungeon-viewport.ts). 폴라
+   미니맵의 .minimap-*와 톤은 맞추되 정방형 좌표계라 별도 클래스로 둔다. */
+.dungeon-viewport {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  display: block;
+}
+
+.dungeon-viewport-full {
+  max-width: 100%;
+}
+
+/* .dungeon-minimap-wrap 배경(#1e2129)과 뚜렷이 구분되도록 바닥은 더 밝게,
+   미확인 슬롯은 더 어둡게 — 두 색이 배경과 같으면 칸 경계가 안 보이는
+   버그가 있었음(2026-09-04 브라우저 검증 중 발견, designnotes.md 20번). */
+.viewport-floor {
+  fill: #343a4d;
+  stroke: none;
+}
+
+.viewport-floor-current {
+  fill: #3d4459;
+}
+
+/* 반경 밖(암흑지역) 또는 아예 칸이 없는 슬롯 — "안 보임" */
+.viewport-unseen {
+  fill: #131521;
+  stroke: none;
+}
+
+.viewport-wall {
+  stroke: #8b94a8;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.viewport-current {
+  fill: #7be0a8;
+  stroke: #eee;
+  stroke-width: 1.5;
+}
+
+.viewport-portal-mark {
+  font-size: 16px;
+  fill: #f0c46a;
+  text-anchor: middle;
+}
+
+/* 전체맵의 캔버스 테두리 — 지금까지 탐험한 부분이 1층 전체 중 어디쯤인지
+   가늠할 수 있도록 격자 전체 범위를 옅게 표시 */
+.viewport-full-bounds {
+  fill: none;
+  stroke: #2a2e3c;
+  stroke-width: 1;
+}
+
 .board {
   display: flex;
   justify-content: space-between;
