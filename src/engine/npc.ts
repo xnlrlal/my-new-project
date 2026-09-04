@@ -24,6 +24,9 @@ export interface NpcDef {
   perceptionJam: number;
   obsession: number;
   poisonResist: number;
+  // 공격속도(designnotes.md 3-10번)의 입력값 — 확정된 서사적 근거가 없어
+  // 기준값(0, attackSpeed 1행동)으로 둔다.
+  agility: number;
   ranged: boolean;
   // engine.ts의 즉사(헤드샷) 판정이 요구하는 등급값 — 몬스터 등급제(1~9)를
   // 그대로 빌려 쓰되(EnemyCombatant가 요구하는 필드라 값 자체는 필요),
@@ -61,6 +64,7 @@ export const WANDERING_EXPLORER: NpcDef = {
   perceptionJam: 0,
   obsession: 0,
   poisonResist: 0,
+  agility: 0,
   ranged: false,
   grade: 9,
   introMessage: '낯선 탐험가와 눈이 마주쳤다. 서로를 향한 경계가 순식간에 전투로 번졌다!',

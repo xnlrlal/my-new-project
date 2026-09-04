@@ -5,6 +5,7 @@ import type { NpcDef } from '../engine/npc';
 import { statusEffectsText, hasBleed } from '../engine/status-effects';
 import { damagedPartsText } from '../engine/body-parts';
 import { BANDAGE } from '../engine/consumables';
+import { attackSpeed } from '../engine/engine';
 
 export type BattleMode = 'manual' | 'auto';
 
@@ -53,7 +54,7 @@ function renderActor(actor: Actor, role: 'player' | 'companion' | 'enemy', grade
       <div class="bar"><div class="bar-fill" style="width:${hpPct}%"></div></div>
       <div class="stat-line">HP ${hpPct}% ${actor.shield > 0 ? `· 방어막 ${actor.shield}` : ''}</div>
       <div class="bar"><div class="bar-fill mana" style="width:${manaPct}%"></div></div>
-      <div class="stat-line">마나 ${actor.mana}/${actor.maxMana}</div>
+      <div class="stat-line">마나 ${actor.mana}/${actor.maxMana} · 행동력 ${actor.actionsRemaining}/${attackSpeed(actor)}</div>
       ${statusText ? `<div class="stat-line status-effects">${statusText}</div>` : ''}
       ${partsText ? `<div class="stat-line damaged-parts">${partsText}</div>` : ''}
     </div>
@@ -218,7 +219,7 @@ export function renderBattle(
       ${player.hand
         .map(
           (card) => `
-        <button class="card" data-card-id="${card.id}" ${card.cost > player.mana || cardsDisabled ? 'disabled' : ''}>
+        <button class="card" data-card-id="${card.id}" ${card.cost > player.mana || player.actionsRemaining <= 0 || cardsDisabled ? 'disabled' : ''}>
           <div class="card-name"><span>${card.name}</span><span>${card.cost}</span></div>
           <div class="card-desc">${card.description}</div>
         </button>

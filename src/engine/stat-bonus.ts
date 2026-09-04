@@ -17,7 +17,12 @@ export interface SubStats {
   cognition: number; // 인지력 — 정신. 카드 코스트 경감 확률
   dexterity: number; // 손재주 — 정신. 방어막 보정(구 defenseBonus 계승) + 상시 피해 감소(%, engine.ts)
   willpower: number; // 인내심 — 정신. 자연재생력 — 라운드 종료 시 최대체력의 %를 회복(engine.ts)
-  agility: number; // 민첩성 — 정신. 추가 드로우 확률
+  // 민첩성 — 정신. 공격속도(designnotes.md 3-10번)의 유일한 입력값 —
+  // 라운드당 카드(행동) 횟수를 정한다(engine.ts의 attackSpeed(), 민첩성
+  // 3당 +1행동). 원래 "추가 드로우 확률"이라는 미착수 예약값이었으나 실제
+  // 전투 로직 어디에서도 소비된 적이 없어 이 역할로 재지정됨 — 새 스탯을
+  // 추가하지 않고 세부스탯 12종 체계를 그대로 유지하기 위한 결정.
+  agility: number;
   smell: number; // 후각 — 이능. 마석/정수 드랍률 보정(전투 외)
   poisonResist: number; // 독내성 — 이능. (예약) 상태이상 피해 경감
   perceptionJam: number; // 인식방해 — 이능. 적 명중률 저하

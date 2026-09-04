@@ -22,7 +22,15 @@ const EXP_PER_LEVEL = 20;
 // v3: 오크를 플레이어 종족에서 완전히 제거 + 수인 추가 + 메인스탯 스케일
 // 재조정(races.ts) — raceId: 'orc'인 구세이브가 getRace()에서 더는 유효하지
 // 않으므로, 이 버전 상승만으로 그런 세이브까지 전부 안전하게 초기화된다.
-const CURRENT_SCHEMA_VERSION = 3;
+// v4: 공격속도 시스템(designnotes.md 3-10번) — "마나=행동 횟수"를 폐기하고
+// Actor에 agility/actionsRemaining 필드를 추가, engine.ts의 턴 루프를
+// 전면 교체함. `session.state`(전투 중 저장된 GameState)는 필드 단위로
+// 검증하지 않고 그대로 캐스팅되므로(session.ts), 구버전 세이브가 전투
+// 중이었다면 이 두 필드가 없어 NaN 등 정의되지 않은 동작으로 이어질 수
+// 있음 — sanitizeResumeSession으로 부분 복구하기보다 필드 의미 자체가
+// 바뀐 경우라 전체 초기화가 더 안전하다는 기존 원칙(designnotes.md 1번)을
+// 그대로 따름.
+const CURRENT_SCHEMA_VERSION = 4;
 
 export type ManaStoneCounts = Partial<Record<number, number>>;
 
