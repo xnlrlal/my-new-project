@@ -17,7 +17,10 @@ function zoneForIndex(idx: number): ArmZone {
   return 'west';
 }
 
-function ringId(ring: number, i: number): CellId {
+// export됨 — 미니맵(ui/dungeon-minimap.ts)이 어떤 칸의 반지름 방향/원주
+// 방향 이웃 슬롯 id를 직접 계산해(그 슬롯이 실제로 존재하는지, open에
+// 포함되는지) 미로 벽을 그리는 데 재사용한다.
+export function ringId(ring: number, i: number): CellId {
   return `ring${ring}-${((i % RING_SIZE) + RING_SIZE) % RING_SIZE}`;
 }
 
