@@ -92,40 +92,31 @@ export function renderLocalViewportSvg(maze: DungeonMaze, pos: CellId): string {
   `;
 }
 
-// 전체맵 — "전체맵" 버튼을 눌렀을 때만 보임. 실제로 밟아본(maze.visited)
-// 칸만 그리고, 그 칸 기준으로 벽 유무를 판단(이웃 칸 자체의 방문 여부와는
-// 무관 — "이 칸에 서면 보이는 벽은 항상 보인다"는 폴라 미니맵과 같은
-// 원칙). 안 가본 칸은 폴라 미니맵과 달리 흐린 점조차 없이 아무것도
-// 그리지 않는다(위 파일 상단 설명 참고).
+// 전체맵 — "전체맵" 버튼을 눌렀을 때만 보임. 캔버스 자체는 항상 1층
+// 격자 전체 크기(maze.gridSize × gridSize)로 그려서 "지금까지 탐험한
+// 부분이 전체 맵 중 어디쯤인지"가 한눈에 보이게 한다(2026-09-04 갱신 —
+// 처음엔 방문한 칸의 바운딩 박스만큼만 잘라서 보여줬으나, 그러면 탐험
+// 초반엔 좁은 구석 하나가 "전체맵"인 것처럼 보이는 문제가 있어 "전체맵은
+// 맵 전체를 띄워줘야지"라는 피드백에 따라 고정 전체 크기로 바꿈).
+// 실제로 밟아본(maze.visited) 칸만 그리고, 그 칸 기준으로 벽 유무를
+// 판단(이웃 칸 자체의 방문 여부와는 무관 — "이 칸에 서면 보이는 벽은
+// 항상 보인다"는 폴라 미니맵과 같은 원칙). 안 가본 칸은 폴라 미니맵과
+// 달리 흐린 점조차 없이 아무것도 그리지 않는다(위 파일 상단 설명 참고) —
+// 이 부분은 그대로 유지: "전체 맵 크기"를 보여주는 것과 "안 가본 곳의
+// 내용을 미리 보여주는 것"은 서로 다른 얘기다.
 export function renderGridFullMapSvg(maze: DungeonMaze, pos: CellId): string {
-  const visitedCells = [...maze.cells.values()].filter((c) => maze.visited.has(c.id));
-  if (visitedCells.length === 0) {
-    return `<svg class="dungeon-viewport dungeon-viewport-full" viewBox="0 0 100 100" role="img" aria-label="전체맵"></svg>`;
-  }
-
-  let minRow = Infinity;
-  let maxRow = -Infinity;
-  let minCol = Infinity;
-  let maxCol = -Infinity;
-  for (const cell of visitedCells) {
-    minRow = Math.min(minRow, cell.row);
-    maxRow = Math.max(maxRow, cell.row);
-    minCol = Math.min(minCol, cell.col);
-    maxCol = Math.max(maxCol, cell.col);
-  }
-
-  const cols = maxCol - minCol + 1;
-  const rows = maxRow - minRow + 1;
-  const width = cols * SCALE + PADDING * 2;
-  const height = rows * SCALE + PADDING * 2;
+  const size = maze.gridSize;
+  const width = size * SCALE + PADDING * 2;
+  const height = size * SCALE + PADDING * 2;
   const half = SCALE / 2 - 3;
   const toPx = (row: number, col: number) => ({
-    cx: PADDING + (col - minCol) * SCALE + SCALE / 2,
-    cy: PADDING + (row - minRow) * SCALE + SCALE / 2,
+    cx: PADDING + col * SCALE + SCALE / 2,
+    cy: PADDING + row * SCALE + SCALE / 2,
   });
 
-  const parts: string[] = [];
-  for (const cell of visitedCells) {
+  const parts: string[] = [`<rect x="${PADDING}" y="${PADDING}" width="${size * SCALE}" height="${size * SCALE}" class="viewport-full-bounds" />`];
+  for (const cell of maze.cells.values()) {
+    if (!maze.visited.has(cell.id)) continue;
     const { cx, cy } = toPx(cell.row, cell.col);
     const isOpen = (ddr: -1 | 1 | 0, ddc: -1 | 1 | 0) => cell.open.has(`grid${cell.row + ddr}-${cell.col + ddc}`);
     const isCurrent = cell.id === pos;
