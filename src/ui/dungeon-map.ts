@@ -1,5 +1,6 @@
 import type { ArmZone, DungeonCell, DungeonMove } from '../engine/dungeon';
 import { zoneFlavor, zoneLabel } from '../engine/dungeon';
+import { POTION } from '../engine/consumables';
 
 export interface DungeonMapHandlers {
   onMove: (move: DungeonMove) => void;
@@ -8,6 +9,7 @@ export interface DungeonMapHandlers {
   onOpenInventory: () => void;
   onOpenEquipment: () => void;
   onOpenEssence: () => void;
+  onUsePotion: () => void;
 }
 
 export function renderDungeonMap(
@@ -20,11 +22,24 @@ export function renderDungeonMap(
   portalMessage: string | null,
   floor1RevertLocked: boolean,
   dungeonClockLabel: string | null,
+  hp: number,
+  maxHp: number,
+  potionCount: number,
   handlers: DungeonMapHandlers
 ) {
   const clockHtml = dungeonClockLabel
     ? `<div class="stat-line dungeon-clock" style="text-align:center;font-weight:600">${dungeonClockLabel}</div>`
     : '';
+
+  const hpPct = Math.round((hp / maxHp) * 100);
+  // 포션(designnotes.md 2번 섹션)은 전투 화면(ui/battle.ts)이 아니라 여기,
+  // 미궁 이동 화면에서만 사용 가능 — "전투 중 포션 사용 금지" 결정을 별도
+  // 플래그 없이 화면 배치만으로 자연스럽게 지킨다.
+  const canUsePotion = potionCount > 0 && hp < maxHp;
+  const potionHtml =
+    potionCount > 0
+      ? `<button class="menu-return small" id="use-potion" ${canUsePotion ? '' : 'disabled'}>${POTION.name} 사용 (보유 ${potionCount}개)</button>`
+      : '';
 
   const portalPanel = cell.portal
     ? floor === 1
@@ -70,6 +85,9 @@ export function renderDungeonMap(
     <div class="dungeon-screen">
       <div class="stats-card">
         <div class="stats-race">${zoneLabel(cell.zone)}</div>
+        <div class="bar"><div class="bar-fill" style="width:${hpPct}%"></div></div>
+        <div class="stat-line">HP ${hpPct}%</div>
+        ${potionHtml}
         <div class="stat-line">${zoneFlavor(cell.zone)}</div>
         ${message ? `<div class="stat-line dungeon-message">${message}</div>` : ''}
       </div>
@@ -92,4 +110,5 @@ export function renderDungeonMap(
   document.getElementById('open-inventory')?.addEventListener('click', handlers.onOpenInventory);
   document.getElementById('open-equipment')?.addEventListener('click', handlers.onOpenEquipment);
   document.getElementById('open-codex')?.addEventListener('click', handlers.onOpenEssence);
+  document.getElementById('use-potion')?.addEventListener('click', handlers.onUsePotion);
 }

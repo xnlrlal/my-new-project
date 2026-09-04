@@ -1,18 +1,19 @@
 import type { PlayerProfile } from '../engine/profile';
 import { hasPocketWatch, consumableCount } from '../engine/profile';
 import { POCKET_WATCH_TEMPLATE, POCKET_WATCH_PRICE } from '../engine/gear';
-import { BANDAGE } from '../engine/consumables';
+import { BANDAGE, POTION } from '../engine/consumables';
 
 export interface ShopHandlers {
   onBack: () => void;
   onBuyPocketWatch: () => void;
   onBuyBandage: () => void;
+  onBuyPotion: () => void;
 }
 
-// 상점 판매 품목: 회중시계(designnotes.md 6-3번, 최초 품목) + 붕대
-// (6-1번, 소모품 카테고리의 첫 품목). 그 외 품목은 아직 없어 실제 상점
-// 콘텐츠(README/로드맵 "상점" 항목)는 여전히 이후 작업 대상이다. 정수
-// 해제는 이 상점이 아니라 신전(ui/temple.ts)에서 스톤으로 직접 처리한다.
+// 상점 판매 품목: 회중시계(designnotes.md 6-3번, 최초 품목) + 붕대·포션
+// (6-1번, 소모품 카테고리). 그 외 품목은 아직 없어 실제 상점 콘텐츠
+// (README/로드맵 "상점" 항목)는 여전히 이후 작업 대상이다. 정수 해제는
+// 이 상점이 아니라 신전(ui/temple.ts)에서 스톤으로 직접 처리한다.
 export function renderShop(root: HTMLElement, profile: PlayerProfile, handlers: ShopHandlers) {
   const owned = hasPocketWatch(profile);
   const canAffordWatch = profile.gold >= POCKET_WATCH_PRICE;
@@ -50,6 +51,18 @@ export function renderShop(root: HTMLElement, profile: PlayerProfile, handlers: 
     </div>
   `;
 
+  const canAffordPotion = profile.gold >= POTION.price;
+  const potionOwned = consumableCount(profile, 'potion');
+  const potionRow = `
+    <div class="item-row gear-row">
+      <div>
+        <div>${POTION.name} <span class="grade-tag">${POTION.price} 스톤</span>${potionOwned > 0 ? ` <span class="grade-tag">보유 ${potionOwned}개</span>` : ''}</div>
+        <div class="essence-stat">${POTION.description}</div>
+      </div>
+      <button class="menu-start small" id="buy-potion" ${canAffordPotion ? '' : 'disabled'}>구매</button>
+    </div>
+  `;
+
   root.innerHTML = `
     <div class="inventory-screen">
       <h2 class="screen-title">상점</h2>
@@ -63,6 +76,7 @@ export function renderShop(root: HTMLElement, profile: PlayerProfile, handlers: 
         <div class="stat-line" style="font-weight:600">판매 품목</div>
         ${pocketWatchRow}
         ${bandageRow}
+        ${potionRow}
       </div>
       <button class="menu-return" id="back-btn">뒤로</button>
     </div>
@@ -70,5 +84,6 @@ export function renderShop(root: HTMLElement, profile: PlayerProfile, handlers: 
 
   document.getElementById('buy-pocket-watch')?.addEventListener('click', handlers.onBuyPocketWatch);
   document.getElementById('buy-bandage')?.addEventListener('click', handlers.onBuyBandage);
+  document.getElementById('buy-potion')?.addEventListener('click', handlers.onBuyPotion);
   document.getElementById('back-btn')?.addEventListener('click', handlers.onBack);
 }

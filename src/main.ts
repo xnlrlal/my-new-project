@@ -36,6 +36,7 @@ import {
   type PlayerProfile,
   type ExpGrantResult,
 } from './engine/profile';
+import { POTION_HEAL_PERCENT } from './engine/consumables';
 import { createEssenceFromMonster, essenceSkillCards, type EquippedEssence } from './engine/essence';
 import { computeTotalStats } from './engine/stats-calc';
 import { applyStatBonuses } from './engine/stat-bonus';
@@ -421,6 +422,11 @@ function render() {
         persistProfile();
         render();
       },
+      onBuyPotion: () => {
+        profile = buyConsumable(profile, 'potion');
+        persistProfile();
+        render();
+      },
     });
     return;
   }
@@ -464,18 +470,34 @@ function render() {
     return;
   }
 
-  if (screen === 'dungeon-map' && maze && pos) {
+  if (screen === 'dungeon-map' && maze && pos && selectedRace && dungeonHp !== null) {
     const cell = cellAt(maze, pos);
     const moves = availableMoves(maze, pos);
     const floorLabel = dungeonFloor === 1 ? '미궁 1층' : `${zoneLabel(dungeonThemeZone!)} 미궁 2층`;
-    renderDungeonMap(app, floorLabel, dungeonFloor, cell, moves, dungeonMessage, portalMessage, isFloor1RevertLocked(dungeonElapsedSeconds), dungeonClockLabel, {
-      onMove: handleMove,
-      onEnterPortal: enterFloorTwo,
-      onRevertToFloor1: revertToFloor1,
-      onOpenInventory: () => openSubScreen('inventory'),
-      onOpenEquipment: () => openSubScreen('equipment'),
-      onOpenEssence: () => openSubScreen('essence'),
-    });
+    const maxHp = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus).maxHp;
+    renderDungeonMap(
+      app,
+      floorLabel,
+      dungeonFloor,
+      cell,
+      moves,
+      dungeonMessage,
+      portalMessage,
+      isFloor1RevertLocked(dungeonElapsedSeconds),
+      dungeonClockLabel,
+      dungeonHp,
+      maxHp,
+      consumableCount(profile, 'potion'),
+      {
+        onMove: handleMove,
+        onEnterPortal: enterFloorTwo,
+        onRevertToFloor1: revertToFloor1,
+        onOpenInventory: () => openSubScreen('inventory'),
+        onOpenEquipment: () => openSubScreen('equipment'),
+        onOpenEssence: () => openSubScreen('essence'),
+        onUsePotion: usePotion,
+      }
+    );
     return;
   }
 
@@ -848,6 +870,22 @@ function applyOutOfCombatRegen() {
   const healed = Math.round(totalStats.maxHp * ((totalStats.willpower * OUT_OF_COMBAT_REGEN_COEF) / 100));
   if (healed <= 0) return;
   dungeonHp = Math.min(totalStats.maxHp, dungeonHp + healed);
+}
+
+// 포션 사용(designnotes.md 2번 섹션) — 미궁 지도 화면(dungeon-map.ts)에서만
+// 호출되고, 전투 화면(battle.ts)에는 이 버튼 자체가 없어 "전투 중 포션
+// 사용 금지" 결정을 화면 배치만으로 지킨다. dungeon-map.ts가 이미 보유
+// 수량>0·HP<최대체력일 때만 버튼을 활성화하지만, 여기서도 방어적으로
+// 다시 확인한다(consumeItem처럼 호출부 책임 원칙).
+function usePotion() {
+  if (!selectedRace || dungeonHp === null) return;
+  if (consumableCount(profile, 'potion') <= 0) return;
+  const maxHp = computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus).maxHp;
+  if (dungeonHp >= maxHp) return;
+  profile = consumeItem(profile, 'potion');
+  dungeonHp = Math.min(maxHp, dungeonHp + Math.round((maxHp * POTION_HEAL_PERCENT) / 100));
+  persistProfile();
+  render();
 }
 
 // Shared by both entering a fresh maze and moving within one, so the very
