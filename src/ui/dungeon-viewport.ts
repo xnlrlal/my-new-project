@@ -93,11 +93,22 @@ export function renderLocalViewportSvg(maze: DungeonMaze, pos: CellId): string {
 }
 
 // 전체맵 — "전체맵" 버튼을 눌렀을 때만 보임. 캔버스 자체는 항상 1층
-// 격자 전체 크기(maze.gridSize × gridSize)로 그려서 "지금까지 탐험한
-// 부분이 전체 맵 중 어디쯤인지"가 한눈에 보이게 한다(2026-09-04 갱신 —
+// 격자 전체 크기(maze.gridSize × gridSize)만큼 그려서 "지금까지 탐험한
+// 부분이 전체 맵 중 얼마나 되는지"가 한눈에 보이게 한다(2026-09-04 갱신 —
 // 처음엔 방문한 칸의 바운딩 박스만큼만 잘라서 보여줬으나, 그러면 탐험
-// 초반엔 좁은 구석 하나가 "전체맵"인 것처럼 보이는 문제가 있어 "전체맵은
-// 맵 전체를 띄워줘야지"라는 피드백에 따라 고정 전체 크기로 바꿈).
+// 초반엔 좁은 구석 하나가 "전체맵"인 것처럼 보여 "전체맵은 맵 전체를
+// 띄워줘야지"라는 피드백에 따라 고정 전체 크기로 바꿈).
+//
+// 좌표는 절대 격자 좌표(row/col)가 아니라 **캐릭터의 현재 위치를 캔버스
+// 중앙에 고정**한 상대 좌표로 그린다(2026-09-04 추가 갱신 — "전체맵을 볼
+// 때 캐릭터가 중심이 되어야 한다, 대략적인 위치를 짐작 못하게 하기
+// 위함"이라는 피드백). 만약 절대 좌표로 그렸다면, 탐험한 덩어리가 캔버스
+// 안에서 어느 쪽에 치우쳐 있는지만 보고도 "나는 지금 북쪽에 가깝구나"
+// 같은 대략적인 위치를 유추할 수 있었을 것 — 캐릭터를 항상 정중앙에 두면
+// 그 정보 자체가 사라지고, 탐험한 모양(상대적인 갈래·거리)만 보인다.
+// 캔버스 크기 자체는 여전히 격자 전체 크기라 "총 몇 칸 중 이만큼
+// 탐험했다"는 규모감은 그대로 유지된다.
+//
 // 실제로 밟아본(maze.visited) 칸만 그리고, 그 칸 기준으로 벽 유무를
 // 판단(이웃 칸 자체의 방문 여부와는 무관 — "이 칸에 서면 보이는 벽은
 // 항상 보인다"는 폴라 미니맵과 같은 원칙). 안 가본 칸은 폴라 미니맵과
@@ -109,12 +120,15 @@ export function renderGridFullMapSvg(maze: DungeonMaze, pos: CellId): string {
   const width = size * SCALE + PADDING * 2;
   const height = size * SCALE + PADDING * 2;
   const half = SCALE / 2 - 3;
+  const center = cellAt(maze, pos);
+  const cx0 = width / 2;
+  const cy0 = height / 2;
   const toPx = (row: number, col: number) => ({
-    cx: PADDING + col * SCALE + SCALE / 2,
-    cy: PADDING + row * SCALE + SCALE / 2,
+    cx: cx0 + (col - center.col) * SCALE,
+    cy: cy0 + (row - center.row) * SCALE,
   });
 
-  const parts: string[] = [`<rect x="${PADDING}" y="${PADDING}" width="${size * SCALE}" height="${size * SCALE}" class="viewport-full-bounds" />`];
+  const parts: string[] = [`<rect x="${(width - size * SCALE) / 2}" y="${(height - size * SCALE) / 2}" width="${size * SCALE}" height="${size * SCALE}" class="viewport-full-bounds" />`];
   for (const cell of maze.cells.values()) {
     if (!maze.visited.has(cell.id)) continue;
     const { cx, cy } = toPx(cell.row, cell.col);
@@ -128,7 +142,7 @@ export function renderGridFullMapSvg(maze: DungeonMaze, pos: CellId): string {
   }
 
   return `
-    <svg class="dungeon-viewport dungeon-viewport-full" viewBox="0 0 ${width} ${height}" role="img" aria-label="전체맵(가본 곳만 표시)">
+    <svg class="dungeon-viewport dungeon-viewport-full" viewBox="0 0 ${width} ${height}" role="img" aria-label="전체맵(가본 곳만 표시, 현재 위치가 중앙)">
       ${parts.join('')}
     </svg>
   `;
