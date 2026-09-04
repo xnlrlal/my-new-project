@@ -7,7 +7,7 @@ import type { RaceId } from './races';
 import type { BodyPart } from './types';
 import { getConsumable, type ConsumableId } from './consumables';
 import { sanitizeResumeSession, type ResumeSession } from './session';
-import type { SerializedDungeonMaze } from './dungeon';
+import type { ArmZone, SerializedDungeonMaze } from './dungeon';
 import { SECONDS_PER_HOUR, type ClockSpeed } from './village-clock';
 import { STARTER_ARMOR, findWeaponChoice } from './ritual';
 import type { StatBonus } from './stat-bonus';
@@ -114,19 +114,27 @@ export interface PlayerProfile {
   // (1차 구현 범위, 교체/해산 UI 없음 — 전투 중 쓰러지면 자동으로 null이
   // 됨). 페르마데스 원칙에 따라 사망 시 resetProfile()로 함께 초기화.
   companionNpcId: string | null;
-  // 1층 미궁의 영구 구조(designnotes.md 4-1번 갱신 참고) — 예전엔 미궁에
-  // 들어설 때마다(enterDungeon) 매번 새로 생성했으나, "구조가 바뀌는 일은
-  // 없다"는 요구에 따라 이 캐릭터가 처음 1층에 들어선 순간 딱 한 번
-  // 생성되어 여기 저장되고, 이후로는 계속 재사용된다(main.ts의
-  // enterDungeon/persistProfileLocalOnly가 관리). 탐험 기록(visited)과 함정
-  // 해제 상태도 이 안에 함께 보존되므로, 마을에 다녀와도 이미 가본 곳/이미
-  // 처치한 함정 고블린은 그대로 기억된다. null = 아직 한 번도 1층에
-  // 들어간 적 없음(다음 진입 시 새로 생성). 페르마데스 원칙에 따라 사망 시
-  // 다른 진행 상황과 함께 초기화된다 — "고정된 구조"는 캐릭터의 생애 동안만
-  // 유지되는 것으로 취급(세계 자체의 영구 상태를 저장할 별도 장치가 아직
-  // 없어, 기존 PlayerProfile 필드들과 같은 수명 주기를 따르는 게 가장
-  // 일관적이라는 판단 — 필요해지면 재검토).
+  // 1층 미궁의 이 캐릭터 개인 진행 상태(designnotes.md 4-1/16번 참고) —
+  // 미궁 구조 자체는 이제 세계 공통 상수(dungeon.ts의 generateFloor1Maze,
+  // 고정 시드)라 이 필드가 "구조"를 담당하지 않는다. 여기 저장되는 건
+  // 그 고정 구조 위에서 이 캐릭터가 남긴 흔적뿐이다 — 탐험 기록(visited),
+  // 처치해서 해제한 함정, 발견한 포탈. enterDungeon()이 처음 1층에 들어설
+  // 때 generateFloor1Maze()의 (항상 같은) 초기 상태로 이 필드를 채우고,
+  // 이후로는 그 위에 진행 상태를 계속 덧쓴다(main.ts의
+  // enterDungeon/persistProfileLocalOnly가 관리). null = 아직 한 번도
+  // 1층에 들어간 적 없음(다음 진입 시 새로 생성). 페르마데스 원칙에 따라
+  // 사망 시 다른 진행 상황과 함께 초기화된다 — 다음 캐릭터는 정확히 같은
+  // 구조를 다시 만나지만 탐험은 처음부터 다시 한다.
   floor1MazeTemplate: SerializedDungeonMaze | null;
+  // 2층 버전의 floor1MazeTemplate — 방향(구역)별로 하나씩. 2층 구조도
+  // 이제 구역마다 고정된 시드(generateFloor2Maze)라 세계 공통이며, 여기
+  // 저장되는 건 마찬가지로 그 구역에서 이 캐릭터가 남긴 진행 상태뿐이다.
+  // 미궁 런을 넘나들며(마을에 강제 귀환했다가 다시 들어가도) 그 구역에
+  // 처음 발 들인 이후의 탐험 기록이 계속 유지된다는 점에서 예전(런 단위로만
+  // 유지)과 달라짐 — 1층과 동일한 대우로 확장한 것. 구역을 아직 한 번도
+  // 방문한 적 없으면 그 키 자체가 없다(Partial). 페르마데스 원칙에 따라
+  // 사망 시 다른 진행 상황과 함께 초기화된다.
+  floor2MazeTemplates: Partial<Record<ArmZone, SerializedDungeonMaze>>;
   // Wall-clock timestamp (Date.now()) of the last time this profile was
   // actually persisted (main.ts's persistProfileLocalOnly stamps it on
   // every local save). Lets adoptLoggedInProfile/restoreLoggedInSession
@@ -167,6 +175,7 @@ function defaultProfile(): PlayerProfile {
     hasCompletedComingOfAge: false,
     companionNpcId: null,
     floor1MazeTemplate: null,
+    floor2MazeTemplates: {},
     achievementStatBonus: {},
     achievementHp2PctGranted: false,
     achievementHp01PctGranted: false,
@@ -499,6 +508,24 @@ export function addExp(profile: PlayerProfile, amount: number): AddExpResult {
   return { profile: { ...profile, level, exp }, leveledUp };
 }
 
+const ARM_ZONES: readonly ArmZone[] = ['north', 'east', 'south', 'west'];
+
+function isArmZone(value: unknown): value is ArmZone {
+  return typeof value === 'string' && (ARM_ZONES as readonly string[]).includes(value);
+}
+
+// session.ts의 sanitizeFloor2Zones와 같은 방어적 파싱 패턴 — 방향별 맵이라
+// 키 자체(ArmZone인지)와 값(SerializedDungeonMaze 모양인지) 둘 다 확인한다.
+function sanitizeFloor2MazeTemplates(raw: unknown): PlayerProfile['floor2MazeTemplates'] {
+  if (!raw || typeof raw !== 'object') return {};
+  const result: PlayerProfile['floor2MazeTemplates'] = {};
+  for (const [zone, template] of Object.entries(raw as Record<string, unknown>)) {
+    if (!isArmZone(zone) || !template || typeof template !== 'object') continue;
+    result[zone] = template as SerializedDungeonMaze;
+  }
+  return result;
+}
+
 // Defensively parses a raw, untyped value (JSON.parse'd localStorage, or a
 // bare cloud API response — cloud-profile.ts uses this too) into a valid
 // PlayerProfile, field by field, so a save from before a field existed
@@ -556,6 +583,7 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
       parsed.floor1MazeTemplate && typeof parsed.floor1MazeTemplate === 'object'
         ? (parsed.floor1MazeTemplate as SerializedDungeonMaze)
         : null,
+    floor2MazeTemplates: sanitizeFloor2MazeTemplates(parsed.floor2MazeTemplates),
     updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : 0,
   };
 }

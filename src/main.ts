@@ -814,14 +814,20 @@ function forceReturnFromDungeon() {
   goTo('village');
 }
 
-// Reuses a zone's floor-2 maze if the player has been there before this run
-// (see floor2Zones' declaration comment) — only a zone's very first entry
-// this run calls generateFloor2Maze(). That's no longer "generates a fresh
-// maze" in the random sense, though — generateFloor2Maze는 1층과 같은 이유로
-// (designnotes.md 16번) 구역별 고정 시드를 쓰므로, 같은 구역은 이번 런이든
-// 다음 런이든 항상 같은 구조로 돌아온다. "최초 미궁 진입을 제외하고 역행
-// 시엔 재사용이 원칙" applies symmetrically to floor 1 and every floor-2 zone
-// alike.
+// 세 단계로 그 구역의 미궁을 찾는다(designnotes.md 16번 "2층도 진행 상태까지
+// 영구 보존"으로 확장):
+// 1. floor2Zones[themeZone] — 이번 런 안에서 이미 가본 적 있으면 정확한
+//    위치까지 그대로 이어서 재개(기존 동작 그대로).
+// 2. profile.floor2MazeTemplates[themeZone] — 이번 런에선 처음이지만 예전
+//    런(또는 이전 마을 방문)에 이 구역을 가본 적 있으면, 그때 남긴 탐험
+//    기록(visited)·해제한 함정·발견한 포탈을 그대로 이어받는다. 1층
+//    enterDungeon()과 동일하게 위치는 새로 무작위 배치(randomStartPosition).
+// 3. 아무 기록도 없으면 — 이 구역에 이 캐릭터가 처음 발 들이는 순간.
+//    generateFloor2Maze(themeZone)로 (항상 같은) 초기 상태를 만들어
+//    profile.floor2MazeTemplates에도 즉시 저장해둔다.
+// "최초 미궁 진입을 제외하고 역행 시엔 재사용이 원칙" applies symmetrically
+// to floor 1 and every floor-2 zone alike — 이제 그 재사용 범위가 이번 런을
+// 넘어 캐릭터 생애 전체로 넓어졌다는 점만 1층과 같아짐.
 function enterFloorTwo(themeZone: ArmZone) {
   // Snapshot floor 1 exactly as it stands so backtracking can resume it
   // later instead of regenerating (see floor1Maze's declaration comment).
@@ -839,10 +845,17 @@ function enterFloorTwo(themeZone: ArmZone) {
     dungeonMessage = `${zoneLabel(themeZone)} 미궁(2층)으로 돌아왔다.`;
     portalMessage = null;
     goTo('dungeon-map');
+    return;
+  }
+
+  const persisted = profile.floor2MazeTemplates[themeZone];
+  if (persisted) {
+    maze = deserializeMaze(persisted);
   } else {
     maze = generateFloor2Maze(themeZone);
-    arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, `${zoneLabel(themeZone)} 미궁(2층)에 들어섰다. 주변을 살핀다.`);
+    profile = { ...profile, floor2MazeTemplates: { ...profile.floor2MazeTemplates, [themeZone]: serializeMaze(maze) } };
   }
+  arriveAt(randomStartPosition(), BASE_BATTLE_CHANCE, `${zoneLabel(themeZone)} 미궁(2층)에 들어섰다. 주변을 살핀다.`);
 }
 
 // Only reachable from floor 2's portal cell, and only before the 7-day
@@ -1261,6 +1274,21 @@ function persistProfileLocalOnly() {
   // 살아있는 floor1 미궁 인스턴스는 1층에 있으면 `maze`, 2층에 올라가 있으면
   // 잠시 파킹해둔 `floor1Maze`(둘 다 main.ts 상단 모듈 변수) 둘 중 하나다.
   const liveFloor1Maze = dungeonFloor === 1 ? maze : floor1Maze;
+  // 2층도 같은 이유로 profile.floor2MazeTemplates에 계속 흘려보낸다 — 다만
+  // 2층은 방향(구역)별로 여러 개가 동시에 "살아있을" 수 있다: 지금 화면에
+  // 떠 있는 구역(dungeonFloor===2일 때의 `maze`)과, 이번 런 동안 방문했다가
+  // 1층으로 돌아가며 파킹해둔 나머지 구역들(`floor2Zones`)이 전부 대상이다.
+  const liveFloor2Mazes: Partial<Record<ArmZone, DungeonMaze>> = {};
+  for (const [zone, saved] of Object.entries(floor2Zones) as [ArmZone, { maze: DungeonMaze; pos: CellId }][]) {
+    liveFloor2Mazes[zone] = saved.maze;
+  }
+  if (dungeonFloor === 2 && dungeonThemeZone && maze) {
+    liveFloor2Mazes[dungeonThemeZone] = maze;
+  }
+  const nextFloor2MazeTemplates = { ...profile.floor2MazeTemplates };
+  for (const [zone, m] of Object.entries(liveFloor2Mazes) as [ArmZone, DungeonMaze][]) {
+    nextFloor2MazeTemplates[zone] = serializeMaze(m);
+  }
   // Always stamp updatedAt, even when there's no resumable session to
   // capture (auth/menu/character-select) — it's the "this device's save is
   // current as of now" signal that adoptLoggedInProfile/restoreLoggedInSession
@@ -1271,6 +1299,7 @@ function persistProfileLocalOnly() {
     updatedAt: Date.now(),
     session: captured !== undefined ? captured : profile.session,
     floor1MazeTemplate: liveFloor1Maze ? serializeMaze(liveFloor1Maze) : profile.floor1MazeTemplate,
+    floor2MazeTemplates: nextFloor2MazeTemplates,
   };
   saveProfile(profile);
 }
