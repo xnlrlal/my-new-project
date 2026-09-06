@@ -1,13 +1,15 @@
 import type { PlayerProfile } from '../engine/profile';
-import { hasPocketWatch, consumableCount } from '../engine/profile';
+import { hasPocketWatch, consumableCount, unidentifiedCommonHerbIds } from '../engine/profile';
 import { POCKET_WATCH_TEMPLATE, POCKET_WATCH_PRICE } from '../engine/gear';
 import { BANDAGE, POTION } from '../engine/consumables';
+import { getHerb, HERB_UNIDENTIFIED_NAME, type HerbId } from '../engine/herbs';
 
 export interface ShopHandlers {
   onBack: () => void;
   onBuyPocketWatch: () => void;
   onBuyBandage: () => void;
   onBuyPotion: () => void;
+  onIdentifyHerb: (herbId: HerbId) => void;
 }
 
 // 상점 판매 품목: 회중시계(designnotes.md 6-3번, 최초 품목) + 붕대·포션
@@ -63,6 +65,35 @@ export function renderShop(root: HTMLElement, profile: PlayerProfile, handlers: 
     </div>
   `;
 
+  // 아이템 식별 시스템(designnotes.md 2-1번) — "마을에서는 상점에서 미확인
+  // 약초 식별 가능"이라는 지시에 따른 유료 감정 서비스. 미궁 감정사 NPC
+  // (ui/herb-identifier.ts)의 무료 식별과 달리 스톤을 받는다. 감정할
+  // 미확인 약초가 하나도 없으면 이 섹션 자체가 안 뜬다.
+  const unidentifiedHerbIds = unidentifiedCommonHerbIds(profile);
+  const herbIdentifySection =
+    unidentifiedHerbIds.length > 0
+      ? `
+      <div class="stats-card">
+        <div class="stat-line" style="font-weight:600">미확인 약초 감정</div>
+        ${unidentifiedHerbIds
+          .map((id) => {
+            const price = getHerb(id).identifyPrice;
+            const count = profile.herbs[id] ?? 0;
+            const canAfford = profile.gold >= price;
+            return `
+          <div class="item-row gear-row">
+            <div>
+              <div>${HERB_UNIDENTIFIED_NAME} <span class="grade-tag">${price} 스톤</span> <span class="grade-tag">보유 ${count}개</span></div>
+            </div>
+            <button class="menu-start small" data-identify-herb="${id}" ${canAfford ? '' : 'disabled'}>감정</button>
+          </div>
+        `;
+          })
+          .join('')}
+      </div>
+    `
+      : '';
+
   root.innerHTML = `
     <div class="inventory-screen">
       <h2 class="screen-title">상점</h2>
@@ -78,6 +109,7 @@ export function renderShop(root: HTMLElement, profile: PlayerProfile, handlers: 
         ${bandageRow}
         ${potionRow}
       </div>
+      ${herbIdentifySection}
       <button class="menu-return" id="back-btn">뒤로</button>
     </div>
   `;
@@ -85,5 +117,8 @@ export function renderShop(root: HTMLElement, profile: PlayerProfile, handlers: 
   document.getElementById('buy-pocket-watch')?.addEventListener('click', handlers.onBuyPocketWatch);
   document.getElementById('buy-bandage')?.addEventListener('click', handlers.onBuyBandage);
   document.getElementById('buy-potion')?.addEventListener('click', handlers.onBuyPotion);
+  root.querySelectorAll<HTMLButtonElement>('[data-identify-herb]').forEach((btn) => {
+    btn.addEventListener('click', () => handlers.onIdentifyHerb(btn.dataset.identifyHerb as HerbId));
+  });
   document.getElementById('back-btn')?.addEventListener('click', handlers.onBack);
 }

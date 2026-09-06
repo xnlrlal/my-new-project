@@ -33,10 +33,23 @@ import {
   recordMonsterKill,
   recruitCompanion,
   clearCompanion,
+  addHerbToInventory,
+  unidentifiedCommonHerbIds,
+  identifyHerbViaNpc,
+  identifyHerbAtShop,
   type PlayerProfile,
   type ExpGrantResult,
 } from './engine/profile';
 import { POTION_HEAL_PERCENT } from './engine/consumables';
+import {
+  rollHerbForage,
+  randomCommonHerbId,
+  randomHerbIdentifierFlavor,
+  HERB_IDENTIFIER_ENCOUNTER_CHANCE,
+  HERB_UNIDENTIFIED_NAME,
+  type HerbIdentifierFlavor,
+} from './engine/herbs';
+import { renderHerbIdentifier } from './ui/herb-identifier';
 import { createEssenceFromMonster, essenceSkillCards, type EquippedEssence } from './engine/essence';
 import { computeTotalStats } from './engine/stats-calc';
 import { applyStatBonuses } from './engine/stat-bonus';
@@ -114,7 +127,8 @@ type Screen =
   | 'shop'
   | 'library'
   | 'exchange'
-  | 'temple';
+  | 'temple'
+  | 'herb-identifier';
 
 const PORTAL_EXP_BONUS = 2;
 // 전투 없이 안전하게 이동할 때마다 자연재생력(인내심)만큼 소량 회복시킨다 —
@@ -146,6 +160,11 @@ let currentMonster: MonsterDef | null = null;
 // 몬스터 전투를 시작하는 startZoneBattle()과 NPC 조우를 시작하는
 // startNpcEncounter() 각각이 반대쪽을 null로 정리한다.
 let currentNpc: NpcDef | null = null;
+// 미궁 감정사 조우(designnotes.md 2-1번, herbs.ts) — 전투가 아닌 평화로운
+// 상호작용이라 currentNpc/currentMonster와 별개로 관리한다. 세이브에 저장할
+// 만큼 중요한 상태가 아니라(같은 자리로 돌아오면 다시 굴리면 그만) 화면이
+// 뜬 동안만 유지되는 순수 UI 상태다.
+let currentHerbIdentifierFlavor: HerbIdentifierFlavor | null = null;
 let state: GameState | null = null;
 let expResult: ExpGrantResult | null = null;
 let expChecked = false;
@@ -432,6 +451,33 @@ function render() {
         profile = buyConsumable(profile, 'potion');
         persistProfile();
         render();
+      },
+      onIdentifyHerb: (herbId) => {
+        profile = identifyHerbAtShop(profile, herbId);
+        persistProfile();
+        render();
+      },
+    });
+    return;
+  }
+
+  if (screen === 'herb-identifier') {
+    if (!currentHerbIdentifierFlavor) {
+      // 세이브 복원 등으로 화면은 남았는데 플레이버가 없는 경우(비저장 상태라
+      // 새로고침 시 발생 가능) — 이 조우 자체가 저장 대상이 아니므로 그냥
+      // 미궁 지도로 돌려보낸다.
+      goTo('dungeon-map');
+      return;
+    }
+    renderHerbIdentifier(app, profile, currentHerbIdentifierFlavor, {
+      onIdentify: (herbId) => {
+        profile = identifyHerbViaNpc(profile, herbId);
+        persistProfile();
+        render();
+      },
+      onLeave: () => {
+        currentHerbIdentifierFlavor = null;
+        goTo('dungeon-map');
       },
     });
     return;
@@ -963,6 +1009,17 @@ function arriveAt(id: CellId, battleChance: number, safeMessage: string, options
   }
 
   portalMessage = null;
+
+  // 미궁 감정사 조우(designnotes.md 2-1번) — 전투 조우(rollBattle)와 완전히
+  // 독립된 평화로운 이벤트라 그보다 먼저 확인한다. 식별할 미확인 일반 등급
+  // 약초가 하나도 없으면 만날 이유가 없어 애초에 굴리지 않는다.
+  if (unidentifiedCommonHerbIds(profile).length > 0 && Math.random() < HERB_IDENTIFIER_ENCOUNTER_CHANCE) {
+    currentHerbIdentifierFlavor = randomHerbIdentifierFlavor();
+    applyOutOfCombatRegen();
+    goTo('herb-identifier');
+    return;
+  }
+
   if (rollBattle(battleChance)) {
     const forcedMonsterId = options?.forcedMonsterId;
     const ambush = options?.ambush ?? false;
@@ -981,7 +1038,17 @@ function arriveAt(id: CellId, battleChance: number, safeMessage: string, options
     startZoneBattle(cell.zone, { forcedMonsterId, ambush });
   } else {
     applyOutOfCombatRegen();
-    dungeonMessage = safeMessage;
+    // 미확인 약초 발견(designnotes.md 2-1번) — 몬스터 드랍(마석/정수 전용
+    // 파이프라인, 3-7번 원칙)과 의도적으로 분리해, 전투 없이 안전하게
+    // 넘어간 이동에서만 확률적으로 발견된다("약초는 몬스터가 아니라
+    // 바닥에서 채집한다"는 자연스러운 구분).
+    if (rollHerbForage()) {
+      profile = addHerbToInventory(profile, randomCommonHerbId());
+      persistProfile();
+      dungeonMessage = `${safeMessage} 바닥에 떨어진 낯선 약초를 발견해 주웠다. (${HERB_UNIDENTIFIED_NAME})`;
+    } else {
+      dungeonMessage = safeMessage;
+    }
     goTo('dungeon-map');
   }
 }
