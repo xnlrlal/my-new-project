@@ -6,6 +6,7 @@ import type { EquippedGear } from './stats-calc';
 import type { RaceId } from './races';
 import type { BodyPart } from './types';
 import { getConsumable, type ConsumableId } from './consumables';
+import { getHerb, isHerbIdentifiableByCommonPath, type HerbId } from './herbs';
 import { sanitizeResumeSession, type ResumeSession } from './session';
 import type { ArmZone, SerializedDungeonMaze } from './dungeon';
 import { SECONDS_PER_HOUR, type ClockSpeed } from './village-clock';
@@ -64,6 +65,14 @@ export interface PlayerProfile {
   // 저장 방식. 개별 인스턴스가 없어 GearInstance/EquippedEssence와 달리
   // instanceId 개념이 필요 없다.
   consumables: Partial<Record<ConsumableId, number>>;
+  // 아이템 식별 시스템(designnotes.md 2-1번, herbs.ts) — 소모품과 같은
+  // 카운터 저장 방식. 어느 종류를 식별했는지는 별도로 identifiedHerbIds에
+  // 기록한다(개별 인스턴스가 아니라 종류 단위 지식).
+  herbs: Partial<Record<HerbId, number>>;
+  // 캐릭터가 식별을 완료한 약초 "종류" 목록 — 마스터 설정대로 개별
+  // 인스턴스가 아니라 종류 단위 지식이며, 캐릭터 소유 지식이라 페르마데스
+  // 원칙에 따라 사망 시 다른 진행 상황과 함께 초기화된다.
+  identifiedHerbIds: HerbId[];
   inventoryGear: GearInstance[];
   equippedGear: EquippedGear;
   gold: number;
@@ -167,6 +176,8 @@ function defaultProfile(): PlayerProfile {
     essenceReleaseCount: 0,
     manaStones: {},
     consumables: {},
+    herbs: {},
+    identifiedHerbIds: [],
     inventoryGear: [],
     equippedGear: {},
     gold: 0,
@@ -299,6 +310,49 @@ export function consumeItem(profile: PlayerProfile, id: ConsumableId): PlayerPro
   if (count <= 1) delete nextConsumables[id];
   else nextConsumables[id] = count - 1;
   return { ...profile, consumables: nextConsumables };
+}
+
+export function herbCount(profile: PlayerProfile, id: HerbId): number {
+  return profile.herbs[id] ?? 0;
+}
+
+export function addHerbToInventory(profile: PlayerProfile, id: HerbId, amount = 1): PlayerProfile {
+  return { ...profile, herbs: { ...profile.herbs, [id]: herbCount(profile, id) + amount } };
+}
+
+export function isHerbIdentified(profile: PlayerProfile, id: HerbId): boolean {
+  return profile.identifiedHerbIds.includes(id);
+}
+
+function markHerbIdentified(profile: PlayerProfile, id: HerbId): PlayerProfile {
+  if (isHerbIdentified(profile, id)) return profile;
+  return { ...profile, identifiedHerbIds: [...profile.identifiedHerbIds, id] };
+}
+
+// 두 일반 식별 경로(미궁 감정사 NPC/마을 상점) 둘 다에서 후보로 쓴다 — 실제
+// 보유 중이고, 아직 식별 안 됐고, 특수 등급이 아닌(isHerbIdentifiableByCommonPath)
+// 종류만 후보에 오른다. main.ts가 이 목록이 비어있으면 감정사 조우 확률 자체를
+// 굴리지 않는 데도 쓰인다.
+export function unidentifiedCommonHerbIds(profile: PlayerProfile): HerbId[] {
+  return (Object.keys(profile.herbs) as HerbId[]).filter(
+    (id) => herbCount(profile, id) > 0 && !isHerbIdentified(profile, id) && isHerbIdentifiableByCommonPath(id)
+  );
+}
+
+// 미궁 감정사 NPC(designnotes.md 2-1번 "고등급 탐험가, 요정족, 관련 직종")
+// — 은혜/친절 차원의 무료 식별. 상점 감정(아래)과 달리 스톤을 받지 않는다.
+export function identifyHerbViaNpc(profile: PlayerProfile, id: HerbId): PlayerProfile {
+  if (!isHerbIdentifiableByCommonPath(id) || herbCount(profile, id) <= 0) return profile;
+  return markHerbIdentified(profile, id);
+}
+
+// 마을 상점 감정 — 전문가에게 의뢰하는 유료 서비스라 스톤을 받는다. 이미
+// 식별했거나, 특수 등급이거나, 스톤이 부족하면 아무 일도 일어나지 않는다.
+export function identifyHerbAtShop(profile: PlayerProfile, id: HerbId): PlayerProfile {
+  if (!isHerbIdentifiableByCommonPath(id) || herbCount(profile, id) <= 0 || isHerbIdentified(profile, id)) return profile;
+  const price = getHerb(id).identifyPrice;
+  if (profile.gold < price) return profile;
+  return markHerbIdentified({ ...profile, gold: profile.gold - price }, id);
 }
 
 export function addGearToInventory(profile: PlayerProfile, gear: GearInstance): PlayerProfile {
@@ -568,6 +622,8 @@ export function sanitizeProfile(raw: unknown): PlayerProfile {
     manaStones: parsed.manaStones && typeof parsed.manaStones === 'object' ? (parsed.manaStones as ManaStoneCounts) : {},
     consumables:
       parsed.consumables && typeof parsed.consumables === 'object' ? (parsed.consumables as Partial<Record<ConsumableId, number>>) : {},
+    herbs: parsed.herbs && typeof parsed.herbs === 'object' ? (parsed.herbs as Partial<Record<HerbId, number>>) : {},
+    identifiedHerbIds: Array.isArray(parsed.identifiedHerbIds) ? (parsed.identifiedHerbIds as HerbId[]) : [],
     inventoryGear: Array.isArray(parsed.inventoryGear) ? (parsed.inventoryGear as GearInstance[]) : [],
     equippedGear: parsed.equippedGear && typeof parsed.equippedGear === 'object' ? (parsed.equippedGear as EquippedGear) : {},
     gold: typeof parsed.gold === 'number' ? parsed.gold : 0,

@@ -1,8 +1,9 @@
 import type { PlayerProfile } from '../engine/profile';
-import { totalManaStones } from '../engine/profile';
+import { totalManaStones, isHerbIdentified } from '../engine/profile';
 import { slotLabel } from '../engine/gear';
 import { statBonusText, statBonusMagnitude } from '../engine/stat-bonus';
 import { CONSUMABLES } from '../engine/consumables';
+import { HERBS, HERB_UNIDENTIFIED_NAME } from '../engine/herbs';
 
 export interface InventoryHandlers {
   onBack: () => void;
@@ -33,6 +34,22 @@ export function renderInventory(
     consumableEntries.length > 0
       ? consumableEntries.map((entry) => `<div class="item-row"><span>${entry.def.name}</span><span>x${entry.count}</span></div>`).join('')
       : '<div class="stat-line">보유한 소모품이 없습니다.</div>';
+
+  // 아이템 식별 시스템(designnotes.md 2-1번) — 식별 전에는 어느 종류든
+  // 전부 같은 이름(HERB_UNIDENTIFIED_NAME)으로만 표시된다. 식별은 미궁
+  // 감정사 NPC(무료, ui/herb-identifier.ts) 또는 마을 상점(유료,
+  // ui/shop.ts)에서 처리하며, 여기 인벤토리 화면에는 표시만 한다.
+  const herbEntries = HERBS.map((def) => ({ def, count: profile.herbs[def.id] ?? 0 })).filter((entry) => entry.count > 0);
+
+  const herbHtml =
+    herbEntries.length > 0
+      ? herbEntries
+          .map(
+            (entry) =>
+              `<div class="item-row"><span>${isHerbIdentified(profile, entry.def.id) ? entry.def.name : HERB_UNIDENTIFIED_NAME}</span><span>x${entry.count}</span></div>`
+          )
+          .join('')
+      : '<div class="stat-line">보유한 약초가 없습니다.</div>';
 
   const gearHtml =
     profile.inventoryGear.length > 0
@@ -69,6 +86,10 @@ export function renderInventory(
       <div class="stats-card">
         <div class="stat-line" style="font-weight:600">소모품</div>
         ${consumableHtml}
+      </div>
+      <div class="stats-card">
+        <div class="stat-line" style="font-weight:600">약초</div>
+        ${herbHtml}
       </div>
       <div class="stats-card">
         <div class="stat-line" style="font-weight:600">미착용 장비 (장비창에서 장착 가능)</div>
