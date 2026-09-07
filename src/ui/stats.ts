@@ -60,9 +60,8 @@ export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerPro
         <div class="stat-line">민첩성은 전투 중 라운드당 행동(카드 사용) 횟수를 결정합니다(3당 +1행동).</div>
         <details class="stats-substats">
           <summary>세부스탯 자세히 보기</summary>
-          <div class="stat-line">육체 — 근력 ${totalStats.strength} · 유연성 ${totalStats.flexibility} · 시각 ${totalStats.sight} · 명중률 ${totalStats.accuracy}</div>
-          <div class="stat-line">정신 — 인지력 ${totalStats.cognition} · 손재주 ${totalStats.dexterity} · 인내심 ${totalStats.willpower} · 민첩성 ${totalStats.agility}</div>
-          <div class="stat-line">이능 — 후각 ${totalStats.smell} · 독내성 ${totalStats.poisonResist} · 인식방해 ${totalStats.perceptionJam} · 집착 ${totalStats.obsession}</div>
+          <div class="stat-line">육체 — 근력 ${totalStats.strength} · 유연성 ${totalStats.flexibility} · 시각 ${totalStats.sight} · 후각 ${totalStats.smell} · 명중률 ${totalStats.accuracy}</div>
+          <div class="stat-line">정신·이능(분류 재검토 중) — 인지력 ${totalStats.cognition} · 손재주 ${totalStats.dexterity} · 인내심 ${totalStats.willpower} · 민첩성 ${totalStats.agility} · 독내성 ${totalStats.poisonResist} · 인식방해 ${totalStats.perceptionJam} · 집착 ${totalStats.obsession}</div>
         </details>
         <div class="stat-line">처치한 몬스터 종류: ${profile.defeatedMonsterNames.length}</div>
         <div class="stats-skills">
