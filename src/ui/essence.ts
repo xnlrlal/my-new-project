@@ -5,6 +5,7 @@ import { statBonusText } from '../engine/stat-bonus';
 
 export interface EssenceScreenHandlers {
   onBack: () => void;
+  onOpenLog: () => void;
 }
 
 export function renderEssenceScreen(
@@ -67,9 +68,13 @@ export function renderEssenceScreen(
       <div class="stat-line" style="font-weight:600; margin-top:8px">정수 도감 (${profile.discoveredEssenceIds.length} / ${MONSTERS.length})</div>
       <div class="essence-slots">${codexHtml}</div>
 
+      <div class="nav-row">
+        <button class="menu-return small" id="log-btn">로그</button>
+      </div>
       <button class="menu-return" id="back-btn">뒤로</button>
     </div>
   `;
 
+  document.getElementById('log-btn')?.addEventListener('click', handlers.onOpenLog);
   document.getElementById('back-btn')?.addEventListener('click', handlers.onBack);
 }

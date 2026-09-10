@@ -2,7 +2,7 @@ import './style.css';
 import type { GameState } from './engine/types';
 import { getRace, type RaceDef } from './engine/races';
 import type { MonsterDef, MonsterGrade } from './engine/monsters';
-import { getMonsterById, pickMonsterForFloorAndZone, rollEssenceDrop, rollManaStoneDrop } from './engine/monsters';
+import { getMonsterById, pickMonsterForFloorAndZone, rollEssenceDrop, rollManaStoneDrop, stoneValueForGrade } from './engine/monsters';
 import { initGame, playCard, endTurn, type EnemyCombatant } from './engine/engine';
 import { getNpcById, WANDERING_EXPLORER, NPC_ENCOUNTER_CHANCE, NPC_KILL_LOOT_GOLD, type NpcDef } from './engine/npc';
 import { hasBleed, removeStatusEffect } from './engine/status-effects';
@@ -40,13 +40,14 @@ import {
   type PlayerProfile,
   type ExpGrantResult,
 } from './engine/profile';
-import { POTION_HEAL_PERCENT } from './engine/consumables';
+import { POTION_HEAL_PERCENT, BANDAGE, POTION } from './engine/consumables';
 import {
   rollHerbForage,
   randomCommonHerbId,
   randomHerbIdentifierFlavor,
   HERB_IDENTIFIER_ENCOUNTER_CHANCE,
   HERB_UNIDENTIFIED_NAME,
+  getHerb,
   type HerbIdentifierFlavor,
 } from './engine/herbs';
 import { renderHerbIdentifier } from './ui/herb-identifier';
@@ -55,7 +56,7 @@ import { computeTotalStats } from './engine/stats-calc';
 import { applyStatBonuses } from './engine/stat-bonus';
 import { huntingProficiencyBonus, huntingProficiencyLabel, huntingProficiencyTier } from './engine/hunting-proficiency';
 import { autoPlayOneTurn, estimateWinProbability } from './engine/battle-ai';
-import { type EquipmentSlot } from './engine/gear';
+import { type EquipmentSlot, POCKET_WATCH_TEMPLATE } from './engine/gear';
 import {
   randomStartPosition,
   cellAt,
@@ -109,6 +110,7 @@ import { renderEssenceScreen } from './ui/essence';
 import { renderTemple } from './ui/temple';
 import { renderDungeonMap } from './ui/dungeon-map';
 import { renderAuth, type AuthMode } from './ui/auth';
+import { renderGameLog } from './ui/game-log';
 import { signIn, signUp, signOut, getCurrentUser, isCloudConfigured, type AuthUser } from './engine/auth';
 import { loadCloudProfile, saveCloudProfile } from './engine/cloud-profile';
 
@@ -128,7 +130,8 @@ type Screen =
   | 'library'
   | 'exchange'
   | 'temple'
-  | 'herb-identifier';
+  | 'herb-identifier'
+  | 'game-log';
 
 const PORTAL_EXP_BONUS = 2;
 // 전투 없이 안전하게 이동할 때마다 자연재생력(인내심)만큼 소량 회복시킨다 —
@@ -172,6 +175,11 @@ let dropChecked = false;
 let pendingEssence: EquippedEssence | null = null;
 let essenceOutcome: string | null = null;
 let returnScreen: Screen = 'stats';
+// 게임 로그 화면(game-log) 전용 복귀 지점 — returnScreen과 별개 변수로 둔
+// 이유: returnScreen은 인벤토리/장비창/정수창(1단계 서브화면)이 이미 쓰고
+// 있어서, 그 서브화면 안에서 로그를 또 열면(2단계 중첩) 같은 변수를 같이
+// 덮어써 인벤토리 자신의 뒤로가기가 game-log로 잘못 돌아가는 문제가 생긴다.
+let gameLogReturnScreen: Screen = 'village';
 // Raw estimateWinProbability() result for the current battle, computed once
 // in startZoneBattle — the auto-battle button (battle.ts) reads this to
 // show "예상 승률 N%" and to decide its safe/risky wording, but auto-battle
@@ -240,6 +248,37 @@ let dungeonHp: number | null = null;
 // (resumeCharacter)는 복원된 state의 현재 길이로 맞춰 — 재시작 시 이미
 // 반영된 손상을 또 깎지 않는다.
 let processedDamagedPartsCount = 0;
+// 게임 전체 이벤트 로그(designnotes.md 게임 로그 화면) — 전투 로그(state.log,
+// 전투당 초기화)와 달리 캐릭터 생성 이후 세션이 끝날 때까지 계속 누적된다.
+// profile에는 저장하지 않는다(세션 동안만 유지, 새로고침하면 초기화) — 두
+// 문서 확인 후 정한 범위: 저장까지 하려면 세이브 스키마·클라우드 동기화까지
+// 손대야 해서 작업량이 커진다는 판단.
+const GAME_LOG_MAX_ENTRIES = 500;
+let gameLog: string[] = [];
+// state.log(전투 로그)에서 이미 gameLog로 옮겨 적은 항목 수 — processedDamaged
+// PartsCount와 같은 커서 패턴. 새 전투 시작(startZoneBattle/startNpcEncounter)
+// 때 0으로, 저장된 전투를 이어할 때(resumeCharacter)는 복원된 state의 현재
+// 길이로 맞춰 이미 지난 세션에서 보였을 항목을 또 한꺼번에 쏟아붓지 않는다.
+let processedBattleLogCount = 0;
+
+function logEvent(message: string) {
+  gameLog.push(message);
+  if (gameLog.length > GAME_LOG_MAX_ENTRIES) gameLog.splice(0, gameLog.length - GAME_LOG_MAX_ENTRIES);
+}
+
+// render()는 상태가 바뀔 때마다(afterStateChange 경유든, 핸들러가 직접
+// persistProfile()+render()를 부르든) 거의 항상 호출되므로, 매 렌더 맨 앞에서
+// 이 동기화를 한 번 태우는 것이 전투 로그 갱신 지점을 일일이 쫓아다니는 것보다
+// 안전하다 — processedBattleLogCount 커서 덕분에 아무것도 새로 없으면 그냥
+// no-op.
+function syncBattleLogToGameLog() {
+  if (!state || state.log.length <= processedBattleLogCount) return;
+  const newEntries = state.log.slice(processedBattleLogCount);
+  processedBattleLogCount = state.log.length;
+  for (const entry of newEntries) {
+    logEvent(`[${entry.turn}턴] ${entry.message}`);
+  }
+}
 // 몬스터 무리 스폰(dungeon-clock.ts의 packSizeForDay) — 무작위 전투가
 // 발동하는 순간 packSizeForDay로 정해진 마릿수를 packTotal에 담고,
 // packRemaining은 "이번 전투 이후로 몇 마리가 더 남았는지"를 센다.
@@ -273,6 +312,7 @@ let lastVillageTickAt: number | null = null;
 const DUNGEON_CONTEXT_SCREENS: Screen[] = ['dungeon-map', 'battle', 'inventory', 'equipment', 'essence'];
 
 function render() {
+  syncBattleLogToGameLog();
   // Computed once per render rather than per-screen: maze !== null already
   // means "currently inside a dungeon run" for every one of
   // DUNGEON_CONTEXT_SCREENS (subscreens don't clear maze), so a single check
@@ -328,8 +368,13 @@ function render() {
     return;
   }
 
+  if (screen === 'game-log') {
+    renderGameLog(app, gameLog, { onBack: () => goTo(gameLogReturnScreen) });
+    return;
+  }
+
   if (screen === 'inventory') {
-    renderInventory(app, profile, dungeonClockLabel, { onBack: () => goTo(returnScreen) });
+    renderInventory(app, profile, dungeonClockLabel, { onBack: () => goTo(returnScreen), onOpenLog: () => openGameLog() });
     return;
   }
 
@@ -346,12 +391,13 @@ function render() {
         persistProfile();
         render();
       },
+      onOpenLog: () => openGameLog(),
     });
     return;
   }
 
   if (screen === 'essence') {
-    renderEssenceScreen(app, profile, dungeonClockLabel, { onBack: () => goTo(returnScreen) });
+    renderEssenceScreen(app, profile, dungeonClockLabel, { onBack: () => goTo(returnScreen), onOpenLog: () => openGameLog() });
     return;
   }
 
@@ -408,6 +454,7 @@ function render() {
         onOpenExchange: () => goTo('exchange'),
         onOpenTemple: () => goTo('temple'),
         onQuitToMenu: () => goTo('menu'),
+        onOpenLog: () => openGameLog(),
         onSetSpeed: (speed) => {
           profile = { ...profile, clockSpeed: speed };
           persistProfile();
@@ -437,23 +484,28 @@ function render() {
   if (screen === 'shop') {
     renderShop(app, profile, {
       onBack: () => goTo('village'),
+      onOpenLog: () => openGameLog(),
       onBuyPocketWatch: () => {
         profile = buyPocketWatch(profile);
+        logEvent(`${POCKET_WATCH_TEMPLATE.name}을(를) 구매했다.`);
         persistProfile();
         render();
       },
       onBuyBandage: () => {
         profile = buyConsumable(profile, 'bandage');
+        logEvent(`${BANDAGE.name}을(를) 구매했다.`);
         persistProfile();
         render();
       },
       onBuyPotion: () => {
         profile = buyConsumable(profile, 'potion');
+        logEvent(`${POTION.name}을(를) 구매했다.`);
         persistProfile();
         render();
       },
       onIdentifyHerb: (herbId) => {
         profile = identifyHerbAtShop(profile, herbId);
+        logEvent(`상점에서 약초를 감정받았다. (${getHerb(herbId).name})`);
         persistProfile();
         render();
       },
@@ -472,6 +524,7 @@ function render() {
     renderHerbIdentifier(app, profile, currentHerbIdentifierFlavor, {
       onIdentify: (herbId) => {
         profile = identifyHerbViaNpc(profile, herbId);
+        logEvent(`미궁 감정사에게 약초를 감정받았다. (${getHerb(herbId).name})`);
         persistProfile();
         render();
       },
@@ -479,6 +532,7 @@ function render() {
         currentHerbIdentifierFlavor = null;
         goTo('dungeon-map');
       },
+      onOpenLog: () => openGameLog(),
     });
     return;
   }
@@ -487,10 +541,13 @@ function render() {
     renderTemple(app, profile, {
       onBack: () => goTo('village'),
       onReleaseEssence: (essenceId) => {
+        const essence = profile.essences.find((e) => e.id === essenceId);
         profile = releaseEssence(profile, essenceId);
+        if (essence) logEvent(`신전에서 ${essence.monsterName}의 정수를 해제했다.`);
         persistProfile();
         render();
       },
+      onOpenLog: () => openGameLog(),
     });
     return;
   }
@@ -499,16 +556,19 @@ function render() {
     renderExchange(app, profile, {
       onBack: () => goTo('village'),
       onExchangeGrade: (grade: MonsterGrade) => {
+        const count = profile.manaStones[grade] ?? 0;
         profile = exchangeManaStonesForGrade(profile, grade);
+        if (count > 0) logEvent(`${grade}등급 마석 ${count}개를 ${count * stoneValueForGrade(grade)}스톤으로 환전했다.`);
         persistProfile();
         render();
       },
+      onOpenLog: () => openGameLog(),
     });
     return;
   }
 
   if (screen === 'library') {
-    renderLibrary(app, { onBack: () => goTo('village') });
+    renderLibrary(app, { onBack: () => goTo('village'), onOpenLog: () => openGameLog() });
     return;
   }
 
@@ -518,6 +578,7 @@ function render() {
       onOpenInventory: () => openSubScreen('inventory'),
       onOpenEquipment: () => openSubScreen('equipment'),
       onOpenEssence: () => openSubScreen('essence'),
+      onOpenLog: () => openGameLog(),
     });
     return;
   }
@@ -553,6 +614,7 @@ function render() {
         onUsePotion: usePotion,
         onShowLocalView: showLocalDungeonView,
         onShowFullMap: showFullDungeonMap,
+        onOpenLog: () => openGameLog(),
       }
     );
     return;
@@ -608,12 +670,14 @@ function render() {
             return;
           }
           dungeonMessage = '전투에서 승리했다.';
+          logEvent(dungeonMessage);
           goTo('dungeon-map');
         },
         onAcknowledgeDeath: () => handleDeath('battle'),
         onSpareNpc: () => {
           if (!state || state.status !== 'incapacitated' || !currentNpc) return;
           dungeonMessage = currentNpc.spareMessage;
+          logEvent(dungeonMessage);
           currentNpc = null;
           persistProfile();
           goTo('dungeon-map');
@@ -625,6 +689,7 @@ function render() {
           // 참고) — 실제 전리품 시스템이 들어오면 대체될 자리.
           profile = { ...profile, gold: profile.gold + NPC_KILL_LOOT_GOLD };
           dungeonMessage = currentNpc.killMessage;
+          logEvent(dungeonMessage);
           currentNpc = null;
           persistProfile();
           goTo('dungeon-map');
@@ -633,6 +698,7 @@ function render() {
           if (!state || state.status !== 'incapacitated' || !currentNpc || profile.companionNpcId) return;
           profile = recruitCompanion(profile, currentNpc.id);
           dungeonMessage = currentNpc.recruitMessage;
+          logEvent(dungeonMessage);
           currentNpc = null;
           persistProfile();
           goTo('dungeon-map');
@@ -645,12 +711,14 @@ function render() {
           } else {
             essenceOutcome = '장착 슬롯이 가득 차 흡수할 수 없었습니다.';
           }
+          logEvent(essenceOutcome);
           pendingEssence = null;
           persistProfile();
           render();
         },
         onDiscardEssence: () => {
           essenceOutcome = '정수를 버렸습니다.';
+          logEvent(essenceOutcome);
           pendingEssence = null;
           persistProfile();
           render();
@@ -669,6 +737,7 @@ function render() {
           persistProfile();
           render();
         },
+        onOpenLog: () => openGameLog(),
       }
     );
   }
@@ -677,6 +746,11 @@ function render() {
 function openSubScreen(next: Screen) {
   returnScreen = screen;
   goTo(next);
+}
+
+function openGameLog() {
+  gameLogReturnScreen = screen;
+  goTo('game-log');
 }
 
 function afterStateChange() {
@@ -802,6 +876,7 @@ function enterDungeon() {
   // Brand-new dungeon entry is the only place HP resets to full — floor
   // transitions and backtracking leave whatever's left in dungeonHp alone.
   dungeonHp = selectedRace ? computeTotalStats(selectedRace.stats, profile.essences, profile.equippedGear, profile.achievementStatBonus).maxHp : null;
+  logEvent('미궁 1층에 입장했다.');
   arriveAt(randomStartPosition(maze), BASE_BATTLE_CHANCE, '미궁에 들어섰다. 주변을 살핀다.');
 }
 
@@ -822,6 +897,7 @@ function forceReturnFromDungeon() {
   const newElapsed = villageNoonAfterForcedReturn(dungeonEntryVillageSeconds);
 
   lastDungeonClosedMessage = '미궁이 폐쇄되어 마을로 강제 귀환했다.';
+  logEvent(lastDungeonClosedMessage);
 
   dungeonFloor = 1;
   dungeonThemeZone = null;
@@ -863,9 +939,11 @@ function forceReturnFromDungeon() {
   profile = { ...gearOutcome.profile, villageElapsedSeconds: newElapsed, hasVisitedDungeonExchange: true };
   if (taxOutcome.taxedYear !== null) {
     lastTaxMessage = `${taxOutcome.taxedYear + 2}년차 세금 ${ANNUAL_TAX_AMOUNT.toLocaleString()}스톤이 징수되었습니다. (잔액: ${profile.gold.toLocaleString()}스톤)`;
+    logEvent(lastTaxMessage);
   }
   if (gearOutcome.removedCount > 0) {
     lastDungeonGearLossMessage = '미궁에서 얻은 장비는 미궁 밖에서는 사용할 수 없어 사라졌다.';
+    logEvent(lastDungeonGearLossMessage);
   }
   goTo('village');
 }
@@ -899,6 +977,7 @@ function enterFloorTwo(themeZone: ArmZone) {
     maze = saved.maze;
     pos = saved.pos;
     dungeonMessage = `${zoneLabel(themeZone)} 미궁(2층)으로 돌아왔다.`;
+    logEvent(dungeonMessage);
     portalMessage = null;
     goTo('dungeon-map');
     return;
@@ -911,6 +990,7 @@ function enterFloorTwo(themeZone: ArmZone) {
     maze = generateFloor2Maze(themeZone);
     profile = { ...profile, floor2MazeTemplates: { ...profile.floor2MazeTemplates, [themeZone]: serializeMaze(maze) } };
   }
+  logEvent(`${zoneLabel(themeZone)} 미궁(2층)에 처음 입장했다.`);
   arriveAt(randomStartPosition(maze), BASE_BATTLE_CHANCE, `${zoneLabel(themeZone)} 미궁(2층)에 들어섰다. 주변을 살핀다.`);
 }
 
@@ -934,6 +1014,7 @@ function revertToFloor1() {
   floor1Maze = null;
   floor1Pos = null;
   dungeonMessage = '1층으로 돌아왔다.';
+  logEvent(dungeonMessage);
   portalMessage = null;
   packTotal = 1;
   packRemaining = 0;
@@ -1046,6 +1127,7 @@ function arriveAt(id: CellId, battleChance: number, safeMessage: string, options
       profile = addHerbToInventory(profile, randomCommonHerbId());
       persistProfile();
       dungeonMessage = `${safeMessage} 바닥에 떨어진 낯선 약초를 발견해 주웠다. (${HERB_UNIDENTIFIED_NAME})`;
+      logEvent(dungeonMessage);
     } else {
       dungeonMessage = safeMessage;
     }
@@ -1075,6 +1157,7 @@ function handlePortalArrival(cell: DungeonCell) {
     profile = result.profile;
     persistProfile();
     portalMessage = `경험치 +${PORTAL_EXP_BONUS} 획득!${result.leveledUp ? ' 레벨 업!' : ''}`;
+    logEvent(`포탈비석을 발견했다! ${portalMessage}`);
   } else {
     portalMessage = null;
   }
@@ -1113,6 +1196,7 @@ function startZoneBattle(zone: Zone, options?: { forcedMonsterId?: string; ambus
   state = initGame(totalStats, currentMonster, bonusCards, startingHp, [], ambush, false, companion);
   dungeonHp = state.player.hp;
   processedDamagedPartsCount = 0;
+  processedBattleLogCount = 0;
   winProbability = estimateWinProbability(totalStats, bonusCards, currentMonster, startingHp, [], ambush, false, companion);
   // battleMode is deliberately left as-is here — it's a sticky preference
   // (see its declaration comment), and goTo('battle') below restarts the
@@ -1142,6 +1226,7 @@ function startNpcEncounter() {
   state = initGame(totalStats, currentNpc, bonusCards, startingHp, [], false, true, companion);
   dungeonHp = state.player.hp;
   processedDamagedPartsCount = 0;
+  processedBattleLogCount = 0;
   winProbability = estimateWinProbability(totalStats, bonusCards, currentNpc, startingHp, [], false, true, companion);
   expResult = null;
   expChecked = false;
@@ -1165,6 +1250,8 @@ function startNpcEncounter() {
 function handleDeath(reason: 'battle' | 'tax') {
   deathReason = reason;
   profile = resetProfile();
+  gameLog = [];
+  processedBattleLogCount = 0;
   selectedRace = null;
   currentMonster = null;
   currentNpc = null;
@@ -1459,6 +1546,7 @@ function resumeCharacter() {
     currentNpc = session.currentNpcId ? getNpcById(session.currentNpcId) : null;
     state = session.state;
     processedDamagedPartsCount = state?.player.damagedParts.length ?? 0;
+    processedBattleLogCount = state?.log.length ?? 0;
     dungeonHp = session.dungeonHp;
     winProbability = session.winProbability;
     // battleMode is intentionally not restored from the session — resuming
@@ -1582,6 +1670,8 @@ async function handleLogout() {
   authRequestId += 1;
   await signOut();
   authUser = null;
+  gameLog = [];
+  processedBattleLogCount = 0;
   goTo('auth');
 }
 
@@ -1610,6 +1700,7 @@ function advanceProfileVillageTime(newElapsed: number): boolean {
   profile = taxOutcome.profile;
   if (taxOutcome.taxedYear !== null) {
     lastTaxMessage = `${taxOutcome.taxedYear + 2}년차 세금 ${ANNUAL_TAX_AMOUNT.toLocaleString()}스톤이 징수되었습니다. (잔액: ${profile.gold.toLocaleString()}스톤)`;
+    logEvent(lastTaxMessage);
   }
 
   const crossedCycle = crossedJudgmentCycle(profile.villageElapsedSeconds, newElapsed, profile.lastAnsweredCycle);

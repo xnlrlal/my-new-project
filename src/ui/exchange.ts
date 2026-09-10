@@ -4,6 +4,7 @@ import { stoneValueForGrade, type MonsterGrade } from '../engine/monsters';
 export interface ExchangeHandlers {
   onBack: () => void;
   onExchangeGrade: (grade: MonsterGrade) => void;
+  onOpenLog: () => void;
 }
 
 export function renderExchange(root: HTMLElement, profile: PlayerProfile, handlers: ExchangeHandlers) {
@@ -43,6 +44,9 @@ export function renderExchange(root: HTMLElement, profile: PlayerProfile, handle
         ${rowsHtml}
       </div>
       <p class="inventory-note">등급이 높을수록(숫자가 작을수록) 마석 1개당 더 많은 스톤으로 환전됩니다. 같은 등급의 마석은 가치가 모두 동일합니다.</p>
+      <div class="nav-row">
+        <button class="menu-return small" id="log-btn">로그</button>
+      </div>
       <button class="menu-return" id="back-btn">뒤로</button>
     </div>
   `;
@@ -50,5 +54,6 @@ export function renderExchange(root: HTMLElement, profile: PlayerProfile, handle
   root.querySelectorAll<HTMLButtonElement>('[data-exchange-grade]').forEach((btn) => {
     btn.addEventListener('click', () => handlers.onExchangeGrade(Number(btn.dataset.exchangeGrade) as MonsterGrade));
   });
+  document.getElementById('log-btn')?.addEventListener('click', handlers.onOpenLog);
   document.getElementById('back-btn')?.addEventListener('click', handlers.onBack);
 }

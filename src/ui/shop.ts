@@ -10,6 +10,7 @@ export interface ShopHandlers {
   onBuyBandage: () => void;
   onBuyPotion: () => void;
   onIdentifyHerb: (herbId: HerbId) => void;
+  onOpenLog: () => void;
 }
 
 // 상점 판매 품목: 회중시계(designnotes.md 6-3번, 최초 품목) + 붕대·포션
@@ -110,6 +111,9 @@ export function renderShop(root: HTMLElement, profile: PlayerProfile, handlers: 
         ${potionRow}
       </div>
       ${herbIdentifySection}
+      <div class="nav-row">
+        <button class="menu-return small" id="log-btn">로그</button>
+      </div>
       <button class="menu-return" id="back-btn">뒤로</button>
     </div>
   `;
@@ -120,5 +124,6 @@ export function renderShop(root: HTMLElement, profile: PlayerProfile, handlers: 
   root.querySelectorAll<HTMLButtonElement>('[data-identify-herb]').forEach((btn) => {
     btn.addEventListener('click', () => handlers.onIdentifyHerb(btn.dataset.identifyHerb as HerbId));
   });
+  document.getElementById('log-btn')?.addEventListener('click', handlers.onOpenLog);
   document.getElementById('back-btn')?.addEventListener('click', handlers.onBack);
 }

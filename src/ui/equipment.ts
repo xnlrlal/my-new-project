@@ -6,6 +6,7 @@ export interface EquipmentHandlers {
   onBack: () => void;
   onEquip: (instanceId: string) => void;
   onUnequip: (slot: EquipmentSlot) => void;
+  onOpenLog: () => void;
 }
 
 export function renderEquipment(
@@ -70,6 +71,9 @@ export function renderEquipment(
         <div class="stat-line" style="font-weight:600">보유 장비</div>
         ${inventoryGearHtml}
       </div>
+      <div class="nav-row">
+        <button class="menu-return small" id="log-btn">로그</button>
+      </div>
       <button class="menu-return" id="back-btn">뒤로</button>
     </div>
   `;
@@ -80,5 +84,6 @@ export function renderEquipment(
   root.querySelectorAll<HTMLButtonElement>('[data-unequip-slot]').forEach((btn) => {
     btn.addEventListener('click', () => handlers.onUnequip(btn.dataset.unequipSlot as EquipmentSlot));
   });
+  document.getElementById('log-btn')?.addEventListener('click', handlers.onOpenLog);
   document.getElementById('back-btn')?.addEventListener('click', handlers.onBack);
 }

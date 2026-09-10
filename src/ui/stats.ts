@@ -11,6 +11,7 @@ export interface StatsHandlers {
   onOpenInventory: () => void;
   onOpenEquipment: () => void;
   onOpenEssence: () => void;
+  onOpenLog: () => void;
 }
 
 export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerProfile, secondsUntilJudgment: number, handlers: StatsHandlers) {
@@ -78,6 +79,7 @@ export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerPro
         <button class="menu-return small" id="inventory-btn">인벤토리</button>
         <button class="menu-return small" id="equipment-btn">장비창</button>
         <button class="menu-return small" id="essence-btn">정수 창</button>
+        <button class="menu-return small" id="log-btn">로그</button>
       </div>
       <button class="menu-return" id="back-btn">마을로 돌아가기</button>
     </div>
@@ -87,4 +89,5 @@ export function renderStats(root: HTMLElement, race: RaceDef, profile: PlayerPro
   document.getElementById('inventory-btn')?.addEventListener('click', handlers.onOpenInventory);
   document.getElementById('equipment-btn')?.addEventListener('click', handlers.onOpenEquipment);
   document.getElementById('essence-btn')?.addEventListener('click', handlers.onOpenEssence);
+  document.getElementById('log-btn')?.addEventListener('click', handlers.onOpenLog);
 }

@@ -21,6 +21,7 @@ export interface VillageHandlers {
   onAcceptJudgment: () => void;
   onDeclineJudgment: () => void;
   onQuitToMenu: () => void;
+  onOpenLog: () => void;
 }
 
 // hasCharacter=true means race selection is already final (raceId saved) —
@@ -84,6 +85,7 @@ export function renderVillage(
       <div class="nav-row">
         <button class="menu-return small" id="inventory-btn" ${judging ? 'disabled' : ''}>인벤토리</button>
         <button class="menu-return small" id="equipment-btn" ${judging ? 'disabled' : ''}>장비창</button>
+        <button class="menu-return small" id="log-btn" ${judging ? 'disabled' : ''}>로그</button>
       </div>
       <div class="nav-row">
         <button class="menu-return small" id="shop-btn" ${judging ? 'disabled' : ''}>상점</button>
@@ -100,6 +102,7 @@ export function renderVillage(
   document.getElementById('back-btn')?.addEventListener('click', handlers.onBack);
   document.getElementById('inventory-btn')?.addEventListener('click', handlers.onOpenInventory);
   document.getElementById('equipment-btn')?.addEventListener('click', handlers.onOpenEquipment);
+  document.getElementById('log-btn')?.addEventListener('click', handlers.onOpenLog);
   document.getElementById('shop-btn')?.addEventListener('click', handlers.onOpenShop);
   document.getElementById('library-btn')?.addEventListener('click', handlers.onOpenLibrary);
   document.getElementById('exchange-btn')?.addEventListener('click', handlers.onOpenExchange);

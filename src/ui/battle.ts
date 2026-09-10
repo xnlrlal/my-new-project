@@ -28,6 +28,7 @@ export interface BattleHandlers {
   onSpareNpc: () => void;
   onFinishNpc: () => void;
   onRecruitCompanion: () => void;
+  onOpenLog: () => void;
 }
 
 export interface EssenceDropState {
@@ -199,6 +200,7 @@ export function renderBattle(
       <button class="nav-link" id="open-inventory">인벤토리</button>
       <button class="nav-link" id="open-equipment">장비창</button>
       <button class="nav-link" id="open-codex">정수창</button>
+      <button class="nav-link" id="open-game-log">게임 로그</button>
     </div>
     <div class="dungeon-floor">${floorLabel}</div>
     ${clockHtml}
@@ -257,6 +259,7 @@ export function renderBattle(
   document.getElementById('open-inventory')?.addEventListener('click', handlers.onOpenInventory);
   document.getElementById('open-equipment')?.addEventListener('click', handlers.onOpenEquipment);
   document.getElementById('open-codex')?.addEventListener('click', handlers.onOpenEssence);
+  document.getElementById('open-game-log')?.addEventListener('click', handlers.onOpenLog);
   document.getElementById('spare-npc')?.addEventListener('click', handlers.onSpareNpc);
   document.getElementById('finish-npc')?.addEventListener('click', handlers.onFinishNpc);
   document.getElementById('recruit-companion')?.addEventListener('click', handlers.onRecruitCompanion);
