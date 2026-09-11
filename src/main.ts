@@ -735,7 +735,7 @@ function render() {
           state = {
             ...state,
             player: { ...state.player, statusEffects: removeStatusEffect(state.player.statusEffects, 'bleed') },
-            log: [...state.log, { turn: state.turn, actor: 'player', message: '붕대를 사용해 출혈을 멎게 했다.' }],
+            log: [...state.log, { turn: state.turn, actor: 'player', message: '붕대를 사용해 출혈을 멎게 했다.', omitFromGameLog: true }],
           };
           persistProfile();
           render();

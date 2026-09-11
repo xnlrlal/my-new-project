@@ -200,7 +200,7 @@ export function initGame(
     enemyGrade: enemy.grade,
     enemyRanged: enemy.ranged,
     enemyIsHuman: isHuman,
-    log: [{ turn: 1, actor: 'player', message: `${enemy.name}(을)를 만났다! 전투 시작!` }],
+    log: [{ turn: 1, actor: 'player', message: `${enemy.name}(을)를 만났다! 전투 시작!`, omitFromGameLog: true }],
     status: 'playing',
   };
 }
@@ -493,7 +493,7 @@ function checkCompanionFallen(state: GameState): GameState {
   return {
     ...state,
     companion: null,
-    log: appendLog(state, { actor: 'companion', message: `${state.companion.name}이(가) 쓰러져 전투에서 이탈했다!` }),
+    log: appendLog(state, { actor: 'companion', message: `${state.companion.name}이(가) 쓰러져 전투에서 이탈했다!`, omitFromGameLog: true }),
   };
 }
 
@@ -544,11 +544,13 @@ export function endTurn(state: GameState): GameState {
     player: playerTick.actor,
     companion: companionTick ? companionTick.actor : state.companion,
     enemy: enemyTick.actor,
+    // 상태이상 틱(독/출혈 피해, 기절 스킵)도 카드 판정과 같은 이유로
+    // omitFromGameLog — 전투 인라인 로그에는 계속 보임.
     log: [
       ...state.log,
-      ...playerTick.messages.map((message) => ({ turn: state.turn, actor: 'player' as const, message })),
-      ...(companionTick?.messages.map((message) => ({ turn: state.turn, actor: 'companion' as const, message })) ?? []),
-      ...enemyTick.messages.map((message) => ({ turn: state.turn, actor: 'enemy' as const, message })),
+      ...playerTick.messages.map((message) => ({ turn: state.turn, actor: 'player' as const, message, omitFromGameLog: true })),
+      ...(companionTick?.messages.map((message) => ({ turn: state.turn, actor: 'companion' as const, message, omitFromGameLog: true })) ?? []),
+      ...enemyTick.messages.map((message) => ({ turn: state.turn, actor: 'enemy' as const, message, omitFromGameLog: true })),
     ],
   };
   next = trackLowestPlayerHp(checkCompanionFallen(checkGameOver(next)));
