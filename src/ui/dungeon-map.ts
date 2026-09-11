@@ -18,6 +18,7 @@ export interface DungeonMapHandlers {
   // 상태인데 또 토글"되는 모호함을 없애기 위함.
   onShowLocalView: () => void;
   onShowFullMap: () => void;
+  onOpenLog: () => void;
 }
 
 export function renderDungeonMap(
@@ -104,6 +105,7 @@ export function renderDungeonMap(
       <button class="nav-link" id="open-inventory">인벤토리</button>
       <button class="nav-link" id="open-equipment">장비창</button>
       <button class="nav-link" id="open-codex">정수창</button>
+      <button class="nav-link" id="open-log">로그</button>
     </div>
     <div class="dungeon-floor">${floorLabel}</div>
     ${clockHtml}
@@ -136,6 +138,7 @@ export function renderDungeonMap(
   document.getElementById('open-inventory')?.addEventListener('click', handlers.onOpenInventory);
   document.getElementById('open-equipment')?.addEventListener('click', handlers.onOpenEquipment);
   document.getElementById('open-codex')?.addEventListener('click', handlers.onOpenEssence);
+  document.getElementById('open-log')?.addEventListener('click', handlers.onOpenLog);
   document.getElementById('use-potion')?.addEventListener('click', handlers.onUsePotion);
   document.getElementById('show-local-view')?.addEventListener('click', handlers.onShowLocalView);
   document.getElementById('show-full-map')?.addEventListener('click', handlers.onShowFullMap);

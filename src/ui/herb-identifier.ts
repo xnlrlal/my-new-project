@@ -5,6 +5,7 @@ import { HERB_UNIDENTIFIED_NAME, type HerbId, type HerbIdentifierFlavor } from '
 export interface HerbIdentifierHandlers {
   onIdentify: (herbId: HerbId) => void;
   onLeave: () => void;
+  onOpenLog: () => void;
 }
 
 // 미궁 감정사 조우(designnotes.md 2-1번) — 전투 화면과 무관한 평화로운
@@ -37,6 +38,9 @@ export function renderHerbIdentifier(root: HTMLElement, profile: PlayerProfile, 
       <div class="stats-card">
         ${herbRows}
       </div>
+      <div class="nav-row">
+        <button class="menu-return small" id="log-btn">로그</button>
+      </div>
       <button class="menu-return" id="leave-btn">그냥 지나간다</button>
     </div>
   `;
@@ -44,5 +48,6 @@ export function renderHerbIdentifier(root: HTMLElement, profile: PlayerProfile, 
   root.querySelectorAll<HTMLButtonElement>('[data-identify-herb]').forEach((btn) => {
     btn.addEventListener('click', () => handlers.onIdentify(btn.dataset.identifyHerb as HerbId));
   });
+  document.getElementById('log-btn')?.addEventListener('click', handlers.onOpenLog);
   document.getElementById('leave-btn')?.addEventListener('click', handlers.onLeave);
 }

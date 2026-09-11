@@ -5,6 +5,7 @@ import { statBonusText } from '../engine/stat-bonus';
 export interface TempleHandlers {
   onBack: () => void;
   onReleaseEssence: (essenceId: string) => void;
+  onOpenLog: () => void;
 }
 
 // 신전 — 정수 해제(README 로드맵 1번)를 전담하는 마을 시설. 상점의 소모품
@@ -57,6 +58,9 @@ export function renderTemple(root: HTMLElement, profile: PlayerProfile, handlers
         ${statusHtml}
         <div class="essence-slots">${essenceRows}</div>
       </div>
+      <div class="nav-row">
+        <button class="menu-return small" id="log-btn">로그</button>
+      </div>
       <button class="menu-return" id="back-btn">뒤로</button>
     </div>
   `;
@@ -64,5 +68,6 @@ export function renderTemple(root: HTMLElement, profile: PlayerProfile, handlers
   root.querySelectorAll<HTMLButtonElement>('[data-release-essence]').forEach((btn) => {
     btn.addEventListener('click', () => handlers.onReleaseEssence(btn.dataset.releaseEssence!));
   });
+  document.getElementById('log-btn')?.addEventListener('click', handlers.onOpenLog);
   document.getElementById('back-btn')?.addEventListener('click', handlers.onBack);
 }

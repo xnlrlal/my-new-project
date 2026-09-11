@@ -7,6 +7,7 @@ import { HERBS, HERB_UNIDENTIFIED_NAME } from '../engine/herbs';
 
 export interface InventoryHandlers {
   onBack: () => void;
+  onOpenLog: () => void;
 }
 
 export function renderInventory(
@@ -96,9 +97,13 @@ export function renderInventory(
         ${gearHtml}
       </div>
       <p class="inventory-note">마석은 몬스터 처치 시 드물게 드랍되어 자동으로 인벤토리에 담깁니다. 장비는 몬스터에게서 얻을 수 없으며, 성인식 지급과 상점 구매로만 얻을 수 있습니다. 스톤은 드랍되지 않으며, 표시만 됩니다.</p>
+      <div class="nav-row">
+        <button class="menu-return small" id="log-btn">로그</button>
+      </div>
       <button class="menu-return" id="back-btn">뒤로</button>
     </div>
   `;
 
+  document.getElementById('log-btn')?.addEventListener('click', handlers.onOpenLog);
   document.getElementById('back-btn')?.addEventListener('click', handlers.onBack);
 }
