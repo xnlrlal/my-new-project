@@ -276,6 +276,9 @@ function syncBattleLogToGameLog() {
   const newEntries = state.log.slice(processedBattleLogCount);
   processedBattleLogCount = state.log.length;
   for (const entry of newEntries) {
+    // 카드 판정/턴 시작 배너/자연재생 회복(engine.ts가 omitFromGameLog로
+    // 표시)은 전투 인라인 로그에만 남기고 게임 로그로는 넘기지 않는다.
+    if (entry.omitFromGameLog) continue;
     logEvent(`[${entry.turn}턴] ${entry.message}`);
   }
 }
@@ -1349,6 +1352,7 @@ function checkForDrop() {
 
   if (rollManaStoneDrop()) {
     profile = addManaStone(profile, currentMonster.grade);
+    logEvent(`${currentMonster.grade}등급 마석을 얻었다.`);
     persistProfile();
   }
 
