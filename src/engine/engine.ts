@@ -200,7 +200,7 @@ export function initGame(
     enemyGrade: enemy.grade,
     enemyRanged: enemy.ranged,
     enemyIsHuman: isHuman,
-    log: [{ turn: 1, actor: 'player', message: `${enemy.name}(을)를 만났다! 전투 시작!` }],
+    log: [{ turn: 1, actor: 'player', message: `${enemy.name}(을)를 만났다! 전투 시작!`, omitFromGameLog: true }],
     status: 'playing',
   };
 }
@@ -446,7 +446,10 @@ function applyCard(state: GameState, source: ActorId, card: Card, explicitTarget
 
   let next: GameState = {
     ...state,
-    log: appendLog(state, { actor: source, message }),
+    // 카드 판정 결과(명중/회피/치명타/피해량/방어경감/상태이상 부여/부위손상/
+    // 회복/방어막)는 omitFromGameLog로 표시 — 전투 화면 인라인 로그에는 계속
+    // 보이지만 게임 전체 로그(LogEntry.omitFromGameLog 문서 참고)로는 안 감.
+    log: appendLog(state, { actor: source, message, omitFromGameLog: true }),
   };
   next = withActor(next, source, updatedSource);
   if (source !== targetId) next = withActor(next, targetId, updatedTarget);
@@ -490,7 +493,7 @@ function checkCompanionFallen(state: GameState): GameState {
   return {
     ...state,
     companion: null,
-    log: appendLog(state, { actor: 'companion', message: `${state.companion.name}이(가) 쓰러져 전투에서 이탈했다!` }),
+    log: appendLog(state, { actor: 'companion', message: `${state.companion.name}이(가) 쓰러져 전투에서 이탈했다!`, omitFromGameLog: true }),
   };
 }
 
@@ -541,11 +544,13 @@ export function endTurn(state: GameState): GameState {
     player: playerTick.actor,
     companion: companionTick ? companionTick.actor : state.companion,
     enemy: enemyTick.actor,
+    // 상태이상 틱(독/출혈 피해, 기절 스킵)도 카드 판정과 같은 이유로
+    // omitFromGameLog — 전투 인라인 로그에는 계속 보임.
     log: [
       ...state.log,
-      ...playerTick.messages.map((message) => ({ turn: state.turn, actor: 'player' as const, message })),
-      ...(companionTick?.messages.map((message) => ({ turn: state.turn, actor: 'companion' as const, message })) ?? []),
-      ...enemyTick.messages.map((message) => ({ turn: state.turn, actor: 'enemy' as const, message })),
+      ...playerTick.messages.map((message) => ({ turn: state.turn, actor: 'player' as const, message, omitFromGameLog: true })),
+      ...(companionTick?.messages.map((message) => ({ turn: state.turn, actor: 'companion' as const, message, omitFromGameLog: true })) ?? []),
+      ...enemyTick.messages.map((message) => ({ turn: state.turn, actor: 'enemy' as const, message, omitFromGameLog: true })),
     ],
   };
   next = trackLowestPlayerHp(checkCompanionFallen(checkGameOver(next)));
@@ -589,14 +594,32 @@ export function endTurn(state: GameState): GameState {
     player: playerRegen.actor,
     companion: companionRegen ? companionRegen.actor : next.companion,
     enemy: enemyRegen.actor,
+    // 자연재생 회복 문구도 카드 판정과 같은 이유(라운드마다 반복되는 잡음)로
+    // omitFromGameLog — 전투 인라인 로그에는 계속 보임.
     log: [
       ...next.log,
-      ...(playerRegen.healed > 0 ? [{ turn: next.turn, actor: 'player' as const, message: `자연재생력으로 체력을 ${playerRegen.healed} 회복했다.` }] : []),
+      ...(playerRegen.healed > 0
+        ? [{ turn: next.turn, actor: 'player' as const, message: `자연재생력으로 체력을 ${playerRegen.healed} 회복했다.`, omitFromGameLog: true }]
+        : []),
       ...(companionRegen && companionRegen.healed > 0
-        ? [{ turn: next.turn, actor: 'companion' as const, message: `${next.companion!.name}이(가) 자연재생력으로 체력을 ${companionRegen.healed} 회복했다.` }]
+        ? [
+            {
+              turn: next.turn,
+              actor: 'companion' as const,
+              message: `${next.companion!.name}이(가) 자연재생력으로 체력을 ${companionRegen.healed} 회복했다.`,
+              omitFromGameLog: true,
+            },
+          ]
         : []),
       ...(enemyRegen.healed > 0
-        ? [{ turn: next.turn, actor: 'enemy' as const, message: `${next.enemy.name}이(가) 자연재생력으로 체력을 ${enemyRegen.healed} 회복했다.` }]
+        ? [
+            {
+              turn: next.turn,
+              actor: 'enemy' as const,
+              message: `${next.enemy.name}이(가) 자연재생력으로 체력을 ${enemyRegen.healed} 회복했다.`,
+              omitFromGameLog: true,
+            },
+          ]
         : []),
     ],
   };
@@ -625,6 +648,7 @@ export function endTurn(state: GameState): GameState {
     player: refreshedPlayer,
     companion: refreshedCompanion,
     enemy: refreshedEnemy,
-    log: [...next.log, { turn: nextTurn, actor: 'player', message: `--- ${nextTurn}턴 시작 ---` }],
+    // 턴 시작 배너도 카드 판정과 같은 이유로 omitFromGameLog.
+    log: [...next.log, { turn: nextTurn, actor: 'player', message: `--- ${nextTurn}턴 시작 ---`, omitFromGameLog: true }],
   };
 }

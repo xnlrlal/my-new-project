@@ -88,6 +88,14 @@ export interface LogEntry {
   turn: number;
   actor: ActorId;
   message: string;
+  // true면 전투 화면의 인라인 로그(battle.ts)에는 그대로 보이지만, main.ts의
+  // 게임 전체 로그(게임 로그 화면)로는 동기화되지 않는다 — 카드 판정(명중/
+  // 회피/치명타/피해량/방어경감/상태이상 부여/부위손상/회복/방어막)과 턴
+  // 진행 잡음(라운드 시작 배너, 자연재생 회복)처럼 전투 한 판 안에서는
+  // 의미 있지만 세션 전체를 훑어볼 땐 소음에 가까운 항목에만 표시한다.
+  // 기본값(undefined)은 포함 — 상태이상 틱 피해, 동료 이탈, 붕대 사용,
+  // 업적/숙련도 등은 이 플래그 없이 그대로 게임 로그에도 남는다.
+  omitFromGameLog?: boolean;
 }
 
 // 'incapacitated'(전투 불능, designnotes.md 3-6번) — 인간형 NPC 전용 결과.
