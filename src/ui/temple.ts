@@ -8,10 +8,11 @@ export interface TempleHandlers {
   onOpenLog: () => void;
 }
 
-// 신전 — 정수 해제(README 로드맵 1번)를 전담하는 마을 시설. 상점의 소모품
-// 판매가 아니라 신전에서 스톤을 직접 지불하는 방식으로 확정됨(사용자
-// 지시) — 캐릭터당 평생 3회까지만 가능하고, 회차마다(500만/1000만/2000만
-// 스톤) 값이 크게 오른다(profile.ts의 essenceReleasePrice/releaseEssence).
+// 신전 — 정수 해제(README "정수(essence)" 항목 참고)를 전담하는 마을 시설.
+// 상점의 소모품 판매가 아니라 신전에서 스톤을 직접 지불하는 방식으로
+// 확정됨(사용자 지시) — 캐릭터당 평생 3회까지만 가능하고, 회차마다(500만
+// /1000만/2000만 스톤) 값이 크게 오른다(profile.ts의
+// essenceReleasePrice/releaseEssence).
 export function renderTemple(root: HTMLElement, profile: PlayerProfile, handlers: TempleHandlers) {
   const price = essenceReleasePrice(profile);
   const usesLeft = ESSENCE_RELEASE_MAX_USES - profile.essenceReleaseCount;

@@ -251,11 +251,11 @@ const MAX_CRIT_MULTIPLIER = 2;
 // 항상 같은 비율로 작동해 이 문제가 없다.
 const STRENGTH_ATTACK_COEF = 0.1; // 근력 1당 카드 피해 +10%
 
-// 이능 활성화(README 로드맵 1번) — 정수 스킬 카드(essence.ts, Card.isEssenceSkill)
-// 에만 적용되는 위력 배율. designnotes.md 5-1번이 예시로 든 "정수 스킬값×
-// (1+이능×0.05)" 공식을 그대로 1차 채택했다 — 마스터 설정에 정확한 수치가
-// 없어 요청하면 언제든 바꿀 수 있는 1차 추정치. 기본 카드 풀(cards.ts)은
-// isEssenceSkill이 없어 이 배율의 영향을 받지 않는다.
+// 이능 활성화(README "스탯 체계" 항목 참고) — 정수 스킬 카드(essence.ts,
+// Card.isEssenceSkill)에만 적용되는 위력 배율. "정수 스킬값×(1+이능×0.05)"
+// 공식을 그대로 1차 채택했다 — 마스터 설정에 정확한 수치가 없어 요청하면
+// 언제든 바꿀 수 있는 1차 추정치. 기본 카드 풀(cards.ts)은 isEssenceSkill이
+// 없어 이 배율의 영향을 받지 않는다.
 const ARCANE_ESSENCE_COEF = 0.05; // 이능 1당 정수 스킬 카드 위력 +5%
 
 // damage/heal/shield 세 효과 모두 card.value를 그대로 쓰던 걸, 정수 스킬

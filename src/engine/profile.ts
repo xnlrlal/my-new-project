@@ -226,11 +226,11 @@ export function recordEssenceDiscovery(profile: PlayerProfile, monsterId: string
   return { ...profile, discoveredEssenceIds: [...profile.discoveredEssenceIds, monsterId] };
 }
 
-// 정수 해제(README 로드맵 1번 "정수 해제(특수 장치) 시스템") — 신전
-// 시설(ui/temple.ts)에서 스톤을 내고 처리한다(사용자 지시로 확정, 소모품
-// 판매 방식이었던 이전 시도를 대체함). 캐릭터당 평생 딱 3번까지만
-// 가능하고, 회차가 늘수록 값이 훨씬 비싸진다 — 정수가 "영구 장착"이라는
-// 원칙을 되돌리는 특수한 방법인 만큼 남용을 막기 위한 설계.
+// 정수 해제(README "정수(essence)" 항목 참고) — 신전 시설(ui/temple.ts)에서
+// 스톤을 내고 처리한다(사용자 지시로 확정, 소모품 판매 방식이었던 이전
+// 시도를 대체함). 캐릭터당 평생 딱 3번까지만 가능하고, 회차가 늘수록 값이
+// 훨씬 비싸진다 — 정수가 "영구 장착"이라는 원칙을 되돌리는 특수한 방법인
+// 만큼 남용을 막기 위한 설계.
 export const ESSENCE_RELEASE_MAX_USES = 3;
 const ESSENCE_RELEASE_PRICES = [5_000_000, 10_000_000, 20_000_000];
 

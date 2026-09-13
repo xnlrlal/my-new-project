@@ -1122,10 +1122,11 @@ function arriveAt(id: CellId, battleChance: number, safeMessage: string, options
     startZoneBattle(cell.zone, { forcedMonsterId, ambush });
   } else {
     applyOutOfCombatRegen();
-    // 미확인 약초 발견(designnotes.md 2-1번) — 몬스터 드랍(마석/정수 전용
-    // 파이프라인, 3-7번 원칙)과 의도적으로 분리해, 전투 없이 안전하게
-    // 넘어간 이동에서만 확률적으로 발견된다("약초는 몬스터가 아니라
-    // 바닥에서 채집한다"는 자연스러운 구분).
+    // 미확인 약초 발견(README "아이템 식별 시스템" 항목 참고) — 몬스터
+    // 드랍(마석/정수 전용 파이프라인, README "몬스터를 처치해도 장비는 얻을
+    // 수 없음" 항목 참고)과 의도적으로 분리해, 전투 없이 안전하게 넘어간
+    // 이동에서만 확률적으로 발견된다("약초는 몬스터가 아니라 바닥에서
+    // 채집한다"는 자연스러운 구분).
     if (rollHerbForage()) {
       profile = addHerbToInventory(profile, randomCommonHerbId());
       persistProfile();
