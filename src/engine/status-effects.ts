@@ -73,7 +73,7 @@ export function tickStatusEffects(actor: Actor, actorLabel: string): StatusTickR
       const dmg = Math.max(0, Math.round(raw * (1 - reduction / 100)));
       if (dmg > 0) {
         hp = Math.max(0, hp - dmg);
-        messages.push(`${actorLabel}이(가) 독 피해로 ${dmg}의 피해를 입었다!`);
+        messages.push(`${actorLabel}이(가) 독으로 ${dmg}의 피해를 입었다!`);
       }
     } else if (effect.type === 'bleed') {
       const dmg = BLEED_DAMAGE_PER_STACK * effect.stacks;
